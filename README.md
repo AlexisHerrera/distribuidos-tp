@@ -1,6 +1,6 @@
 # TP
 
-## Cliente
+## Client
 
 ```bash
 python client/main.py .data/movies_metadata.csv .data/ratings.csv .data/credits.csv 

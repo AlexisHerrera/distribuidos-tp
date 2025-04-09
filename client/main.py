@@ -2,8 +2,6 @@ import sys
 import argparse
 import io
 
-CHUNK_SIZE = 100
-
 
 def count_lines_in_file(file_object: io.TextIOWrapper, file_description: str, file_path_for_msg: str) -> bool:
     print(f"\n--- Counting lines in: {file_description} ({file_path_for_msg}) ---")
