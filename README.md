@@ -1,7 +1,11 @@
-# TP
+# Client
 
-## Client
+## Requirements
+```bash
+ pip install -r requirements.txt
+```
 
+## Usage
 ```bash
 python client/main.py .data/movies_metadata.csv .data/ratings.csv .data/credits.csv 
 ```

@@ -51,7 +51,7 @@ def parse_arguments():
 def main():
     try:
         args = parse_arguments()
-        print(f"Successfully opened files:")
+        print("Successfully opened files:")
         print(f"  Movies:  {args.movies_path_name}")
         print(f"  Ratings: {args.ratings_path_name}")
         print(f"  Cast:    {args.cast_path_name}")
