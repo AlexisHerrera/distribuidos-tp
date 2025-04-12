@@ -13,12 +13,12 @@ class RabbitMQBroker():
         self.__channel.start_consuming()
 
     def put(self, body: bytes):
-        try:
-            self.__channel.basic_publish(exchange='', routing_key=self.__send_queue, body=body)
-        except pika.UnroutableError:
-            pass
-        except pika.NackError:
-            pass
+        # try:
+        self.__channel.basic_publish(exchange='', routing_key=self.__send_queue, body=body)
+        # except pika.UnroutableError:
+            # pass
+        # except pika.NackError:
+            # pass
 
     def __callback(self, ch, _method, _properties, body):
         pass

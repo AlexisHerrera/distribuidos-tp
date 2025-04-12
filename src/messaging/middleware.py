@@ -9,7 +9,7 @@ class Middleware(MiddlewareInterface):
         pass
 
 
-    def recv(self):
+    def recv(self, callback):
         pass
 
 
