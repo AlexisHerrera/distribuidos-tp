@@ -1,28 +1,57 @@
+from abc import ABC, abstractmethod
 import pika
 
-class RabbitMQBroker():
-    def __init__(self, host, send_queue, recv_queue):
-        self.__connection = pika.BlockingConnection(pika.ConnectionParameters(host=host))
-        self.__channel = self.__connection.channel()
-        self.__send_queue = send_queue
+class Broker(ABC):
+    @abstractmethod
+    def exchange_declare(self, exchange_name, exchange_type):
+        pass
 
-        self.__channel.queue_declare(queue=send_queue)
+    @abstractmethod
+    def queue_declare(self, queue_name) -> str:
+        pass
 
-        self.__channel.basic_consume(queue=recv_queue, on_message_callback=self.__callback, auto_ack=True)
+    @abstractmethod
+    def queue_bind(self, exchange_name, queue_name):
+        pass
 
-        self.__channel.start_consuming()
+    @abstractmethod
+    def put(self, exchange, routing_key, body):
+        pass
 
-    def put(self, body: bytes):
-        # try:
-        self.__channel.basic_publish(exchange='', routing_key=self.__send_queue, body=body)
-        # except pika.UnroutableError:
-            # pass
-        # except pika.NackError:
-            # pass
+    @abstractmethod
+    def consume(self, callback, queue_name):
+        pass
 
-    def __callback(self, ch, _method, _properties, body):
+    @abstractmethod
+    def close(self):
         pass
 
 
-    def stop(self):
+class RabbitMQBroker(Broker):
+    def __init__(self, host: str):
+        self.__connection = pika.BlockingConnection(pika.ConnectionParameters(host=host))
+        self.__channel = self.__connection.channel()
+
+    def exchange_declare(self, exchange_name, exchange_type):
+        self.__channel.exchange_declare(exchange=exchange_name, exchange_type=exchange_type)
+
+    def queue_declare(self, queue_name: str = '') -> str:
+        result = self.__channel.queue_declare(queue=queue_name, exclusive=True)
+        return result.method.queue
+
+    def queue_bind(self, exchange_name, queue_name):
+        self.__channel.queue_bind(exchange=exchange_name, queue=queue_name)
+
+    def put(self, exchange: str = '', routing_key: str = '', body: bytes = b''):
+        self.__channel.basic_publish(exchange=exchange, routing_key=routing_key, body=body)
+
+    def consume(self, callback, queue_name):
+        self.__channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
+        self.__channel.start_consuming()
+
+    def close(self):
+        self.__channel.close()
         self.__connection.close()
+
+
+
