@@ -10,7 +10,7 @@ class MiddlewareInterface(ABC):
         pass
 
     @abstractmethod
-    def recv(self, message):
+    def recv(self, callback):
         pass
 
     @abstractmethod
