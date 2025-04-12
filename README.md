@@ -30,22 +30,16 @@ Successfully opened files:
 Successfully completed processing all files.
 ```
 
-## Protocol
+# Protocol
 
-### Message Structure
+## Message Structure
 
-```
-MsgId: 1 byte
-  MsgLen: 2 bytes # Should be enough for a batch
-  AttributeId: 1 byte
-    Data: variable lenght
-  AttributeId
-    Data
-  Separator: ; 1 byte
-  AttributeId
-    Data
-  ...
-```
+| MsgId  | MsgLen      | AttributeId | Data            | AttributeId | Data | ... |
+| ------ | ----------- | ----------- | --------------- | ----------- | ---- | --- |
+| 1 Byte | 2 Bytes | 1 Byte      | Variable length | ...         | ...  | ... |
+
+> [!Note]
+> The 2 Bytes for message len should be enough for a batch of size < 8kb
 
 Depending on the AttributeId its type varies. Each type will be decoded in the following way:
 
@@ -68,10 +62,16 @@ Examples:
 | :---: | :----: | :---------: | :--: | :---------: | :--: | :---------: | :--: | :---------: | :--: |
 |   2   |   20   |      1      | 800  |      2      | 4.5  |      1      | 999  |      2      | 3.0  |
 
+### Message types
+
+| MsgId | TypeName |
+| :---: | :------: |
+|   1   |  Movie   |
+
 ```
 1 Movie:
   1 id
-	  uint32
+    uint32
   2 title
     string
   3 genres
