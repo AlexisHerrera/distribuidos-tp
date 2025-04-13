@@ -1,6 +1,8 @@
 import sys
 import argparse
 import io
+import logging
+from common.socket_communication import send_message, connect_to_server
 
 
 def count_lines_in_file(file_object: io.TextIOWrapper, file_description: str, file_path_for_msg: str) -> bool:
@@ -47,6 +49,14 @@ def parse_arguments():
 
     return args
 
+def send_file_batches():
+    client_socket = connect_to_server('cleaner', 12345)
+    if client_socket:
+        message = 'Send Batches from client!'
+        send_message(client_socket, message)
+        logging.info(f'Sent message: {message}')
+        client_socket.close()
+
 
 def main():
     try:
@@ -72,6 +82,8 @@ def main():
             print(f"There was a problem processing the {description} file. "
                   "Check error messages above.")
 
+    send_file_batches()
+    
     if all_successful:
         print("\nSuccessfully completed processing all files.")
         sys.exit(0)
