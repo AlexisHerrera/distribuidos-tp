@@ -14,7 +14,7 @@ class TestConnection():
 
         connection = Connection(broker, publisher, consumer)
 
-        message = "message"
+        message = "message" # TODO: change to Message
 
         connection.send(message)
 
