@@ -19,6 +19,9 @@ services:
     entrypoint: python3 /tests/messaging/consumer.py
     environment:
       - PYTHONPATH=$PYTHONPATH:$PWD
+      - RABBIT_HOST=rabbitmq
+      - CONSUMER_EXCHANGE=test
+      - PUBLISHER_EXCHANGE=another-test
     depends_on:
       - rabbitmq
     networks:
@@ -35,6 +38,9 @@ services:
       - rabbitmq
     environment:
       - PYTHONPATH=$PYTHONPATH:$PWD
+      - RABBIT_HOST=rabbitmq
+      - CONSUMER_EXCHANGE=another-test
+      - PUBLISHER_EXCHANGE=test
     networks:
       - tp-distribuidos-test-messaging
 

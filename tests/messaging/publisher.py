@@ -4,7 +4,7 @@ from src.utils.config import Config
 
 def main():
     config = Config()
-    config.host = 'rabbitmq'
+    config.rabbit_host = 'rabbitmq'
     config.publisher_exchange = 'test'
     config.consumer_exchange = 'another-test'
 

@@ -10,9 +10,6 @@ def callback(body):
 
 def main():
     config = Config()
-    config.host = 'rabbitmq'
-    config.consumer_exchange = 'test'
-    config.publisher_exchange = 'another-test'
 
     conn = ConnectionCreator.create(config)
 

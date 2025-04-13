@@ -8,7 +8,7 @@ from src.utils.config import Config
 class ConnectionCreator():
     @classmethod
     def create(cls, config: Config) -> Connection:
-        broker = RabbitMQBroker(config.host)
+        broker = RabbitMQBroker(config.rabbit_host)
         publisher = BroadcastPublisher(broker, config.publisher_exchange)
         consumer = BroadcastConsumer(broker, config.consumer_exchange)
 
