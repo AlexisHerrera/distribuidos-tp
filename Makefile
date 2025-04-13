@@ -2,6 +2,7 @@ default: docker-compose-up
 
 docker-image:
 	docker build -f ./src/client/Dockerfile -t "client:latest" .
+	docker build -f ./src/server/cleaner/Dockerfile -t "cleaner:latest" .
 .PHONY: docker-image
 
 docker-compose-up: docker-image
