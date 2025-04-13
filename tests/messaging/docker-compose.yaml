@@ -5,8 +5,6 @@ services:
     build:
       context: ../../
       dockerfile: rabbitmq/Dockerfile
-    volumes:
-      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     networks:
       - tp-distribuidos-test-messaging
 

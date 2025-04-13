@@ -12,14 +12,15 @@ class Connection():
 
     def send(self, message):
         # encode message and send
+        # Message.from(message)
         self.__publisher.put(self.__broker, message)
 
     def recv(self, callback: Callable):
         def __callback(ch, method, _properties, body):
             try:
                 # decode message and pass to callback
-                message = body.decode('UTF-8')
-                callback(message)
+                # message = body.decode('UTF-8')
+                callback(body)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             except Exception:
                 ch.basic_nack(delivery_tag=method.delivery_tag)

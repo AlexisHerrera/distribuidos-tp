@@ -4,11 +4,11 @@ from src.utils.config import Config
 
 def main():
     config = Config()
-    config.rabbit_host = 'rabbitmq'
-    config.publisher_exchange = 'test'
-    config.consumer_exchange = 'another-test'
 
     conn = ConnectionCreator.create(config)
+
+    # movies = list[Movie]
+    # conn.send(movies)
 
     conn.send(b'holi')
 

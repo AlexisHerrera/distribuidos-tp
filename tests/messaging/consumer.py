@@ -1,6 +1,6 @@
 import signal
 
-from src.utils.log import logging
+from src.utils.log import initialize_log, logging
 from src.messaging.connection_creator import ConnectionCreator
 from src.utils.config import Config
 
@@ -10,6 +10,7 @@ def callback(body):
 
 def main():
     config = Config()
+    initialize_log()
 
     conn = ConnectionCreator.create(config)
 
