@@ -1,0 +1,42 @@
+name: tp-distribuidos-test-messaging
+services:
+  rabbitmq:
+    container_name: rabbitmq
+    build:
+      context: ../../
+      dockerfile: rabbitmq/Dockerfile
+    volumes:
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks:
+      - tp-distribuidos-test-messaging
+
+  consumer:
+    container_name: consumer
+    image: tp-distribuidos-test-messaging:latest
+    build:
+      context: ../../
+      dockerfile: tests/messaging/Dockerfile
+    entrypoint: python3 /tests/messaging/consumer.py
+    environment:
+      - PYTHONPATH=$PYTHONPATH:$PWD
+    depends_on:
+      - rabbitmq
+    networks:
+      - tp-distribuidos-test-messaging
+
+  publisher:
+    container_name: publisher
+    image: tp-distribuidos-test-messaging:latest
+    build:
+      context: ../../
+      dockerfile: tests/messaging/Dockerfile
+    entrypoint: python3 /tests/messaging/publisher.py
+    depends_on:
+      - rabbitmq
+    environment:
+      - PYTHONPATH=$PYTHONPATH:$PWD
+    networks:
+      - tp-distribuidos-test-messaging
+
+networks:
+  tp-distribuidos-test-messaging:
