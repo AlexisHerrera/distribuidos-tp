@@ -1,40 +1,24 @@
-# Movie
-# Rating
-# Cast
-# MovieSentiment
-# EOF
-# ACK
-# ...
-# Message
-#   type = Movie, Cast, MovieSentiment, EOF, ...
-#   data = list[Movie | Cast | MovieSentiment] | None
-# Message.encode()
-# Message.from_bytes(body)
+from enum import Enum
 
-from functools import singledispatchmethod
-from typing import overload
+from src.dto.movie import MovieProtocol
 
 
-class A:
-    pass
+class MessageType(Enum):
+    Movie = 1
 
-class B:
-    pass
-
-type As = list[A]
 
 class Message():
-    @singledispatchmethod
-    def from_data(self, data: str):
-        print("default", data)
+    def __init__(self, message_type: MessageType, data: object):
+        self.message_type = message_type
+        self.data = data
 
-    @overload(As)
-    def _(self, data: As):
-        print("intsss", data)
+    def to_bytes(self) -> bytes:
+        match self.message_type:
+            case MessageType.Movie:
+                return MovieProtocol.to_bytes(self.data)
 
-    @overload(B)
-    def _(self, data: B):
-        print("str", data)
+        return b''
 
-    def encode(self):
+    @staticmethod
+    def from_bytes(buf: bytes):
         pass

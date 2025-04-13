@@ -4,23 +4,23 @@ import pika
 
 class Broker(ABC):
     @abstractmethod
-    def exchange_declare(self, exchange_name, exchange_type):
+    def exchange_declare(self, exchange_name: str, exchange_type: str):
         pass
 
     @abstractmethod
-    def queue_declare(self, queue_name) -> str:
+    def queue_declare(self, queue_name: str) -> str:
         pass
 
     @abstractmethod
-    def queue_bind(self, exchange_name, queue_name):
+    def queue_bind(self, exchange_name: str, queue_name: str):
         pass
 
     @abstractmethod
-    def put(self, exchange, routing_key, body):
+    def put(self, exchange: str, routing_key: str, body: bytes):
         pass
 
     @abstractmethod
-    def consume(self, callback, queue_name):
+    def consume(self, callback: Callable, queue_name: str):
         pass
 
     @abstractmethod
