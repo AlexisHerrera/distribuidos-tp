@@ -9,7 +9,7 @@
 ## Usage
 
 ```bash
-python client/main.py .data/movies_metadata.csv .data/ratings.csv .data/credits.csv
+python src/client/main.py .data/movies_metadata.csv .data/ratings.csv .data/credits.csv
 ```
 
 ```
@@ -34,8 +34,8 @@ Successfully completed processing all files.
 
 ## Message Structure
 
-| MsgId  | MsgLen      | AttributeId | Data            | AttributeId | Data | ... |
-| ------ | ----------- | ----------- | --------------- | ----------- | ---- | --- |
+| MsgId  | MsgLen  | AttributeId | Data            | AttributeId | Data | ... |
+| ------ | ------- | ----------- | --------------- | ----------- | ---- | --- |
 | 1 Byte | 2 Bytes | 1 Byte      | Variable length | ...         | ...  | ... |
 
 > [!Note]
