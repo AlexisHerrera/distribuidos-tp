@@ -52,6 +52,3 @@ class RabbitMQBroker(Broker):
     def close(self):
         self.__channel.close()
         self.__connection.close()
-
-
-
