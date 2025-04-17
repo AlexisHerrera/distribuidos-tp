@@ -10,6 +10,8 @@ from common.socket_communication import send_message, connect_to_server
 BATCH_SIZE = int(os.getenv('BATCH_SIZE', '20'))
 CSV_MOVIES_PATH = '.data/movies_metadata.csv'
 
+logging.basicConfig(level=logging.INFO)
+
 def count_lines_in_file(file_object: io.TextIOWrapper, file_description: str, file_path_for_msg: str) -> bool:
     print(f"\n--- Counting lines in: {file_description} ({file_path_for_msg}) ---")
     line_count = 0
@@ -80,8 +82,8 @@ def send_movies(client_socket):
                 send_message(client_socket, message)
                 logging.info(f'Sent batch with {len(batch)} records.')
 
-                time.sleep(1000)
-
+        send_message(client_socket, 'EOF_MOVIES')
+        logging.info(f'Finished sending all batches')
         client_socket.close()
         logging.info("Finished sending all batches and closed the connection.")
 
@@ -138,5 +140,4 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     main()
