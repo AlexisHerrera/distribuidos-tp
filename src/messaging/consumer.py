@@ -3,7 +3,7 @@ import logging
 from typing import Callable
 
 from src.messaging.broker import Broker
-from src.messaging.message import Message
+from src.messaging.protocol.message import Message
 
 
 class Consumer(ABC):

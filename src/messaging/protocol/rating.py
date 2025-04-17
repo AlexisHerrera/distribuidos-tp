@@ -1,6 +1,6 @@
 # pylint: disable=no-member
-from src.messaging.list_decoder import ListDecoder
-from src.messaging.list_encoder import ListEncoder
+from src.messaging.protocol.list_decoder import ListDecoder
+from src.messaging.protocol.list_encoder import ListEncoder
 from src.messaging.protobuf import ratings_pb2
 from src.model.rating import Rating
 

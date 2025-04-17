@@ -1,6 +1,6 @@
 import unittest
 
-from src.messaging.message import Message, MessageType
+from src.messaging.protocol.message import Message, MessageType
 from src.model.movie import Movie
 from src.model.rating import Rating
 

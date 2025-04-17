@@ -3,7 +3,7 @@ from unittest.mock import Mock
 from src.messaging.broker import Broker
 from src.messaging.connection import Connection
 from src.messaging.consumer import Consumer
-from src.messaging.message import Message, MessageType
+from src.messaging.protocol.message import Message, MessageType
 from src.messaging.publisher import Publisher
 
 

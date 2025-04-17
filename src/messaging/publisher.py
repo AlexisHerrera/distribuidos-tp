@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from src.messaging.broker import Broker
-from src.messaging.message import Message
+from src.messaging.protocol.message import Message
 
 
 class Publisher(ABC):

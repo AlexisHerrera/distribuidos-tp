@@ -1,9 +1,9 @@
 from enum import Enum
 
-from src.dto.eof import EOFProtocol
-from src.dto.movie import MovieProtocol
-from src.dto.null import NullProtocol
-from src.dto.rating import RatingProtocol
+from src.messaging.protocol.eof import EOFProtocol
+from src.messaging.protocol.movie import MovieProtocol
+from src.messaging.protocol.null import NullProtocol
+from src.messaging.protocol.rating import RatingProtocol
 
 
 class MessageType(Enum):

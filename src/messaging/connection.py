@@ -1,6 +1,6 @@
 from typing import Callable
 from src.messaging.broker import Broker
-from src.messaging.message import Message
+from src.messaging.protocol.message import Message
 from src.messaging.publisher import Publisher
 from src.messaging.consumer import Consumer
 

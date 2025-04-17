@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import ANY, Mock
 from src.messaging.broker import Broker
-from src.messaging.message import Message
+from src.messaging.protocol.message import Message
 from src.messaging.consumer import BroadcastConsumer
 
 

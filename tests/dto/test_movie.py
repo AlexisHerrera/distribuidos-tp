@@ -1,7 +1,7 @@
 # pylint: disable=no-member
 import unittest
 
-from src.dto.movie import MovieProtocol
+from src.messaging.protocol.movie import MovieProtocol
 from src.messaging.protobuf import movies_pb2
 from src.model.movie import Movie
 
