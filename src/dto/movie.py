@@ -1,4 +1,5 @@
 # pylint: disable=no-member
+from src.messaging.list_decoder import ListDecoder
 from src.messaging.list_encoder import ListEncoder
 from src.messaging.protobuf import movies_pb2
 from src.model.movie import Movie
@@ -6,19 +7,13 @@ from src.model.movie import Movie
 
 class MovieProtocol:
     def __init__(self):
-        self.__encoder = ListEncoder(self.__to_movie_pb,
-                        lambda l: movies_pb2.Movies(list=l).SerializeToString())
+        self.__encoder = ListEncoder(item_to_bytes=self.__to_movie_pb,
+                        encode_all=lambda l: movies_pb2.Movies(list=l).SerializeToString())
+
+        self.__decoder = ListDecoder(bytes_to_item=self.__to_movie, decode_all=self.__decode_all)
 
     def to_bytes(self, movies: list[Movie]) -> tuple[bytes, int]:
         return self.__encoder.to_bytes(movies)
-        # movies_pb2_list = []
-
-        # for movie in movies:
-        #     movies_pb2_list.append(MovieProtocol.to_movie_pb(movie))
-
-        # movies_encoded = movies_pb2.Movies(list=movies_pb2_list).SerializeToString()
-
-        # return movies_encoded, len(movies_encoded)
 
     def __to_movie_pb(self, movie: Movie):
         movie_encoded = movies_pb2.Movie()
@@ -28,22 +23,18 @@ class MovieProtocol:
 
         return movie_encoded
 
-    @staticmethod
-    def from_bytes(buf: bytes, bytes_amount: int) -> list[Movie]:
-        movies_pb2_list = movies_pb2.Movies()
+    def from_bytes(self, buf: bytes, bytes_amount: int) -> list[Movie]:
+        return self.__decoder.from_bytes(buf, bytes_amount)
 
-        movies_pb2_list.ParseFromString(buf[0:bytes_amount])
-
-        movies = []
-
-        for movie_pb2 in movies_pb2_list.list:
-            movies.append(MovieProtocol.to_movie(movie_pb2))
-
-        return movies
-
-    @staticmethod
-    def to_movie(movie_pb2) -> Movie:
+    def __to_movie(self, movie_pb2) -> Movie:
         movie_id = movie_pb2.id
         title = movie_pb2.title
 
         return Movie(movie_id, title)
+
+    def __decode_all(self, buf: bytes, bytes_amount: int):
+        movies_pb2_list = movies_pb2.Movies()
+
+        movies_pb2_list.ParseFromString(buf[0:bytes_amount])
+
+        return movies_pb2_list.list

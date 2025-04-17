@@ -28,7 +28,7 @@ class Message():
     def to_bytes(self) -> bytes:
         data_encoded = b''
         bytes_amount = 0
-        encoder = NullProtocol() # pylint: disable=unnecessary-lambda-assignment
+        encoder = NullProtocol()
 
         match self.message_type:
             case MessageType.Movie:
@@ -49,18 +49,18 @@ class Message():
         msg_type_from_buf = Message.__int_from_bytes(buf, Message.MSG_TYPE_LEN)
         bytes_amount = Message.__int_from_bytes(buf[Message.MSG_TYPE_LEN:], Message.MSG_LEN_SIZE)
 
-        decoder = lambda _buf, _bytes_amount: None # pylint: disable=unnecessary-lambda-assignment
+        decoder = NullProtocol()
         msg_type = MessageType(msg_type_from_buf)
 
         match msg_type:
             case MessageType.Movie:
-                decoder = MovieProtocol.from_bytes
+                decoder = MovieProtocol()
             case MessageType.Rating:
-                decoder = RatingProtocol.from_bytes
+                decoder = RatingProtocol()
             case MessageType.EOF:
-                pass
+                decoder = EOFProtocol()
 
-        data = decoder(buf[Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE:], bytes_amount)
+        data: list | None = decoder.from_bytes(buf[Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE:], bytes_amount)
 
         return Message(msg_type, data)
 

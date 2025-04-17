@@ -41,7 +41,9 @@ class TestMovieProtocol:
         movies_encoded = movies_pb2.Movies(list=[movie_encoded]).SerializeToString()
         bytes_amount = len(movies_encoded)
 
-        result = MovieProtocol.from_bytes(movies_encoded, bytes_amount)
+        protocol = MovieProtocol()
+
+        result = protocol.from_bytes(movies_encoded, bytes_amount)
 
         assert len(result) == 1
         assert result[0].id == movie.id
