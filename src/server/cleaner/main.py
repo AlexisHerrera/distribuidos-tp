@@ -1,53 +1,36 @@
 import logging
 import os
+import csv
+from io import StringIO
 from common.socket_communication import receive_message, accept_new_connection, create_server_socket
 from model.movie import Movie
-from io import StringIO
-import csv
-import ast
-
+from utils.string_utils import dictionary_to_list
+from movie_fields import MovieCSVField, MIN_EXPECTED_FIELDS
 
 logging.basicConfig(level=logging.INFO)
 
-def dictionary_to_list(dictionary_str):
+def parse_movie(movie_string: str) -> Movie:
     try:
-        dictionary_list = ast.literal_eval(dictionary_str)
-        return [data['name'] for data in dictionary_list]
-    except (ValueError, SyntaxError):
-        return []
-
-def parse_movie(line: str) -> Movie:
-    try:
-        csv_reader = csv.reader(StringIO(line), skipinitialspace=True)
+        csv_reader = csv.reader(StringIO(movie_string), skipinitialspace=True)
         fields = next(csv_reader)
 
-        if len(fields) < 24:
+        if len(fields) < MIN_EXPECTED_FIELDS:
             raise ValueError("Line does not contain enough fields to parse.")
 
-        movie_id = int(fields[5])
-        title = fields[20].strip()
-        genres = dictionary_to_list(fields[3].strip())
-        production_countries = dictionary_to_list(fields[13].strip())
-        release_date = fields[14].strip()
-        budget = int(fields[2])
-        revenue = int(fields[15])
-        overview = fields[10].strip()
-
         return Movie(
-            movie_id=movie_id,
-            title=title,
-            genres=genres,
-            release_date=release_date,
-            production_countries=production_countries,
-            budget=budget,
-            revenue=revenue,
-            overview=overview
+            movie_id=int(fields[MovieCSVField.MOVIE_ID]),
+            title=fields[MovieCSVField.TITLE].strip(),
+            genres=dictionary_to_list(fields[MovieCSVField.GENRES].strip()),
+            release_date=fields[MovieCSVField.RELEASE_DATE].strip(),
+            production_countries=dictionary_to_list(fields[MovieCSVField.PRODUCTION_COUNTRIES].strip()),
+            budget=int(fields[MovieCSVField.BUDGET]),
+            revenue=int(fields[MovieCSVField.REVENUE]),
+            overview=fields[MovieCSVField.OVERVIEW].strip()
         )
 
     except Exception as e:
-        logging.warning(f"Failed to parse line: {line}. Error: {e}")
+        logging.warning(f"Failed to parse line: {movie_string}. Error: {e}")
         return None
-
 
 
 def receive_movies(client_socket):
