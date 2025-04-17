@@ -1,5 +1,4 @@
 import logging
-import os
 import signal
 
 from src.messaging.broker import RabbitMQBroker
@@ -101,17 +100,7 @@ class MovieFilter:
 
 
 if __name__ == "__main__":
-    def get_env_var(var_name, default=None):
-        return os.getenv(var_name, default)
-
-
-    class SimpleConfig(Config):
-        def __init__(self):
-            super().__init__()
-            self.rabbit_host = os.getenv('RABBITMQ_HOST', 'localhost')
-
-
-    config = SimpleConfig()
+    config = Config()
 
     try:
         filter_node = MovieFilter(config)
