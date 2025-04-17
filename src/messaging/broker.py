@@ -36,8 +36,10 @@ class RabbitMQBroker(Broker):
     def exchange_declare(self, exchange_name: str, exchange_type: str):
         self.__channel.exchange_declare(exchange=exchange_name, exchange_type=exchange_type)
 
-    def queue_declare(self, queue_name: str = '') -> str:
-        result = self.__channel.queue_declare(queue=queue_name, exclusive=True)
+    def queue_declare(self, queue_name: str = '', exclusive: bool = False, durable: bool = True) -> str:
+        # Is an exclusive queue (only
+        exclusive_actual = exclusive if queue_name else True
+        result = self.__channel.queue_declare(queue=queue_name, exclusive=exclusive_actual, durable=durable)
         return result.method.queue
 
     def queue_bind(self, exchange_name: str, queue_name: str):
