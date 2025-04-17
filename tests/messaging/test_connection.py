@@ -3,6 +3,7 @@ from unittest.mock import Mock
 from src.messaging.broker import Broker
 from src.messaging.connection import Connection
 from src.messaging.consumer import Consumer
+from src.messaging.message import Message, MessageType
 from src.messaging.publisher import Publisher
 
 
@@ -14,7 +15,7 @@ class TestConnection():
 
         connection = Connection(broker, publisher, consumer)
 
-        message = "message" # TODO: change to Message
+        message = Message(MessageType.Unknown, "message")
 
         connection.send(message)
 
