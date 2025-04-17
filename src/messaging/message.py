@@ -49,8 +49,6 @@ class Message():
                 decoder = MovieProtocol.from_bytes
             case MessageType.EOF:
                 pass
-            case _:
-                msg_type = MessageType.Unknown
 
         data = decoder(buf[Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE:], bytes_amount)
 

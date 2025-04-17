@@ -1,0 +1,2 @@
+[run]
+omit = *tests*,src/messaging/protobuf/*,*__init__.py
