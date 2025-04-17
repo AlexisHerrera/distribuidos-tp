@@ -8,7 +8,7 @@ from src.messaging.message import Message
 
 class Consumer(ABC):
     @abstractmethod
-    def consume(self, broker: Broker, callback: Callable[[Message]]):
+    def consume(self, broker: Broker, callback: Callable[[Message], None]):
         pass
 
 
@@ -18,7 +18,7 @@ class BroadcastConsumer():
         self.__queue_name = broker.queue_declare()
         broker.queue_bind(exchange_name, self.__queue_name)
 
-    def consume(self, broker: Broker, callback: Callable[[Message]]):
+    def consume(self, broker: Broker, callback: Callable[[Message], None]):
         def __callback(ch, method, _properties, body):
             try:
                 # decode message and pass to callback

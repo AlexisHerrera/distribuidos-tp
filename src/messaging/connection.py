@@ -14,7 +14,7 @@ class Connection():
     def send(self, message: Message):
         self.__publisher.put(self.__broker, message)
 
-    def recv(self, callback: Callable[[Message]]):
+    def recv(self, callback: Callable[[Message], None]):
         self.__consumer.consume(self.__broker, callback)
 
     def close(self):
