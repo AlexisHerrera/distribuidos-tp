@@ -34,6 +34,15 @@ class TestMessage:
         assert result_movie.id == movie.id
         assert result_movie.title == movie.title
 
+    def test_encode_eof_should_return_empty_data(self):
+        message = Message(MessageType.EOF, None)
+
+        result = message.to_bytes()
+
+        assert result[:Message.MSG_TYPE_LEN] == MessageType.EOF.value.to_bytes()
+        assert result[Message.MSG_TYPE_LEN:Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE] == b'\x00\x00'
+
+
 
 if __name__ == "__main__":
     unittest.main()
