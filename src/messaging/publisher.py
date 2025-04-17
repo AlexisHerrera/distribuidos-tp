@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from src.messaging.broker import Broker
-from src.messaging.message import Message
+from src.messaging.protocol.message import Message
 
 
 class Publisher(ABC):
@@ -16,9 +16,6 @@ class BroadcastPublisher(Publisher):
         self.__exchange_name = exchange_name
 
     def put(self, broker: Broker, body: Message):
-        # Encode body
-        # message = Encoder.encode(body)
-        # broker.put(routing_key=self.__exchange_name, body=message)
         broker.put(exchange=self.__exchange_name, body=body.to_bytes())
 
 
@@ -28,7 +25,4 @@ class DirectPublisher(Publisher):
         self.__routing_key = queue_name
 
     def put(self, broker: Broker, body: Message):
-        # Encode body
-        # message = Encoder.encode(body)
-        # broker.put(routing_key=self.__routing_key, body=message)
         broker.put(routing_key=self.__routing_key, body=body.to_bytes())

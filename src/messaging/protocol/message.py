@@ -1,11 +1,15 @@
 from enum import Enum
 
-from src.dto.movie import MovieProtocol
+from src.messaging.protocol.eof import EOFProtocol
+from src.messaging.protocol.movie import MovieProtocol
+from src.messaging.protocol.null import NullProtocol
+from src.messaging.protocol.rating import RatingProtocol
 
 
 class MessageType(Enum):
     Unknown = 0
     Movie = 1
+    Rating = 2
     EOF = 100
 
     @classmethod
@@ -22,15 +26,17 @@ class Message():
         self.data = data
 
     def to_bytes(self) -> bytes:
-        data_encoded = b''
-        bytes_amount = 0
+        encoder = NullProtocol() # Default encoder
 
         match self.message_type:
             case MessageType.Movie:
-                (data_encoded, bytes_amount) = MovieProtocol.to_bytes(self.data)
+                encoder = MovieProtocol()
+            case MessageType.Rating:
+                encoder = RatingProtocol()
             case MessageType.EOF:
-                (data_encoded, bytes_amount) = (b'', 0)
+                encoder = EOFProtocol()
 
+        (data_encoded, bytes_amount) = encoder.to_bytes(self.data)
         msg_type_encoded = Message.__int_to_bytes(self.message_type.value, Message.MSG_TYPE_LEN)
         bytes_amount_encoded = Message.__int_to_bytes(bytes_amount, Message.MSG_LEN_SIZE)
 
@@ -41,22 +47,24 @@ class Message():
         msg_type_from_buf = Message.__int_from_bytes(buf, Message.MSG_TYPE_LEN)
         bytes_amount = Message.__int_from_bytes(buf[Message.MSG_TYPE_LEN:], Message.MSG_LEN_SIZE)
 
-        decoder = lambda _buf, _bytes_amount: None # pylint: disable=unnecessary-lambda-assignment
+        decoder = NullProtocol() # Default decoder
         msg_type = MessageType(msg_type_from_buf)
 
         match msg_type:
             case MessageType.Movie:
-                decoder = MovieProtocol.from_bytes
+                decoder = MovieProtocol()
+            case MessageType.Rating:
+                decoder = RatingProtocol()
             case MessageType.EOF:
-                pass
+                decoder = EOFProtocol()
 
-        data = decoder(buf[Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE:], bytes_amount)
+        data: list | None = decoder.from_bytes(buf[Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE:], bytes_amount)
 
         return Message(msg_type, data)
 
     @staticmethod
-    def __int_from_bytes(buf: bytes, to: int) -> int:
-        return int.from_bytes(buf[0:to], 'big', signed=False)
+    def __int_from_bytes(buf: bytes, bytes_amount: int) -> int:
+        return int.from_bytes(buf[0:bytes_amount], 'big', signed=False)
 
     @staticmethod
     def __int_to_bytes(value: int, bytes_amount: int) -> bytes:

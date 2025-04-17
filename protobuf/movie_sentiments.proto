@@ -1,0 +1,17 @@
+edition = "2023";
+
+package protobuf;
+
+option features.field_presence = EXPLICIT;
+
+message MovieSentiment {
+    int32 id = 1;
+    string title = 2;    
+    int32 budget = 3;
+    int32 revenue = 4;
+    string sentiment = 5;
+}
+
+message MovieSentiments {
+    repeated MovieSentiment list = 1;
+}

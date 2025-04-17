@@ -110,7 +110,7 @@ AvgBudgetRevenuePositiveAndNegative -> ReporterService:
     2 title
       string
     3 avg_budget_revenue
-      uint32
+      float
     4 sentiment
       string
 

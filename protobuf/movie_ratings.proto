@@ -1,0 +1,15 @@
+edition = "2023";
+
+package protobuf;
+
+option features.field_presence = EXPLICIT;
+
+message MovieRating {
+    int32 id = 1;
+    string title = 2;
+    float rating = 3;
+}
+
+message MovieRatings {
+    repeated MovieRating list = 1;
+}

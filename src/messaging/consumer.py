@@ -3,7 +3,8 @@ import logging
 from typing import Callable
 
 from src.messaging.broker import Broker, RabbitMQBroker
-from src.messaging.message import Message
+from src.messaging.broker import Broker
+from src.messaging.protocol.message import Message
 
 
 class Consumer(ABC):
@@ -19,18 +20,20 @@ class BroadcastConsumer():
         broker.queue_bind(exchange_name, self.__queue_name)
 
     def consume(self, broker: Broker, callback: Callable[[Message], None]):
+        broker.consume(self._create_callback(callback), self.__queue_name)
+
+    def _create_callback(self, callback):
         def __callback(ch, method, _properties, body):
             try:
                 # decode message and pass to callback
                 message = Message.from_bytes(body)
                 callback(message)
-                # callback(body)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             except Exception as e:
                 logging.error("%s", e)
                 ch.basic_nack(delivery_tag=method.delivery_tag)
 
-        broker.consume(__callback, self.__queue_name)
+        return __callback
 
 
 class NamedQueueConsumer(Consumer):
