@@ -1,9 +1,16 @@
 import sys
 import argparse
 import io
+import os
 import logging
+import time
 from common.socket_communication import send_message, connect_to_server
 
+
+BATCH_SIZE = int(os.getenv('BATCH_SIZE', '20'))
+CSV_MOVIES_PATH = '.data/movies_metadata.csv'
+
+logging.basicConfig(level=logging.INFO)
 
 def count_lines_in_file(file_object: io.TextIOWrapper, file_description: str, file_path_for_msg: str) -> bool:
     print(f"\n--- Counting lines in: {file_description} ({file_path_for_msg}) ---")
@@ -12,7 +19,6 @@ def count_lines_in_file(file_object: io.TextIOWrapper, file_description: str, fi
         with file_object:
             for _ in file_object:
                 line_count += 1
-
     except IOError as e:
         print("Error reading file:", e)
         return False
@@ -49,13 +55,51 @@ def parse_arguments():
 
     return args
 
-def send_file_batches():
-    client_socket = connect_to_server('cleaner', 12345)
-    if client_socket:
-        message = 'Send Batches from client!'
-        send_message(client_socket, message)
-        logging.info(f'Sent message: {message}')
+
+def read_next_batch(csv_file, batch_size):
+    batch = []
+    for _ in range(batch_size):
+        line = csv_file.readline()
+        if not line:
+            break
+        batch.append(line.strip())
+    return batch
+
+
+def send_movies(client_socket):
+    if not os.path.exists(CSV_MOVIES_PATH):
+        logging.error(f"CSV file not found at: {CSV_MOVIES_PATH}")
+        return
+
+    try:
+        with open(CSV_MOVIES_PATH, 'r', encoding='utf-8') as csv_file:
+            while True:
+                batch = read_next_batch(csv_file, BATCH_SIZE)
+                if not batch:
+                    break
+
+                message = '\n'.join(batch)
+                send_message(client_socket, message)
+                logging.info(f'Sent batch with {len(batch)} records.')
+
+        send_message(client_socket, 'EOF_MOVIES')
+        logging.info(f'Finished sending all batches')
         client_socket.close()
+        logging.info("Finished sending all batches and closed the connection.")
+
+    except Exception as e:
+        logging.error(f"Error while reading or sending batches: {e}")
+
+def create_client_socket():
+    try:
+        server_host = os.getenv('SERVER_HOST', 'cleaner')
+        server_port = int(os.getenv('SERVER_PORT', '12345'))
+        client_socket = connect_to_server(server_host, server_port)
+        if not client_socket:
+            logging.error("Could not establish connection to server.")
+        return client_socket
+    except ValueError:
+        logging.error("Could not establish connection to server.")
 
 
 def main():
@@ -81,9 +125,12 @@ def main():
             all_successful = False
             print(f"There was a problem processing the {description} file. "
                   "Check error messages above.")
+            
+    client_socket = create_client_socket()
 
-    send_file_batches()
-    
+    if(client_socket):
+        send_movies(client_socket)
+
     if all_successful:
         print("\nSuccessfully completed processing all files.")
         sys.exit(0)
