@@ -52,9 +52,9 @@ Depending on the AttributeId its type varies. Each type will be decoded in the f
 
 Examples:
 
-| MsgId |     MsgLen     | AttributeId | Data | AttributeId |   Data    | AttributeId |       Data        | AttributeId |    Data    | Separator | AttributeId | Data | AttributeId |     Data     | AttributeId |   Data    | AttributeId |    Data    |
-| :---: | :------------: | :---------: | :--: | :---------: | :-------: | :---------: | :---------------: | :---------: | :--------: | :-------: | :---------: | :--: | :---------: | :----------: | :---------: | :-------: | :---------: | :--------: |
-|   1   | 42+1+28 = 71\* |      1      | 800  |      2      | Toy Story |      3      | \[comedy,family\] |      4      | 1995-10-30 |     ;     |      1      | 999  |      2      | Random movie |      3      | \[drama\] |      4      | 2000-10-30 |
+| MsgId |    MsgLen    | AttributeId | Data | AttributeId |   Data    | AttributeId |       Data        | AttributeId |    Data    | AttributeId | Data | AttributeId |     Data     | AttributeId |   Data    | AttributeId |    Data    |
+| :---: | :----------: | :---------: | :--: | :---------: | :-------: | :---------: | :---------------: | :---------: | :--------: | :---------: | :--: | :---------: | :----------: | :---------: | :-------: | :---------: | :--------: |
+|   1   | 42+28 = 70\* |      1      | 800  |      2      | Toy Story |      3      | \[comedy,family\] |      4      | 1995-10-30 |      1      | 999  |      2      | Random movie |      3      | \[drama\] |      4      | 2000-10-30 |
 
 \* 42 bytes the first movie, 1 byte for separator (if added), 28 bytes for the second movie
 

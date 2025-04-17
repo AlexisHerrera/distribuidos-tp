@@ -1,0 +1,27 @@
+import signal
+
+from src.model.movie import Movie
+from src.utils.log import initialize_log, logging
+from src.messaging.connection_creator import ConnectionCreator
+from src.utils.config import Config
+
+def callback(body: list[Movie]):
+    logging.info(f"{len(body)} {body}")
+
+
+def main():
+    config = Config()
+    initialize_log()
+
+    conn = ConnectionCreator.create(config)
+
+    def stop():
+        conn.close()
+
+    signal.signal(signal.SIGTERM, stop)
+
+    conn.recv(callback=callback)
+
+
+if __name__ == "__main__":
+    main()
