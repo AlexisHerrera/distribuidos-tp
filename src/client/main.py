@@ -3,6 +3,7 @@ import argparse
 import io
 import os
 import logging
+import time
 from common.socket_communication import send_message, connect_to_server
 
 
@@ -59,12 +60,46 @@ def send_file_batches():
         logging.warning("Invalid SERVER_PORT environment variable. Falling back to default port 12345.")
         server_port = 12345
 
-    client_socket = connect_to_server(server_host, server_port)
-    if client_socket:
-        message = 'Send Batches from client!'
-        send_message(client_socket, message)
-        logging.info(f'Sent message: {message}')
+    try:
+        batch_size = int(os.getenv('BATCH_SIZE', '20'))
+    except ValueError:
+        logging.warning("Invalid BATCH_SIZE. Falling back to default value 20.")
+        batch_size = 20
+
+    csv_file_path = '.data/movies_metadata.csv'
+    if not os.path.exists(csv_file_path):
+        logging.error(f"CSV file not found at: {csv_file_path}")
+        return
+
+    try:
+        client_socket = connect_to_server(server_host, server_port)
+        if not client_socket:
+            logging.error("Could not establish connection to server.")
+            return
+
+        with open(csv_file_path, 'r', encoding='utf-8') as csv_file:
+            while True:
+                batch = []
+                for _ in range(batch_size):
+                    line = csv_file.readline()
+                    if not line:
+                        break
+                    batch.append(line.strip())
+
+                if not batch:
+                    break
+
+                message = '\n'.join(batch)
+                send_message(client_socket, message)
+                logging.info(f'Sent batch with {len(batch)} records.')
+
+                time.sleep(1000)
+
         client_socket.close()
+        logging.info("Finished sending all batches and closed the connection.")
+
+    except Exception as e:
+        logging.error(f"Error while reading or sending batches: {e}")
 
 
 def main():
