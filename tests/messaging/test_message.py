@@ -42,6 +42,16 @@ class TestMessage:
         assert result[:Message.MSG_TYPE_LEN] == MessageType.EOF.value.to_bytes()
         assert result[Message.MSG_TYPE_LEN:Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE] == b'\x00\x00'
 
+    def test_decode_eof_should_return_eof_type(self):
+        message = Message(MessageType.EOF, None)
+
+        message_bytes = message.to_bytes()
+
+        result = Message.from_bytes(message_bytes)
+
+        assert result.message_type == message.message_type
+        assert result.data == message.data
+
 
 
 if __name__ == "__main__":
