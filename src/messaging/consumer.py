@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+import logging
 
 from src.messaging.broker import Broker
+from src.messaging.message import Message
 
 
 class Consumer(ABC):
@@ -19,11 +21,12 @@ class BroadcastConsumer():
         def __callback(ch, method, _properties, body):
             try:
                 # decode message and pass to callback
-                # message = Movies.from_bytes(body)
-                # callback(message)
-                callback(body)
+                message = Message.from_bytes(body)
+                callback(message)
+                # callback(body)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
-            except Exception:
+            except Exception as e:
+                logging.error(f"{e}")
                 ch.basic_nack(delivery_tag=method.delivery_tag)
 
 

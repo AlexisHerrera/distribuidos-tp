@@ -1,31 +1,49 @@
+# pylint: disable=no-member
 import unittest
 
 from src.dto.movie import MovieProtocol
-# from src.model.movie import Movie
+from src.messaging.protobuf import movies_pb2
+from src.model.movie import Movie
 
 
 class TestMovieProtocol:
     def test_to_bytes_empty_list(self):
-        res = MovieProtocol.to_bytes([])
+        res_encoded, res_bytes_amount = MovieProtocol.to_bytes([])
 
-        expected = MovieProtocol.MSG_ID.to_bytes(1, 'big') + int.to_bytes(0, 2, 'big')
+        expected_encoded, expected_bytes_amount = b'', 0
 
-        assert res == expected
+        assert res_encoded == expected_encoded
+        assert res_bytes_amount == expected_bytes_amount
 
-    # def test_to_bytes(self):
-    #     movie = Movie(movie_id=1, title="Toy Story")
+    def test_to_bytes(self):
+        movie = Movie(movie_id=1, title="Toy Story")
 
-    #     res = MovieProtocol.to_bytes([movie])
+        res, res_bytes_amount = MovieProtocol.to_bytes([movie])
 
-    #     msg_id = b'\x01'
-    #     msg_len = b'\x00\x10'
-    #     attr_id_movie_id = b'\x01'
-    #     movie_id = b'\x00\x00\x00\x01'
-    #     attr_id_title = b'\x02'
-    #     title = b'Toy Story\x00'
-    #     expected = msg_id + msg_len + attr_id_movie_id + movie_id + attr_id_title + title
+        movie_encoded = movies_pb2.Movie()
+        movie_encoded.id = movie.id
+        movie_encoded.title = movie.title
 
-    #     assert res == expected
+        movies_encoded = movies_pb2.Movies(list=[movie_encoded]).SerializeToString()
+        bytes_amount = len(movies_encoded)
+
+        assert res == movies_encoded
+        assert res_bytes_amount == bytes_amount
+
+    def test_from_bytes(self):
+        movie = Movie(movie_id=1, title="Toy Story")
+        movie_encoded = movies_pb2.Movie()
+        movie_encoded.id = movie.id
+        movie_encoded.title = movie.title
+
+        movies_encoded = movies_pb2.Movies(list=[movie_encoded]).SerializeToString()
+        bytes_amount = len(movies_encoded)
+
+        result = MovieProtocol.from_bytes(movies_encoded, bytes_amount)
+
+        assert len(result) == 1
+        assert result[0].id == movie.id
+        assert result[0].title == movie.title
 
 
 if __name__ == "__main__":

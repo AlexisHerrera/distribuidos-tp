@@ -1,45 +1,49 @@
+# pylint: disable=no-member
+from src.messaging.protobuf import movies_pb2
 from src.model.movie import Movie
 
 
 class MovieProtocol:
     MSG_ID = 1
     MSG_ID_SIZE = 1
-    ATTRIBUTE_ID_SIZE = 2
-    MOVIE_ID_SIZE = 4
     MSG_LEN_SIZE = 2
 
     @staticmethod
-    def to_bytes(movies: list[Movie]) -> bytes:
-        msg_id = int.to_bytes(MovieProtocol.MSG_ID, MovieProtocol.MSG_ID_SIZE, 'big')
-        msg_len = 0
-        movies_encoded = b''
+    def to_bytes(movies: list[Movie]) -> tuple[bytes, int]:
+        movies_pb2_list = []
 
         for movie in movies:
-            (movie_encoded, bytes_amount) = MovieProtocol.movie_to_bytes(movie)
-            msg_len += bytes_amount
-            movies_encoded += movie_encoded
+            movies_pb2_list.append(MovieProtocol.to_movie_pb(movie))
 
-        return msg_id + int.to_bytes(msg_len, MovieProtocol.MSG_LEN_SIZE, 'big') + movies_encoded
+        movies_encoded = movies_pb2.Movies(list=movies_pb2_list).SerializeToString()
 
-    @staticmethod
-    def movie_to_bytes(movie: Movie) -> tuple[bytes, int]:
-        buf = b''
-        buf_len = 0
-
-        for i in range(1, 9):
-            buf += int.to_bytes(i, MovieProtocol.ATTRIBUTE_ID_SIZE, 'big')
-            buf_len += MovieProtocol.ATTRIBUTE_ID_SIZE
-
-            match i:
-                case 1:
-                    buf += int.to_bytes(movie.id, MovieProtocol.MOVIE_ID_SIZE, 'big')
-                    buf_len += MovieProtocol.MOVIE_ID_SIZE
-                case 2:
-                    buf += bytes(f"{movie.title}\x00", 'ascii')
-                    buf_len += len(movie.title) + 1
-
-        return buf, buf_len
+        return movies_encoded, len(movies_encoded)
 
     @staticmethod
-    def from_bytes(buf: bytes) -> list[Movie]:
-        pass
+    def to_movie_pb(movie: Movie):
+        movie_encoded = movies_pb2.Movie()
+
+        movie_encoded.id = movie.id
+        movie_encoded.title = movie.title
+
+        return movie_encoded
+
+    @staticmethod
+    def from_bytes(buf: bytes, bytes_amount: int) -> list[Movie]:
+        movies_pb2_list = movies_pb2.Movies()
+
+        movies_pb2_list.ParseFromString(buf[0:bytes_amount])
+
+        movies = []
+
+        for movie_pb2 in movies_pb2_list.list:
+            movies.append(MovieProtocol.to_movie(movie_pb2))
+
+        return movies
+
+    @staticmethod
+    def to_movie(movie_pb2) -> Movie:
+        movie_id = movie_pb2.id
+        title = movie_pb2.title
+
+        return Movie(movie_id, title)

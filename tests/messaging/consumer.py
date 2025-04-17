@@ -1,11 +1,12 @@
 import signal
 
+from src.model.movie import Movie
 from src.utils.log import initialize_log, logging
 from src.messaging.connection_creator import ConnectionCreator
 from src.utils.config import Config
 
-def callback(body):
-    logging.info(f"{body}")
+def callback(body: list[Movie]):
+    logging.info(f"{len(body)} {body}")
 
 
 def main():
