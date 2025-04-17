@@ -1,6 +1,8 @@
 from enum import Enum
 
+from src.dto.eof import EOFProtocol
 from src.dto.movie import MovieProtocol
+from src.dto.null import NullProtocol
 from src.dto.rating import RatingProtocol
 
 
@@ -26,17 +28,17 @@ class Message():
     def to_bytes(self) -> bytes:
         data_encoded = b''
         bytes_amount = 0
-        encoder = lambda _data: (b'', 0) # pylint: disable=unnecessary-lambda-assignment
+        encoder = NullProtocol() # pylint: disable=unnecessary-lambda-assignment
 
         match self.message_type:
             case MessageType.Movie:
-                encoder = MovieProtocol.to_bytes
+                encoder = MovieProtocol()
             case MessageType.Rating:
-                encoder = RatingProtocol.to_bytes
+                encoder = RatingProtocol()
             case MessageType.EOF:
-                (data_encoded, bytes_amount) = (b'', 0)
+                encoder = EOFProtocol()
 
-        (data_encoded, bytes_amount) = encoder(self.data)
+        (data_encoded, bytes_amount) = encoder.to_bytes(self.data)
         msg_type_encoded = Message.__int_to_bytes(self.message_type.value, Message.MSG_TYPE_LEN)
         bytes_amount_encoded = Message.__int_to_bytes(bytes_amount, Message.MSG_LEN_SIZE)
 

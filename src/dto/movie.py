@@ -1,22 +1,26 @@
 # pylint: disable=no-member
+from src.messaging.list_encoder import ListEncoder
 from src.messaging.protobuf import movies_pb2
 from src.model.movie import Movie
 
 
 class MovieProtocol:
-    @staticmethod
-    def to_bytes(movies: list[Movie]) -> tuple[bytes, int]:
-        movies_pb2_list = []
+    def __init__(self):
+        self.__encoder = ListEncoder(self.__to_movie_pb,
+                        lambda l: movies_pb2.Movies(list=l).SerializeToString())
 
-        for movie in movies:
-            movies_pb2_list.append(MovieProtocol.to_movie_pb(movie))
+    def to_bytes(self, movies: list[Movie]) -> tuple[bytes, int]:
+        return self.__encoder.to_bytes(movies)
+        # movies_pb2_list = []
 
-        movies_encoded = movies_pb2.Movies(list=movies_pb2_list).SerializeToString()
+        # for movie in movies:
+        #     movies_pb2_list.append(MovieProtocol.to_movie_pb(movie))
 
-        return movies_encoded, len(movies_encoded)
+        # movies_encoded = movies_pb2.Movies(list=movies_pb2_list).SerializeToString()
 
-    @staticmethod
-    def to_movie_pb(movie: Movie):
+        # return movies_encoded, len(movies_encoded)
+
+    def __to_movie_pb(self, movie: Movie):
         movie_encoded = movies_pb2.Movie()
 
         movie_encoded.id = movie.id

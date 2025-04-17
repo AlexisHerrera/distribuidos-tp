@@ -1,22 +1,26 @@
 # pylint: disable=no-member
+from src.messaging.list_encoder import ListEncoder
 from src.messaging.protobuf import ratings_pb2
 from src.model.rating import Rating
 
 
 class RatingProtocol:
-    @staticmethod
-    def to_bytes(ratings: list[Rating]) -> tuple[bytes, int]:
-        ratings_pb2_list = []
+    def __init__(self):
+        self.__encoder = ListEncoder(self.__to_rating_pb,
+                        lambda l: ratings_pb2.Ratings(list=l).SerializeToString())
 
-        for rating in ratings:
-            ratings_pb2_list.append(RatingProtocol.to_rating_pb(rating))
+    def to_bytes(self, ratings: list[Rating]) -> tuple[bytes, int]:
+        return self.__encoder.to_bytes(ratings)
+        # ratings_pb2_list = []
 
-        ratings_encoded = ratings_pb2.Ratings(list=ratings_pb2_list).SerializeToString()
+        # for rating in ratings:
+        #     ratings_pb2_list.append(RatingProtocol.to_rating_pb(rating))
 
-        return ratings_encoded, len(ratings_encoded)
+        # ratings_encoded = ratings_pb2.Ratings(list=ratings_pb2_list).SerializeToString()
 
-    @staticmethod
-    def to_rating_pb(rating: Rating):
+        # return ratings_encoded, len(ratings_encoded)
+
+    def __to_rating_pb(self, rating: Rating):
         rating_encoded = ratings_pb2.Rating()
 
         rating_encoded.movie_id = rating.movie_id

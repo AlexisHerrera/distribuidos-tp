@@ -8,7 +8,8 @@ from src.model.movie import Movie
 
 class TestMovieProtocol:
     def test_to_bytes_empty_list(self):
-        res_encoded, res_bytes_amount = MovieProtocol.to_bytes([])
+        protocol = MovieProtocol()
+        res_encoded, res_bytes_amount = protocol.to_bytes([])
 
         expected_encoded, expected_bytes_amount = b'', 0
 
@@ -17,8 +18,9 @@ class TestMovieProtocol:
 
     def test_to_bytes(self):
         movie = Movie(movie_id=1, title="Toy Story")
+        protocol = MovieProtocol()
 
-        res, res_bytes_amount = MovieProtocol.to_bytes([movie])
+        res_encoded, res_bytes_amount = protocol.to_bytes([movie])
 
         movie_encoded = movies_pb2.Movie()
         movie_encoded.id = movie.id
@@ -27,7 +29,7 @@ class TestMovieProtocol:
         movies_encoded = movies_pb2.Movies(list=[movie_encoded]).SerializeToString()
         bytes_amount = len(movies_encoded)
 
-        assert res == movies_encoded
+        assert res_encoded == movies_encoded
         assert res_bytes_amount == bytes_amount
 
     def test_from_bytes(self):
