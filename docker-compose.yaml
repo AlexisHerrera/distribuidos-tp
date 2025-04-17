@@ -1,0 +1,28 @@
+name: tpEscalabilidad
+services:
+  client:
+    container_name: client
+    image: client:latest
+    environment:
+      - SERVER_HOST=cleaner
+      - SERVER_PORT=12345
+      - BATCH_SIZE=20
+    networks:
+      - testing_net
+    volumes:
+      - ./.data:/app/.data
+  cleaner:
+    container_name: cleaner
+    image: cleaner:latest
+    environment:
+      - SERVER_PORT=12345
+      - LISTENING_BACKLOG=3
+      - BATCH_SIZE=20
+    networks:
+      - testing_net
+networks:
+  testing_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.125.0/24
