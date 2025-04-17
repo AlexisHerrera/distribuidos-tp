@@ -1,6 +1,7 @@
 import sys
 import argparse
 import io
+import os
 import logging
 from common.socket_communication import send_message, connect_to_server
 
@@ -12,7 +13,6 @@ def count_lines_in_file(file_object: io.TextIOWrapper, file_description: str, fi
         with file_object:
             for _ in file_object:
                 line_count += 1
-
     except IOError as e:
         print("Error reading file:", e)
         return False
@@ -49,8 +49,17 @@ def parse_arguments():
 
     return args
 
+
 def send_file_batches():
-    client_socket = connect_to_server('cleaner', 12345)
+    server_host = os.getenv('SERVER_HOST', 'cleaner')
+
+    try:
+        server_port = int(os.getenv('SERVER_PORT', '12345'))
+    except ValueError:
+        logging.warning("Invalid SERVER_PORT environment variable. Falling back to default port 12345.")
+        server_port = 12345
+
+    client_socket = connect_to_server(server_host, server_port)
     if client_socket:
         message = 'Send Batches from client!'
         send_message(client_socket, message)
@@ -83,7 +92,7 @@ def main():
                   "Check error messages above.")
 
     send_file_batches()
-    
+
     if all_successful:
         print("\nSuccessfully completed processing all files.")
         sys.exit(0)
@@ -93,4 +102,5 @@ def main():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main()

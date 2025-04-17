@@ -3,6 +3,9 @@ services:
   client:
     container_name: client
     image: client:latest
+    environment:
+      - SERVER_HOST=cleaner
+      - SERVER_PORT=12345
     networks:
       - testing_net
     volumes:
@@ -10,6 +13,9 @@ services:
   cleaner:
     container_name: cleaner
     image: cleaner:latest
+    environment:
+      - SERVER_PORT=12345
+      - LISTENING_BACKLOG=3
     networks:
       - testing_net
 networks:
