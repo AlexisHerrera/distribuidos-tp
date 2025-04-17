@@ -1,5 +1,28 @@
 name: tpEscalabilidad
 services:
+  rabbitmq:
+    container_name: rabbitmq
+    build:
+      context: .
+      dockerfile: rabbitmq/Dockerfile
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    environment:
+      - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
+      # User and pass config
+      # - RABBITMQ_DEFAULT_USER=user
+      # - RABBITMQ_DEFAULT_PASS=password
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing_net
+
   client:
     container_name: client
     image: client:latest
@@ -11,6 +34,7 @@ services:
       - testing_net
     volumes:
       - ./.data:/app/.data
+
   cleaner:
     container_name: cleaner
     image: cleaner:latest
@@ -20,6 +44,25 @@ services:
       - BATCH_SIZE=20
     networks:
       - testing_net
+
+  filter_single_country:
+    container_name: filter_single_country
+    build:
+      context: .
+      dockerfile: src/server/filter/Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RABBIT_HOST=rabbitmq
+      - INPUT_QUEUE=movies_cleaned_queue
+      - OUTPUT_QUEUE=movies_single_country_queue
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    # deploy:
+    #   replicas: 3
+
 networks:
   testing_net:
     ipam:

@@ -3,7 +3,6 @@ import logging
 from typing import Callable
 
 from src.messaging.broker import Broker, RabbitMQBroker
-from src.messaging.broker import Broker
 from src.messaging.protocol.message import Message
 
 
