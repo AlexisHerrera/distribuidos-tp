@@ -4,10 +4,6 @@ from src.model.movie import Movie
 
 
 class MovieProtocol:
-    MSG_ID = 1
-    MSG_ID_SIZE = 1
-    MSG_LEN_SIZE = 2
-
     @staticmethod
     def to_bytes(movies: list[Movie]) -> tuple[bytes, int]:
         movies_pb2_list = []
