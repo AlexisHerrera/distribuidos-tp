@@ -1,0 +1,16 @@
+edition = "2023";
+
+package protobuf;
+
+option features.field_presence = EXPLICIT;
+
+message MovieAvgBudget {
+    int32 id = 1;
+    string title = 2;
+    float avg_budget_revenue = 3;
+    string sentiment = 4;
+}
+
+message MovieAvgBudgets {
+    repeated MovieAvgBudget list = 1;
+}

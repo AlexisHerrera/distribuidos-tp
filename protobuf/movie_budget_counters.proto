@@ -1,0 +1,14 @@
+edition = "2023";
+
+package protobuf;
+
+option features.field_presence = EXPLICIT;
+
+message MovieBudgetCounter {
+    string country = 1;
+    int32 total_budget = 2;
+}
+
+message MovieBudgetCounters {
+    repeated MovieBudgetCounter list = 1;
+}

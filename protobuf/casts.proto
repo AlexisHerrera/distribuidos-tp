@@ -1,0 +1,14 @@
+edition = "2023";
+
+package protobuf;
+
+option features.field_presence = EXPLICIT;
+
+message Cast {
+    int32 id = 1;
+    repeated string cast = 2;
+}
+
+message Casts {
+    repeated Cats list = 1;
+}

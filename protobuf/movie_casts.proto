@@ -1,0 +1,15 @@
+edition = "2023";
+
+package protobuf;
+
+option features.field_presence = EXPLICIT;
+
+message MovieCast {
+    int32 id = 1;
+    string title = 2;
+    repeated string actors_name = 3;
+}
+
+message MovieCasts {
+    repeated MovieCast list = 1;
+}
