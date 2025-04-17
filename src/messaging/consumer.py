@@ -26,7 +26,7 @@ class BroadcastConsumer():
                 # callback(body)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             except Exception as e:
-                logging.error(f"{e}")
+                logging.error("%s", e)
                 ch.basic_nack(delivery_tag=method.delivery_tag)
 
 

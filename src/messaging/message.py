@@ -1,10 +1,10 @@
-import logging
 from enum import Enum
 
 from src.dto.movie import MovieProtocol
 
 
 class MessageType(Enum):
+    Unknown = 0
     Movie = 1
 
 
@@ -33,15 +33,21 @@ class Message():
 
     @staticmethod
     def from_bytes(buf: bytes):
-        msg_type_from_buf = int.from_bytes(buf[0:Message.MSG_TYPE_LEN], 'big')
-        logging.info("msg_type %d", msg_type_from_buf)
-        bytes_amount = int.from_bytes(buf[Message.MSG_TYPE_LEN:Message.MSG_LEN_SIZE], 'big')
+        msg_type_from_buf = Message.__int_from_bytes(buf, Message.MSG_TYPE_LEN)
+        bytes_amount = Message.__int_from_bytes(buf[Message.MSG_TYPE_LEN:], Message.MSG_LEN_SIZE)
+
         decoder = lambda _buf, _bytes_amount: None # pylint: disable=unnecessary-lambda-assignment
-        msg_type = 0
+        msg_type = MessageType.Unknown
 
         match MessageType(msg_type_from_buf):
             case MessageType.Movie:
                 msg_type = MessageType.Movie
                 decoder = MovieProtocol.from_bytes
 
-        return Message(msg_type, decoder(buf[Message.MSG_LEN_SIZE:], bytes_amount))
+        data = decoder(buf[Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE:], bytes_amount)
+
+        return Message(msg_type, data)
+
+    @staticmethod
+    def __int_from_bytes(buf: bytes, to: int) -> int:
+        return int.from_bytes(buf[0:to], 'big')

@@ -17,22 +17,22 @@ class TestMessage:
         assert len(message_bytes[3:]) == bytes_amount
 
 
-    # def test_encode_and_decode_movie_should_return_same_movie(self):
-    #     movie = Movie(1, "Toy Story")
-    #     message = Message(MessageType.Movie, [movie])
+    def test_encode_and_decode_movie_should_return_same_movie(self):
+        movie = Movie(1, "Toy Story")
+        message = Message(MessageType.Movie, [movie])
 
-    #     message_bytes = message.to_bytes()
+        message_bytes = message.to_bytes()
 
-    #     result = Message.from_bytes(message_bytes)
+        result = Message.from_bytes(message_bytes)
 
-    #     assert result.message_type == MessageType.Movie
-    #     assert result.data is not None
-    #     assert len(result.data) == 1
+        assert result.message_type == MessageType.Movie
+        assert result.data is not None
+        assert len(result.data) == 1
 
-    #     result_movie = result.data[0]
+        result_movie = result.data[0]
 
-    #     assert result_movie.id == movie.id
-    #     assert result_movie.title == movie.title
+        assert result_movie.id == movie.id
+        assert result_movie.title == movie.title
 
 
 if __name__ == "__main__":
