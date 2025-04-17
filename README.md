@@ -34,39 +34,30 @@ Successfully completed processing all files.
 
 ## Message Structure
 
-| MsgId  | MsgLen  | AttributeId | Data            | AttributeId | Data | ... |
-| ------ | ------- | ----------- | --------------- | ----------- | ---- | --- |
-| 1 Byte | 2 Bytes | 1 Byte      | Variable length | ...         | ...  | ... |
+| MsgId  | MsgLen  | ProtobufData    |
+| ------ | ------- | --------------- |
+| 1 Byte | 2 Bytes | Variable Length |
 
 > [!Note]
 > The 2 Bytes for message len should be enough for a batch of size < 8kb
 
-Depending on the AttributeId its type varies. Each type will be decoded in the following way:
-
-|     Type     |                                 How to get                                 |
-| :----------: | :------------------------------------------------------------------------: |
-|    uint32    |                                Read 4 bytes                                |
-|    string    |                              Read until '\0'                               |
-| list<string> | Add \[ \] as delimiter of list and each string is separated by a comma ',' |
-|    float     |                                Read 4 bytes                                |
-
-Examples:
-
-| MsgId |    MsgLen    | AttributeId | Data | AttributeId |   Data    | AttributeId |       Data        | AttributeId |    Data    | AttributeId | Data | AttributeId |     Data     | AttributeId |   Data    | AttributeId |    Data    |
-| :---: | :----------: | :---------: | :--: | :---------: | :-------: | :---------: | :---------------: | :---------: | :--------: | :---------: | :--: | :---------: | :----------: | :---------: | :-------: | :---------: | :--------: |
-|   1   | 42+28 = 70\* |      1      | 800  |      2      | Toy Story |      3      | \[comedy,family\] |      4      | 1995-10-30 |      1      | 999  |      2      | Random movie |      3      | \[drama\] |      4      | 2000-10-30 |
-
-\* 42 bytes the first movie, 1 byte for separator (if added), 28 bytes for the second movie
-
-| MsgId | MsgLen | AttributeId | Data | AttributeId | Data | AttributeId | Data | AttributeId | Data |
-| :---: | :----: | :---------: | :--: | :---------: | :--: | :---------: | :--: | :---------: | :--: |
-|   2   |   20   |      1      | 800  |      2      | 4.5  |      1      | 999  |      2      | 3.0  |
-
 ### Message types
 
-| MsgId | TypeName |
-| :---: | :------: |
-|   1   |  Movie   |
+| MsgId |      TypeName      |
+| :---: | :----------------: |
+|   0   |      Unknown       |
+|   1   |       Movie        |
+|   2   |       Rating       |
+|   3   |        Cast        |
+|   4   |   MovieSentiment   |
+|   5   |   MovieAvgBudget   |
+|   6   | MovieBudgetCounter |
+|   7   |    MovieRating     |
+|   8   |   MovieRatingAvg   |
+|   9   |     MovieCast      |
+|  10   |     ActorCount     |
+|  90   |    ReportResult    |
+|  100  |        EOF         |
 
 ```
 1 Movie:
