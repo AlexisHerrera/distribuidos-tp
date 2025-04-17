@@ -13,8 +13,8 @@ services:
     image: tp-distribuidos-test-messaging:latest
     build:
       context: ../../
-      dockerfile: tests/messaging/Dockerfile
-    entrypoint: python3 /tests/messaging/consumer.py
+      dockerfile: tests/docker/Dockerfile
+    entrypoint: python3 /tests/docker/consumer.py
     environment:
       - PYTHONPATH=$PYTHONPATH:$PWD
       - RABBIT_HOST=rabbitmq
@@ -30,8 +30,8 @@ services:
     image: tp-distribuidos-test-messaging:latest
     build:
       context: ../../
-      dockerfile: tests/messaging/Dockerfile
-    entrypoint: python3 /tests/messaging/publisher.py
+      dockerfile: tests/docker/Dockerfile
+    entrypoint: python3 /tests/docker/publisher.py
     depends_on:
       - rabbitmq
     environment:
