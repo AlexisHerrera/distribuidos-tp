@@ -26,9 +26,7 @@ class Message():
         self.data = data
 
     def to_bytes(self) -> bytes:
-        data_encoded = b''
-        bytes_amount = 0
-        encoder = NullProtocol()
+        encoder = NullProtocol() # Default encoder
 
         match self.message_type:
             case MessageType.Movie:
@@ -49,7 +47,7 @@ class Message():
         msg_type_from_buf = Message.__int_from_bytes(buf, Message.MSG_TYPE_LEN)
         bytes_amount = Message.__int_from_bytes(buf[Message.MSG_TYPE_LEN:], Message.MSG_LEN_SIZE)
 
-        decoder = NullProtocol()
+        decoder = NullProtocol() # Default decoder
         msg_type = MessageType(msg_type_from_buf)
 
         match msg_type:
@@ -65,8 +63,8 @@ class Message():
         return Message(msg_type, data)
 
     @staticmethod
-    def __int_from_bytes(buf: bytes, to: int) -> int:
-        return int.from_bytes(buf[0:to], 'big', signed=False)
+    def __int_from_bytes(buf: bytes, bytes_amount: int) -> int:
+        return int.from_bytes(buf[0:bytes_amount], 'big', signed=False)
 
     @staticmethod
     def __int_to_bytes(value: int, bytes_amount: int) -> bytes:
