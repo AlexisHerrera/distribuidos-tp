@@ -16,7 +16,6 @@ class TestMessage:
 
         assert len(message_bytes[3:]) == bytes_amount
 
-
     def test_encode_and_decode_movie_should_return_same_movie(self):
         movie = Movie(1, "Toy Story")
         message = Message(MessageType.Movie, [movie])
