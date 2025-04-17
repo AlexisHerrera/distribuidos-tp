@@ -12,7 +12,7 @@ class Movie:
         self.title = title
         self.genres = genres
         self.release_date = release_date
-        self.poduction_countries = production_countries
+        self.production_countries = production_countries
         self.budget = budget
         self.revenue = revenue
         self.overview = overview

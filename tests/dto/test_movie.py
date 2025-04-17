@@ -25,6 +25,10 @@ class TestMovieProtocol:
         movie_encoded = movies_pb2.Movie()
         movie_encoded.id = movie.id
         movie_encoded.title = movie.title
+        movie_encoded.release_date = movie.release_date
+        movie_encoded.budget = movie.budget
+        movie_encoded.revenue = movie.revenue
+        movie_encoded.overview = movie.overview
 
         movies_encoded = movies_pb2.Movies(list=[movie_encoded]).SerializeToString()
         bytes_amount = len(movies_encoded)
