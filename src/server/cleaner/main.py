@@ -46,6 +46,21 @@ def receive_movies(client_socket):
                 parsed_movie = parse_movie(movie)
                 if parsed_movie:
                     logging.info(parsed_movie)
+
+
+def receive_ratings(client_socket):
+    while True:
+        message = receive_message(client_socket)
+        if message == 'EOF_RATINGS':
+            logging.info("EOF_RATINGS message received.")
+            break
+        else:
+            logging.info(f'Ratings Batch Received:\n{message}')
+            # ratings = message.strip().split('\n')
+            # for rating in ratings:
+            #     parsed_movie = parse_movie(rating)
+            #     if parsed_movie:
+            #         logging.info(parsed_movie)
     
     client_socket.close()
 
@@ -66,7 +81,8 @@ def main():
     client_socket = accept_new_connection(server_socket)
     
     if client_socket:
-        receive_movies(client_socket)
+        # receive_movies(client_socket)
+        receive_ratings(client_socket)
 
 if __name__ == "__main__":
     main()

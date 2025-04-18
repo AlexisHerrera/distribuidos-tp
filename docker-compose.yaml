@@ -6,7 +6,8 @@ services:
     environment:
       - SERVER_HOST=cleaner
       - SERVER_PORT=12345
-      - BATCH_SIZE=20
+      - BATCH_SIZE_MOVIES=20
+      - BATCH_SIZE_RATINGS=50
     networks:
       - testing_net
     volumes:
@@ -17,7 +18,8 @@ services:
     environment:
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
-      - BATCH_SIZE=20
+      - BATCH_SIZE_MOVIES=20
+      - BATCH_SIZE_RATINGS=50
     networks:
       - testing_net
 networks:

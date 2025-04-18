@@ -7,8 +7,10 @@ import time
 from common.socket_communication import send_message, connect_to_server
 
 
-BATCH_SIZE = int(os.getenv('BATCH_SIZE', '20'))
+BATCH_SIZE_MOVIES = int(os.getenv('BATCH_SIZE_MOVIES', '20'))
+BATCH_SIZE_RATINGS = int(os.getenv('BATCH_SIZE_RATINGS', '50'))
 CSV_MOVIES_PATH = '.data/movies_metadata.csv'
+CSV_RATINGS_PATH = '.data/ratings.csv'
 
 logging.basicConfig(level=logging.INFO)
 
@@ -83,9 +85,29 @@ def send_movies(client_socket):
                 logging.info(f'Sent batch with {len(batch)} records.')
 
         send_message(client_socket, 'EOF_MOVIES')
-        logging.info(f'Finished sending all batches')
-        client_socket.close()
-        logging.info("Finished sending all batches and closed the connection.")
+        logging.info(f'Finished sending all batches of movies')
+
+    except Exception as e:
+        logging.error(f"Error while reading or sending batches: {e}")
+
+def send_ratings(client_socket):
+    if not os.path.exists(CSV_RATINGS_PATH):
+        logging.error(f"CSV file not found at: {CSV_RATINGS_PATH}")
+        return
+
+    try:
+        with open(CSV_RATINGS_PATH, 'r', encoding='utf-8') as csv_file:
+            while True:
+                batch = read_next_batch(csv_file, BATCH_SIZE_RATINGS)
+                if not batch:
+                    break
+
+                message = '\n'.join(batch)
+                send_message(client_socket, message)
+                logging.info(f'Sent batch of ratings with {len(batch)} records.')
+
+        send_message(client_socket, 'EOF_RATINGS')
+        logging.info(f'Finished sending all batches of ratings.')
 
     except Exception as e:
         logging.error(f"Error while reading or sending batches: {e}")
@@ -129,7 +151,8 @@ def main():
     client_socket = create_client_socket()
 
     if(client_socket):
-        send_movies(client_socket)
+        # send_movies(client_socket)
+        send_ratings(client_socket)
 
     if all_successful:
         print("\nSuccessfully completed processing all files.")
