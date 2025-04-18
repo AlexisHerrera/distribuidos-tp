@@ -4,7 +4,6 @@ from src.messaging.protocol.list_encoder import ListEncoder
 
 class MessageProtocol:
     def __init__(self, item_to_bytes, encode_all, bytes_to_item, decode_all):
-
         self.__encoder = ListEncoder(item_to_bytes=item_to_bytes, encode_all=encode_all)
         self.__decoder = ListDecoder(bytes_to_item=bytes_to_item, decode_all=decode_all)
 

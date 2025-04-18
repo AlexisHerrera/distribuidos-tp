@@ -47,8 +47,8 @@ class MovieProtocol(MessageProtocol):
         return Movie(movie_id, title, genres, release_date, production_countries, budget, revenue, overview)
 
     def __decode_all(self, buf: bytes, bytes_amount: int):
-        movies_pb2_list = movies_pb2.Movies()
+        pb2_list = movies_pb2.Movies()
 
-        movies_pb2_list.ParseFromString(buf[0:bytes_amount])
+        pb2_list.ParseFromString(buf[0:bytes_amount])
 
-        return movies_pb2_list.list
+        return pb2_list.list

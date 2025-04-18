@@ -4,6 +4,7 @@ from src.messaging.protocol.cast import CastProtocol
 from src.messaging.protocol.eof import EOFProtocol
 from src.messaging.protocol.message_protocol import MessageProtocol
 from src.messaging.protocol.movie import MovieProtocol
+from src.messaging.protocol.movie_avg_budget import MovieAvgBudgetProtocol
 from src.messaging.protocol.movie_budget_counter import MovieBudgetCounterProtocol
 from src.messaging.protocol.movie_sentiment import MovieSentimentProtocol
 from src.messaging.protocol.null import NullProtocol
@@ -73,6 +74,8 @@ class Message():
                 return CastProtocol()
             case MessageType.MovieSentiment:
                 return MovieSentimentProtocol()
+            case MessageType.MovieAvgBudget:
+                return MovieAvgBudgetProtocol()
             case MessageType.MovieBudgetCounter:
                 return MovieBudgetCounterProtocol()
             case MessageType.EOF:

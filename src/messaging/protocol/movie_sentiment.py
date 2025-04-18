@@ -36,8 +36,8 @@ class MovieSentimentProtocol(MessageProtocol):
         return MovieSentiment(movie_id, title, budget, revenue, sentiment)
 
     def __decode_all(self, buf: bytes, bytes_amount: int):
-        movie_sentiment_pb2_list = movie_sentiments_pb2.MovieSetniments()
+        pb2_list = movie_sentiments_pb2.MovieSetniments()
 
-        movie_sentiment_pb2_list.ParseFromString(buf[0:bytes_amount])
+        pb2_list.ParseFromString(buf[0:bytes_amount])
 
-        return movie_sentiment_pb2_list.list
+        return pb2_list.list

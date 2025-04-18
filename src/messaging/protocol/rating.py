@@ -29,8 +29,8 @@ class RatingProtocol(MessageProtocol):
         return Rating(movie_id, rating)
 
     def __decode_all(self, buf: bytes, bytes_amount: int):
-        ratings_pb2_list = ratings_pb2.Ratings()
+        pb2_list = ratings_pb2.Ratings()
 
-        ratings_pb2_list.ParseFromString(buf[0:bytes_amount])
+        pb2_list.ParseFromString(buf[0:bytes_amount])
 
-        return ratings_pb2_list.list
+        return pb2_list.list

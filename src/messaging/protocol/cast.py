@@ -29,8 +29,8 @@ class CastProtocol(MessageProtocol):
         return Cast(movie_id, cast)
 
     def __decode_all(self, buf: bytes, bytes_amount: int):
-        casts_pb2_list = casts_pb2.Casts()
+        pb2_list = casts_pb2.Casts()
 
-        casts_pb2_list.ParseFromString(buf[0:bytes_amount])
+        pb2_list.ParseFromString(buf[0:bytes_amount])
 
-        return casts_pb2_list.list
+        return pb2_list.list
