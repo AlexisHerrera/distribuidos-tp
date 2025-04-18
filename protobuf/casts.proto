@@ -10,5 +10,5 @@ message Cast {
 }
 
 message Casts {
-    repeated Cats list = 1;
+    repeated Cast list = 1;
 }

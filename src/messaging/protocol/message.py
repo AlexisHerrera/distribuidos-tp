@@ -1,7 +1,9 @@
 from enum import Enum
 
+from src.messaging.protocol.cast import CastProtocol
 from src.messaging.protocol.eof import EOFProtocol
 from src.messaging.protocol.movie import MovieProtocol
+from src.messaging.protocol.movie_sentiment import MovieSentimentProtocol
 from src.messaging.protocol.null import NullProtocol
 from src.messaging.protocol.rating import RatingProtocol
 
@@ -10,6 +12,10 @@ class MessageType(Enum):
     Unknown = 0
     Movie = 1
     Rating = 2
+    Cast = 3
+    MovieSentiment = 4
+    MovieAvgBudget = 5
+    MovieBudgetCount = 6
     EOF = 100
 
     @classmethod
@@ -33,6 +39,10 @@ class Message():
                 encoder = MovieProtocol()
             case MessageType.Rating:
                 encoder = RatingProtocol()
+            case MessageType.Cast:
+                encoder = CastProtocol()
+            case MessageType.MovieSentiment:
+                encoder = MovieSentimentProtocol()
             case MessageType.EOF:
                 encoder = EOFProtocol()
 
@@ -55,6 +65,8 @@ class Message():
                 decoder = MovieProtocol()
             case MessageType.Rating:
                 decoder = RatingProtocol()
+            case MessageType.Cast:
+                decoder = CastProtocol()
             case MessageType.EOF:
                 decoder = EOFProtocol()
 

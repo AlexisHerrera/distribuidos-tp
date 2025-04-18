@@ -53,6 +53,37 @@ class TestMovieProtocol:
         assert result[0].id == movie.id
         assert result[0].title == movie.title
 
+    def test_to_bytes_with_all_fields(self):
+        movie = Movie(movie_id=1,
+                    title="Toy Story",
+                    genres=["Comedy", "Family", "Animation"],
+                    release_date="1995-10-30",
+                    production_countries=["United States of America"],
+                    budget=30000000,
+                    revenue=373554033,
+                    overview="Led by Woody, Andy's toys live happily in his room until Andy's\
+                    birthday brings Buzz Lightyear onto ...")
+
+        protocol = MovieProtocol()
+
+        res_encoded, res_bytes_amount = protocol.to_bytes([movie])
+
+        movie_encoded = movies_pb2.Movie()
+        movie_encoded.id = movie.id
+        movie_encoded.title = movie.title
+        movie_encoded.genres.extend(movie.genres)
+        movie_encoded.release_date = movie.release_date
+        movie_encoded.production_countries.extend(movie.production_countries)
+        movie_encoded.budget = movie.budget
+        movie_encoded.revenue = movie.revenue
+        movie_encoded.overview = movie.overview
+
+        movies_encoded = movies_pb2.Movies(list=[movie_encoded]).SerializeToString()
+        bytes_amount = len(movies_encoded)
+
+        assert res_encoded == movies_encoded
+        assert res_bytes_amount == bytes_amount
+
 
 if __name__ == "__main__":
     unittest.main()
