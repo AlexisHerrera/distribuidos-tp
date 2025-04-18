@@ -10,9 +10,6 @@ from common.socket_communication import send_message, connect_to_server
 BATCH_SIZE_MOVIES = int(os.getenv('BATCH_SIZE_MOVIES', '20'))
 BATCH_SIZE_RATINGS = int(os.getenv('BATCH_SIZE_RATINGS', '100'))
 BATCH_SIZE_CREDITS = int(os.getenv('BATCH_SIZE_CREDITS', '20'))
-CSV_MOVIES_PATH = '.data/movies_metadata.csv'
-CSV_RATINGS_PATH = '.data/ratings.csv'
-CSV_CREDITS_PATH = '.data/credits.csv'
 
 logging.basicConfig(level=logging.INFO)
 
@@ -131,9 +128,9 @@ def main():
     client_socket = create_client_socket()
 
     if(client_socket):
-        # send_file(client_socket, CSV_MOVIES_PATH, BATCH_SIZE_MOVIES, 'EOF_MOVIES', 'movies')
-        send_file(client_socket, CSV_RATINGS_PATH, BATCH_SIZE_RATINGS, 'EOF_RATINGS', 'ratings')
-        # send_file(client_socket, CSV_CREDITS_PATH, BATCH_SIZE_CREDITS, 'EOF_CREDITS', 'credits')
+        # send_file(client_socket, args.movies_path_name, BATCH_SIZE_MOVIES, 'EOF_MOVIES', 'movies')
+        send_file(client_socket, args.ratings_path_name, BATCH_SIZE_RATINGS, 'EOF_RATINGS', 'ratings')
+        # send_file(client_socket, args.cast_path_name, BATCH_SIZE_CREDITS, 'EOF_CREDITS', 'credits')
 
 
     if all_successful:
