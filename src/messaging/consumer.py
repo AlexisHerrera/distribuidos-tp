@@ -11,17 +11,7 @@ class Consumer(ABC):
     def consume(self, broker: Broker, callback: Callable[[Message], None]):
         pass
 
-
-class BroadcastConsumer():
-    def __init__(self, broker: Broker, exchange_name: str):
-        broker.exchange_declare(exchange_name, 'fanout')
-        self.__queue_name = broker.queue_declare()
-        broker.queue_bind(exchange_name, self.__queue_name)
-
-    def consume(self, broker: Broker, callback: Callable[[Message], None]):
-        broker.consume(self._create_callback(callback), self.__queue_name)
-
-    def _create_callback(self, callback):
+    def _create_callback(self, callback: Callable[[Message], None]):
         def __callback(ch, method, _properties, body):
             try:
                 # decode message and pass to callback
@@ -33,6 +23,16 @@ class BroadcastConsumer():
                 ch.basic_nack(delivery_tag=method.delivery_tag)
 
         return __callback
+
+
+class BroadcastConsumer(Consumer):
+    def __init__(self, broker: Broker, exchange_name: str):
+        broker.exchange_declare(exchange_name, 'fanout')
+        self.__queue_name = broker.queue_declare()
+        broker.queue_bind(exchange_name, self.__queue_name)
+
+    def consume(self, broker: Broker, callback: Callable[[Message], None]):
+        broker.consume(self._create_callback(callback), self.__queue_name)
 
 
 class NamedQueueConsumer(Consumer):
