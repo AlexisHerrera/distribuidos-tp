@@ -1,11 +1,15 @@
 from enum import Enum
 
+from src.messaging.protocol.actor_count import ActorCountProtocol
 from src.messaging.protocol.cast import CastProtocol
 from src.messaging.protocol.eof import EOFProtocol
 from src.messaging.protocol.message_protocol import MessageProtocol
 from src.messaging.protocol.movie import MovieProtocol
 from src.messaging.protocol.movie_avg_budget import MovieAvgBudgetProtocol
 from src.messaging.protocol.movie_budget_counter import MovieBudgetCounterProtocol
+from src.messaging.protocol.movie_cast import MovieCastProtocol
+from src.messaging.protocol.movie_rating import MovieRatingProtocol
+from src.messaging.protocol.movie_rating_avg import MovieRatingAvgProtocol
 from src.messaging.protocol.movie_sentiment import MovieSentimentProtocol
 from src.messaging.protocol.null import NullProtocol
 from src.messaging.protocol.rating import RatingProtocol
@@ -19,6 +23,10 @@ class MessageType(Enum):
     MovieSentiment = 4
     MovieAvgBudget = 5
     MovieBudgetCounter = 6
+    MovieRating = 7
+    MovieRatingAvg = 8
+    MovieCast = 9
+    ActorCount = 10
     EOF = 100
 
     @classmethod
@@ -78,6 +86,14 @@ class Message():
                 return MovieAvgBudgetProtocol()
             case MessageType.MovieBudgetCounter:
                 return MovieBudgetCounterProtocol()
+            case MessageType.MovieRating:
+                return MovieRatingProtocol()
+            case MessageType.MovieRatingAvg:
+                return MovieRatingAvgProtocol()
+            case MessageType.MovieCast:
+                return MovieCastProtocol()
+            case MessageType.ActorCount:
+                return ActorCountProtocol()
             case MessageType.EOF:
                 return EOFProtocol()
             case _:
