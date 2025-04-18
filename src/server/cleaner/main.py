@@ -81,8 +81,8 @@ def main():
     client_socket = accept_new_connection(server_socket)
     
     if client_socket:
-        # receive_movies(client_socket)
-        receive_ratings(client_socket)
+        receive_movies(client_socket)
+        # receive_ratings(client_socket)
 
 if __name__ == "__main__":
     main()
