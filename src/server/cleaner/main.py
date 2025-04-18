@@ -4,6 +4,7 @@ import csv
 from io import StringIO
 from common.socket_communication import receive_message, accept_new_connection, create_server_socket
 from model.movie import Movie
+from model.rating import Rating
 from utils.string_utils import dictionary_to_list
 from movie_fields import MovieCSVField, MIN_EXPECTED_FIELDS
 
@@ -32,6 +33,22 @@ def parse_movie(movie_string: str) -> Movie:
         logging.warning(f"Failed to parse line: {movie_string}. Error: {e}")
         return None
 
+def parse_rating(rating_string: str) -> Rating:
+    try:
+        csv_reader = csv.reader(StringIO(rating_string), skipinitialspace=True)
+        fields = next(csv_reader)
+
+        if len(fields) < 3:
+            raise ValueError("Line does not contain enough fields to parse a rating.")
+
+        return Rating(
+            movie_id=int(fields[1]),
+            rating=float(fields[2])
+        )
+    except Exception as e:
+        logging.warning(f"Failed to parse rating line: {rating_string}. Error: {e}")
+        return None
+
 
 def receive_movies(client_socket):
     while True:
@@ -56,13 +73,13 @@ def receive_ratings(client_socket):
             break
         else:
             logging.info(f'Ratings Batch Received:\n{message}')
-            # ratings = message.strip().split('\n')
-            # for rating in ratings:
-            #     parsed_movie = parse_movie(rating)
-            #     if parsed_movie:
-            #         logging.info(parsed_movie)
+            rating_lines = message.strip().split('\n')
+            for line in rating_lines:
+                if line.strip():
+                    parsed_rating = parse_rating(line)
+                    if parsed_rating:
+                        logging.info(parsed_rating.rating)
     
-    client_socket.close()
 
 def main():
     try:
@@ -81,8 +98,8 @@ def main():
     client_socket = accept_new_connection(server_socket)
     
     if client_socket:
-        receive_movies(client_socket)
-        # receive_ratings(client_socket)
+        # receive_movies(client_socket)
+        receive_ratings(client_socket)
 
 if __name__ == "__main__":
     main()

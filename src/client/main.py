@@ -131,8 +131,8 @@ def main():
     client_socket = create_client_socket()
 
     if(client_socket):
-        send_file(client_socket, CSV_MOVIES_PATH, BATCH_SIZE_MOVIES, 'EOF_MOVIES', 'movies')
-        # send_file(client_socket, CSV_RATINGS_PATH, BATCH_SIZE_RATINGS, 'EOF_RATINGS', 'ratings')
+        # send_file(client_socket, CSV_MOVIES_PATH, BATCH_SIZE_MOVIES, 'EOF_MOVIES', 'movies')
+        send_file(client_socket, CSV_RATINGS_PATH, BATCH_SIZE_RATINGS, 'EOF_RATINGS', 'ratings')
         # send_file(client_socket, CSV_CREDITS_PATH, BATCH_SIZE_CREDITS, 'EOF_CREDITS', 'credits')
 
 
