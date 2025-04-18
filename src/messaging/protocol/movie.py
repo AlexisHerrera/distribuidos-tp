@@ -16,15 +16,14 @@ class MovieProtocol(MessageProtocol):
 
         movie_encoded.id = movie.id
         movie_encoded.title = movie.title
+
         if movie.genres is not None:
-            for genre in movie.genres:
-                movie_encoded.genres.add(genre)
+            movie_encoded.genres.extend(movie.genres)
 
         movie_encoded.release_date = movie.release_date
 
         if movie.production_countries is not None:
-            for country in movie.production_countries:
-                movie_encoded.production_countries.add(country)
+            movie_encoded.production_countries.extend(movie.production_countries)
 
         movie_encoded.budget = movie.budget
         movie_encoded.revenue = movie.revenue
