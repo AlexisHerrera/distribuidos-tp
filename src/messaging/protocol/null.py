@@ -1,5 +1,8 @@
-class NullProtocol:
-    def __init__(self):
+from src.messaging.protocol.message_protocol import MessageProtocol
+
+
+class NullProtocol(MessageProtocol):
+    def __init__(self): # pylint: disable=super-init-not-called
         pass
 
     def to_bytes(self, _items) -> tuple[bytes, int]:

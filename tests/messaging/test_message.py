@@ -1,6 +1,7 @@
 import unittest
 
 from src.messaging.protocol.message import Message, MessageType
+from src.model.cast import Cast
 from src.model.movie import Movie
 from src.model.rating import Rating
 
@@ -66,6 +67,36 @@ class TestMessage:
             assert result_rating.movie_id == rating.movie_id
             assert result_rating.rating == rating.rating
 
+    class TestCast:
+        def test_encode_cast(self):
+            cast = Cast(1, ["Ricardo Darín", "Guillermo Francella"])
+            message = Message(MessageType.Cast, [cast])
+
+            message_bytes = message.to_bytes()
+
+            assert message_bytes[0:1] == b'\x03'
+
+            bytes_amount = int.from_bytes(message_bytes[1:3], 'big')
+
+            assert len(message_bytes[3:]) == bytes_amount
+
+        def test_encode_and_decode_cast_should_return_same_cast(self):
+            cast = Cast(1, ["Ricardo Darín", "Guillermo Francella"])
+            message = Message(MessageType.Cast, [cast])
+
+            message_bytes = message.to_bytes()
+
+            result = Message.from_bytes(message_bytes)
+
+            assert result.message_type == MessageType.Cast
+            assert result.data is not None
+            assert len(result.data) == 1
+
+            result_cast = result.data[0]
+
+            assert result_cast.id == cast.id
+            for i, name in enumerate(cast.cast):
+                assert result_cast.cast[i] == name
 
     class TestEOF:
         def test_encode_eof_should_return_empty_data(self):
