@@ -3,9 +3,9 @@ import signal
 
 from src.messaging.broker import RabbitMQBroker
 from src.messaging.connection import Connection
+from src.messaging.protocol.message import Message, MessageType
 from src.messaging.publisher import DirectPublisher
 from src.messaging.consumer import NamedQueueConsumer
-from src.messaging.message import Message, MessageType
 from src.model.movie import Movie
 from src.utils.config import Config
 
@@ -50,26 +50,28 @@ class MovieFilter:
             return
 
         if message.message_type == MessageType.Movie:
-            movie: Movie = message.data
-            logger.debug(f"Processing movie: ID={movie.id}, Title='{movie.title}'")
+            movies_list: list[Movie] = message.data
+            if not isinstance(movies_list, list):
+                logger.warning(f"Expected list for Movie data, got {type(movies_list)}")
+                return
+            logger.debug(f"Processing batch of {len(movies_list)} movies.")
+            for movie in movies_list:
+                passed_filter = False
+                production_countries = list(movie.production_countries)
+                if len(production_countries) == 1:
+                    logger.info(f"Movie ID={movie.id} ('{movie.title}') Passed Filter (1 country).")
+                    passed_filter = True
+                else:
+                    logger.debug(
+                        f"Movie ID={movie.id} ('{movie.title}') NOT passed the filter. Production countries: {movie.production_countries}")
 
-            passed_filter = False
-            if isinstance(movie.production_countries, list) and len(movie.production_countries) == 1:
-                logger.info(f"Movie ID={movie.id} ('{movie.title}') Passed Filter (1 country).")
-                passed_filter = True
-            else:
-                country_count = len(movie.production_countries) if isinstance(movie.production_countries,
-                                                                              list) else 'N/A'
-                logger.debug(
-                    f"Movie ID={movie.id} ('{movie.title}') NOT passed the filter ({country_count} countries).")
-
-            if passed_filter:
-                try:
-                    output_message = Message(MessageType.Movie, movie)
-                    self.connection.send(output_message)
-                    logger.debug(f"MovieID={movie.id} published in output queue.")
-                except Exception as e:
-                    logger.error(f"Error Publishing queue ID={movie.id}: {e}", exc_info=True)
+                if passed_filter:
+                    try:
+                        output_message = Message(MessageType.Movie, [movie])
+                        self.connection.send(output_message)
+                        logger.debug(f"MovieID={movie.id} published in output queue.")
+                    except Exception as e:
+                        logger.error(f"Error Publishing queue ID={movie.id}: {e}", exc_info=True)
 
         elif message.message_type == MessageType.EOF:
             logger.info("EOF Received. Propagating...")
