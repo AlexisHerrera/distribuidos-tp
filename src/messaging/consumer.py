@@ -2,6 +2,9 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Callable
 
+from pika.channel import Channel
+from pika.spec import Basic, BasicProperties
+
 from src.messaging.broker import Broker, RabbitMQBroker
 from src.messaging.protocol.message import Message
 
@@ -11,8 +14,15 @@ class Consumer(ABC):
     def consume(self, broker: Broker, callback: Callable[[Message], None]):
         pass
 
-    def _create_callback(self, callback: Callable[[Message], None]):
-        def __callback(ch, method, _properties, body):
+    def _create_callback(
+        self, callback: Callable[[Message], None], requeue: bool = True
+    ):
+        def __callback(
+            ch: Channel,
+            method: Basic.Deliver,
+            _properties: BasicProperties,
+            body: bytes,
+        ):
             try:
                 # decode message and pass to callback
                 message = Message.from_bytes(body)
@@ -20,7 +30,7 @@ class Consumer(ABC):
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             except Exception as e:
                 logging.error('%s', e)
-                ch.basic_nack(delivery_tag=method.delivery_tag)
+                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=requeue)
 
         return __callback
 
@@ -32,7 +42,7 @@ class BroadcastConsumer(Consumer):
         broker.queue_bind(exchange_name, self.__queue_name)
 
     def consume(self, broker: Broker, callback: Callable[[Message], None]):
-        broker.consume(self._create_callback(callback), self.__queue_name)
+        broker.consume(self._create_callback(callback=callback), self.__queue_name)
 
 
 class NamedQueueConsumer(Consumer):
@@ -43,13 +53,6 @@ class NamedQueueConsumer(Consumer):
         self.__queue_name = queue_name
 
     def consume(self, broker: RabbitMQBroker, callback: Callable[[Message], None]):
-        def __callback_wrapper(ch, method, _properties, body):
-            try:
-                message = Message.from_bytes(body)
-                callback(message)
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-            except Exception as e:
-                logging.error('%s', e)
-                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-
-        broker.consume(__callback_wrapper, self.__queue_name)
+        broker.consume(
+            self._create_callback(callback=callback, requeue=False), self.__queue_name
+        )
