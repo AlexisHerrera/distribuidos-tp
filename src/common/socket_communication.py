@@ -38,14 +38,13 @@ def accept_new_connection(server_socket):
         return None
 
 
-def send_message(sock, message):
-    encoded_message = message.encode('utf-8')
-    message_length = len(encoded_message)
+def send_message(sock, message_bytes: bytes):
+    message_length = len(message_bytes)
 
     length_header = struct.pack('>I', message_length)
 
     sock.sendall(length_header)
-    sock.sendall(encoded_message)
+    sock.sendall(message_bytes)
 
 
 def receive_message(sock):
@@ -59,7 +58,7 @@ def receive_message(sock):
     if not message_bytes:
         raise ConnectionError('Failed to receive the full message')
 
-    return message_bytes.decode('utf-8')
+    return message_bytes
 
 
 def recv_exact(sock, num_bytes):

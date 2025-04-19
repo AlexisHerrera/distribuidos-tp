@@ -2,7 +2,15 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY src/client/ .
-COPY src/common/ common/
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-ENTRYPOINT ["python", "main.py", ".data/movies_metadata.csv", ".data/ratings.csv", ".data/credits.csv"]
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy all code from src
+COPY src/ ./src/
+
+ENTRYPOINT ["python", "src/client/main.py", ".data/movies_metadata.csv", ".data/ratings.csv", ".data/credits.csv"]
