@@ -2,6 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Callable
 
+import pika
 from pika.channel import Channel
 from pika.spec import Basic, BasicProperties
 
@@ -23,14 +24,44 @@ class Consumer(ABC):
             _properties: BasicProperties,
             body: bytes,
         ):
+            delivery_tag = method.delivery_tag if method else None
+            processed_successfully = False
             try:
-                # decode message and pass to callback
                 message = Message.from_bytes(body)
                 callback(message)
-                ch.basic_ack(delivery_tag=method.delivery_tag)
+                processed_successfully = True
+
             except Exception as e:
-                logging.error('%s', e)
-                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=requeue)
+                logging.error(
+                    f'Error processing message (tag: {delivery_tag}): {e}',
+                    exc_info=True,
+                )
+                processed_successfully = False
+            try:
+                if not ch.is_open:
+                    logging.warning(
+                        f'ACK/NACK skipped for tag {delivery_tag}: Channel is closed.'
+                    )
+                    return
+
+                if processed_successfully:
+                    logging.debug(f'Sending ACK for delivery_tag={delivery_tag}')
+                    ch.basic_ack(delivery_tag=delivery_tag)
+                else:
+                    logging.warning(
+                        f'Sending NACK (requeue={requeue}) for delivery_tag={delivery_tag} due to processing error.'
+                    )
+                    ch.basic_nack(delivery_tag=delivery_tag, requeue=requeue)
+
+            except pika.exceptions.ChannelWrongStateError:
+                logging.warning(
+                    f'Could not ACK/NACK tag {delivery_tag}: Channel closed during/after processing (expected during shutdown).'
+                )
+            except Exception as e_ack:
+                logging.error(
+                    f'Unexpected error during ACK/NACK for tag {delivery_tag}: {e_ack}',
+                    exc_info=True,
+                )
 
         return __callback
 
