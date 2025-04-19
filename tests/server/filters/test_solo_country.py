@@ -71,73 +71,76 @@ class TestMovieFilter(unittest.TestCase):
         mock_channel.basic_ack.assert_called_once_with(delivery_tag=delivery_tag)
         mock_channel.basic_nack.assert_not_called()
 
-    # def test_process_message_fail_multiple_countries(self):
-    #     movie_bytes = self._create_movie_message(2, "Lost in Translation", ["USA", "Japan"])
-    #     delivery_tag = 102
-    #
-    #     mock_channel = self.mock_broker_instance.simulate_message(
-    #         self.input_queue, movie_bytes, delivery_tag
-    #     )
-    #
-    #     published = self.mock_broker_instance.get_published_messages(self.output_queue)
-    #     self.assertEqual(len(published), 0, "Should not publish any message")
-    #
-    #     mock_channel.basic_ack.assert_called_once_with(delivery_tag=delivery_tag)
-    #     mock_channel.basic_nack.assert_not_called()
-    #
-    # def test_process_message_fail_no_countries(self):
-    #     movie_bytes = self._create_movie_message(3, "No countries", None)
-    #     delivery_tag = 103
-    #
-    #     mock_channel = self.mock_broker_instance.simulate_message(
-    #         self.input_queue, movie_bytes, delivery_tag
-    #     )
-    #
-    #     published = self.mock_broker_instance.get_published_messages(self.output_queue)
-    #     self.assertEqual(len(published), 0)
-    #
-    #     mock_channel.basic_ack.assert_called_once_with(delivery_tag=delivery_tag)
-    #     mock_channel.basic_nack.assert_not_called()
-    #
-    # def test_process_message_fail_empty_countries(self):
-    #     movie_bytes = self._create_movie_message(4, "Empty countries", [])
-    #     delivery_tag = 104
-    #
-    #     mock_channel = self.mock_broker_instance.simulate_message(
-    #         self.input_queue, movie_bytes, delivery_tag
-    #     )
-    #     published = self.mock_broker_instance.get_published_messages(self.output_queue)
-    #     self.assertEqual(len(published), 0)
-    #
-    #     mock_channel.basic_ack.assert_called_once_with(delivery_tag=delivery_tag)
-    #     mock_channel.basic_nack.assert_not_called()
-    #
-    # def test_process_message_eof_propagates(self):
-    #     eof_bytes = self._create_eof_message()
-    #     delivery_tag = 105
-    #
-    #     mock_channel = self.mock_broker_instance.simulate_message(
-    #         self.input_queue, eof_bytes, delivery_tag
-    #     )
-    #
-    #     published = self.mock_broker_instance.get_published_messages(self.output_queue)
-    #     self.assertEqual(len(published), 1, "Should publish EOF (propagation)")
-    #     published_msg = Message.from_bytes(published[0])
-    #     self.assertEqual(published_msg.message_type, MessageType.EOF)
-    #
-    #     mock_channel.basic_ack.assert_called_once_with(delivery_tag=delivery_tag)
-    #     mock_channel.basic_nack.assert_not_called()
-    #
-    # def test_process_message_invalid_message_nacks(self):
-    #     invalid_bytes = b'\x99\x00\x01{'
-    #     delivery_tag = 106
-    #
-    #     mock_channel = self.mock_broker_instance.simulate_message(
-    #         self.input_queue, invalid_bytes, delivery_tag
-    #     )
-    #
-    #     published = self.mock_broker_instance.get_published_messages(self.output_queue)
-    #     self.assertEqual(len(published), 0)
-    #
-    #     mock_channel.basic_ack.assert_not_called()
-    #     mock_channel.basic_nack.assert_called_once_with(delivery_tag=delivery_tag, requeue=False)
+    def test_process_message_fail_multiple_countries(self):
+        movie_bytes = self._create_movie_message(
+            2, 'Lost in Translation', ['USA', 'Japan']
+        )
+        delivery_tag = 102
+
+        mock_channel = MockChannel()
+        mock_method = MockMethod(delivery_tag=delivery_tag)
+
+        self.consumer_callback_wrapper(mock_channel, mock_method, None, movie_bytes)
+
+        published = self.mock_broker_instance.get_published_messages(self.output_queue)
+        self.assertEqual(
+            len(published), 0, 'Should not publish any message (multiple countries)'
+        )
+
+        mock_channel.basic_ack.assert_called_once_with(delivery_tag=delivery_tag)
+        mock_channel.basic_nack.assert_not_called()
+
+    def test_process_message_fail_no_countries(self):
+        movie_bytes = self._create_movie_message(3, 'No countries', None)
+        delivery_tag = 103
+
+        mock_channel = MockChannel()
+        mock_method = MockMethod(delivery_tag=delivery_tag)
+
+        self.consumer_callback_wrapper(mock_channel, mock_method, None, movie_bytes)
+
+        published = self.mock_broker_instance.get_published_messages(self.output_queue)
+        self.assertEqual(
+            len(published), 0, 'Should not publish any message (None countries)'
+        )
+
+        mock_channel.basic_ack.assert_called_once_with(delivery_tag=delivery_tag)
+        mock_channel.basic_nack.assert_not_called()
+
+    def test_process_message_fail_empty_countries(self):
+        movie_bytes = self._create_movie_message(4, 'Empty countries', [])
+        delivery_tag = 104
+
+        mock_channel = MockChannel()
+        mock_method = MockMethod(delivery_tag=delivery_tag)
+
+        self.consumer_callback_wrapper(mock_channel, mock_method, None, movie_bytes)
+
+        published = self.mock_broker_instance.get_published_messages(self.output_queue)
+        self.assertEqual(
+            len(published), 0, 'Should not publish any message (empty countries list)'
+        )
+
+        mock_channel.basic_ack.assert_called_once_with(delivery_tag=delivery_tag)
+        mock_channel.basic_nack.assert_not_called()
+
+    def test_process_message_eof_propagates(self):
+        eof_bytes = self._create_eof_message()
+        delivery_tag = 105
+
+        mock_channel = MockChannel()
+        mock_method = MockMethod(delivery_tag=delivery_tag)
+
+        self.consumer_callback_wrapper(mock_channel, mock_method, None, eof_bytes)
+
+        published = self.mock_broker_instance.get_published_messages(self.output_queue)
+        self.assertEqual(len(published), 1, 'Should publish EOF (propagation)')
+        published_msg = Message.from_bytes(published[0])
+        self.assertEqual(
+            published_msg.message_type,
+            MessageType.EOF,
+            'Published message should be EOF',
+        )
+
+        mock_channel.basic_ack.assert_called_once_with(delivery_tag=delivery_tag)
+        mock_channel.basic_nack.assert_not_called()

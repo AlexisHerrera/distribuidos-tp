@@ -2,7 +2,15 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY src/server/cleaner .
-COPY src/common/ common/
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-ENTRYPOINT ["python", "main.py"]
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy all code from src
+COPY src/ ./src/
+
+ENTRYPOINT ["python", "src/server/cleaner/main.py"]

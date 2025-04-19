@@ -13,4 +13,4 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy all code from src
 COPY src/ ./src/
 
-ENTRYPOINT ["python", "src/server/filter/main.py"]
+ENTRYPOINT ["python", "src/server/filters/main.py"]
