@@ -77,6 +77,23 @@ services:
     # deploy:
     #   replicas: 3
 
+  country_budget_counter:
+    container_name: country_budget_counter
+    build:
+      context: .
+      dockerfile: src/server/counters/Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RABBIT_HOST=rabbitmq
+      - INPUT_QUEUE=movies_single_country_queue
+      - PYTHONPATH=/app
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+
 networks:
   testing_net:
     ipam:

@@ -167,6 +167,8 @@ def main():
         eof_bytes = eof_batch.to_bytes()
         send_message(client_socket, eof_bytes)
         logging.info('Final EOF marker sent.')
+        logging.info('Waiting for response.')
+        time.sleep(60 * 10)
         client_socket.close()
         logging.info('Client socket closed.')
     except ValueError as e:
