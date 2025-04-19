@@ -96,13 +96,14 @@ class CountryBudgetCounter:
             if not isinstance(movie, Movie):
                 logger.warning(f'Data in list is not a Movie object: {type(movie)}')
                 return
+            production_countries = list(movie.production_countries)
             if (
-                not movie.production_countries
-                or not isinstance(movie.production_countries, list)
-                or len(movie.production_countries) != 1
+                not production_countries
+                or not isinstance(production_countries, list)
+                or len(production_countries) != 1
             ):
                 logger.warning(
-                    f"Movie ID {movie.id} received, but has invalid 'production_countries': {movie.production_countries}. Skipping count."
+                    f"Movie ID {movie.id} received, but has invalid 'production_countries': {production_countries}. Skipping count."
                 )
                 return
             if not isinstance(movie.budget, (int, float)) or movie.budget < 0:
@@ -111,7 +112,7 @@ class CountryBudgetCounter:
                 )
                 return
 
-            country = movie.production_countries[0]
+            country = production_countries[0]
             budget = int(movie.budget)
 
             self.country_budgets[country] += budget
