@@ -1,4 +1,3 @@
-# pylint: disable=no-member
 from src.messaging.protobuf import movie_budget_counters_pb2
 from src.messaging.protocol.message_protocol import MessageProtocol
 from src.model.movie_budget_counter import MovieBudgetCounter
@@ -6,10 +5,12 @@ from src.model.movie_budget_counter import MovieBudgetCounter
 
 class MovieBudgetCounterProtocol(MessageProtocol):
     def __init__(self):
-        super().__init__(item_to_bytes=self.__to_movie_budget_counter_pb,
-                        encode_all=self.__encode_all,
-                        bytes_to_item=self.__to_movie_budget_counter,
-                        decode_all=self.__decode_all)
+        super().__init__(
+            item_to_bytes=self.__to_movie_budget_counter_pb,
+            encode_all=self.__encode_all,
+            bytes_to_item=self.__to_movie_budget_counter,
+            decode_all=self.__decode_all,
+        )
 
     def __to_movie_budget_counter_pb(self, movie_budget_counter: MovieBudgetCounter):
         movie_budget_counter_encoded = movie_budget_counters_pb2.MovieBudgetCounter()
@@ -19,8 +20,10 @@ class MovieBudgetCounterProtocol(MessageProtocol):
 
         return movie_budget_counter_encoded
 
-    def __encode_all(self, l):
-        return movie_budget_counters_pb2.MovieBudgetCounters(list=l).SerializeToString()
+    def __encode_all(self, a_list):
+        return movie_budget_counters_pb2.MovieBudgetCounters(
+            list=a_list
+        ).SerializeToString()
 
     def __to_movie_budget_counter(self, movie_budget_counter_pb2) -> MovieBudgetCounter:
         country = movie_budget_counter_pb2.country

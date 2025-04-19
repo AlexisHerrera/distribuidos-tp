@@ -8,7 +8,7 @@ from src.messaging.publisher import BroadcastPublisher, DirectPublisher
 class TestPublisher:
     def test_broadcast_publisher_init(self):
         broker = Mock(Broker)
-        exchange_name = "test"
+        exchange_name = 'test'
 
         _publisher = BroadcastPublisher(broker, exchange_name)
 
@@ -17,7 +17,7 @@ class TestPublisher:
     def test_broadcast_publisher_put(self):
         broker = Mock(Broker)
         message = Mock(Message)
-        exchange_name = "test"
+        exchange_name = 'test'
 
         msg = b'msg'
 
@@ -32,7 +32,7 @@ class TestPublisher:
 
     def test_direct_publisher_init(self):
         broker = Mock(Broker)
-        queue_name = "test"
+        queue_name = 'test'
 
         _publisher = DirectPublisher(broker, queue_name)
 
@@ -41,7 +41,7 @@ class TestPublisher:
     def test_direct_publisher_put(self):
         broker = Mock(Broker)
         message = Mock(Message)
-        queue_name = "test"
+        queue_name = 'test'
 
         msg = b'msg'
 
@@ -55,5 +55,5 @@ class TestPublisher:
         message.to_bytes.assert_called_once()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

@@ -7,7 +7,7 @@ from src.messaging.protocol.message import Message, MessageType
 from src.messaging.publisher import Publisher
 
 
-class TestConnection():
+class TestConnection:
     def test_message_send(self):
         broker = Mock(Broker)
         publisher = Mock(Publisher)
@@ -15,7 +15,7 @@ class TestConnection():
 
         connection = Connection(broker, publisher, consumer)
 
-        message = Message(MessageType.Unknown, "message")
+        message = Message(MessageType.Unknown, 'message')
 
         connection.send(message)
 
@@ -37,7 +37,6 @@ class TestConnection():
 
         consumer.consume.assert_called_once()
 
-
     def test_close(self):
         broker = Mock(Broker)
         publisher = Mock(Publisher)
@@ -50,5 +49,5 @@ class TestConnection():
         broker.close.assert_called_once()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

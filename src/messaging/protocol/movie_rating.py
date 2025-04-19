@@ -1,4 +1,3 @@
-# pylint: disable=no-member
 from src.messaging.protobuf import movie_ratings_pb2
 from src.messaging.protocol.message_protocol import MessageProtocol
 from src.model.movie_rating import MovieRating
@@ -6,10 +5,12 @@ from src.model.movie_rating import MovieRating
 
 class MovieRatingProtocol(MessageProtocol):
     def __init__(self):
-        super().__init__(item_to_bytes=self.__to_movie_rating_pb,
-                        encode_all=self.__encode_all,
-                        bytes_to_item=self.__to_movie_rating,
-                        decode_all=self.__decode_all)
+        super().__init__(
+            item_to_bytes=self.__to_movie_rating_pb,
+            encode_all=self.__encode_all,
+            bytes_to_item=self.__to_movie_rating,
+            decode_all=self.__decode_all,
+        )
 
     def __to_movie_rating_pb(self, movie_rating: MovieRating):
         movie_rating_encoded = movie_ratings_pb2.MovieRating()
@@ -20,8 +21,8 @@ class MovieRatingProtocol(MessageProtocol):
 
         return movie_rating_encoded
 
-    def __encode_all(self, l):
-        return movie_ratings_pb2.MovieRatings(list=l).SerialiazeToString()
+    def __encode_all(self, a_list):
+        return movie_ratings_pb2.MovieRatings(list=a_list).SerialiazeToString()
 
     def __to_movie_rating(self, movie_rating_pb2) -> MovieRating:
         movie_id = movie_rating_pb2.id

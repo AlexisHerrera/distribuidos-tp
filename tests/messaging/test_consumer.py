@@ -8,8 +8,8 @@ from src.messaging.consumer import BroadcastConsumer
 class TestConsumer:
     def test_broadcast_consumer_init(self):
         broker = Mock(Broker)
-        exchange_name = "test"
-        queue_name = "new_queue"
+        exchange_name = 'test'
+        queue_name = 'new_queue'
 
         broker.queue_declare.return_value = queue_name
 
@@ -22,8 +22,8 @@ class TestConsumer:
     def test_broadcast_consumer_consume(self):
         broker = Mock(Broker)
         message = Mock(Message)
-        exchange_name = "test"
-        queue_name = "new_queue"
+        exchange_name = 'test'
+        queue_name = 'new_queue'
 
         broker.queue_declare.return_value = queue_name
 
@@ -34,5 +34,5 @@ class TestConsumer:
         broker.consume.assert_called_once_with(ANY, queue_name)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

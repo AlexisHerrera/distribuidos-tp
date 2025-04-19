@@ -1,4 +1,3 @@
-# pylint: disable=no-member
 import unittest
 
 from src.messaging.protocol.movie import MovieProtocol
@@ -17,7 +16,7 @@ class TestMovieProtocol:
         assert res_bytes_amount == expected_bytes_amount
 
     def test_to_bytes(self):
-        movie = Movie(movie_id=1, title="Toy Story")
+        movie = Movie(movie_id=1, title='Toy Story')
         protocol = MovieProtocol()
 
         res_encoded, res_bytes_amount = protocol.to_bytes([movie])
@@ -37,7 +36,7 @@ class TestMovieProtocol:
         assert res_bytes_amount == bytes_amount
 
     def test_from_bytes(self):
-        movie = Movie(movie_id=1, title="Toy Story")
+        movie = Movie(movie_id=1, title='Toy Story')
         movie_encoded = movies_pb2.Movie()
         movie_encoded.id = movie.id
         movie_encoded.title = movie.title
@@ -54,15 +53,17 @@ class TestMovieProtocol:
         assert result[0].title == movie.title
 
     def test_to_bytes_with_all_fields(self):
-        movie = Movie(movie_id=1,
-                    title="Toy Story",
-                    genres=["Comedy", "Family", "Animation"],
-                    release_date="1995-10-30",
-                    production_countries=["United States of America"],
-                    budget=30000000,
-                    revenue=373554033,
-                    overview="Led by Woody, Andy's toys live happily in his room until Andy's\
-                    birthday brings Buzz Lightyear onto ...")
+        movie = Movie(
+            movie_id=1,
+            title='Toy Story',
+            genres=['Comedy', 'Family', 'Animation'],
+            release_date='1995-10-30',
+            production_countries=['United States of America'],
+            budget=30000000,
+            revenue=373554033,
+            overview="Led by Woody, Andy's toys live happily in his room until Andy's\
+                    birthday brings Buzz Lightyear onto ...",
+        )
 
         protocol = MovieProtocol()
 
@@ -85,5 +86,5 @@ class TestMovieProtocol:
         assert res_bytes_amount == bytes_amount
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
