@@ -5,7 +5,7 @@ from src.messaging.publisher import BroadcastPublisher, DirectPublisher
 from src.utils.config import Config
 
 
-class ConnectionCreator():
+class ConnectionCreator:
     @staticmethod
     def create(config: Config) -> Connection:
         broker = RabbitMQBroker(config.rabbit_host)

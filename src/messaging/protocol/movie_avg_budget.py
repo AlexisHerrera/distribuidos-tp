@@ -1,4 +1,3 @@
-# pylint: disable=no-member
 from src.messaging.protobuf import movie_avg_budgets_pb2
 from src.messaging.protocol.message_protocol import MessageProtocol
 from src.model.movie_avg_budget import MovieAvgBudget
@@ -6,23 +5,27 @@ from src.model.movie_avg_budget import MovieAvgBudget
 
 class MovieAvgBudgetProtocol(MessageProtocol):
     def __init__(self):
-        super().__init__(item_to_bytes=self.__to_movie_avg_budget_pb2,
-                        encode_all=self.__encode_all,
-                        bytes_to_item=self.__to_movie_avg_budget,
-                        decode_all=self.__decode_all)
+        super().__init__(
+            item_to_bytes=self.__to_movie_avg_budget_pb2,
+            encode_all=self.__encode_all,
+            bytes_to_item=self.__to_movie_avg_budget,
+            decode_all=self.__decode_all,
+        )
 
     def __to_movie_avg_budget_pb2(self, movie_avg_budget: MovieAvgBudget):
         movie_avg_budget_encoded = movie_avg_budgets_pb2.MovieAvgBudget()
 
         movie_avg_budget_encoded.id = movie_avg_budget.movie_id
         movie_avg_budget_encoded.title = movie_avg_budget.title
-        movie_avg_budget_encoded.avg_budget_revenue = movie_avg_budget.avg_budget_revenue
+        movie_avg_budget_encoded.avg_budget_revenue = (
+            movie_avg_budget.avg_budget_revenue
+        )
         movie_avg_budget_encoded.sentiment = movie_avg_budget.sentiment
 
         return movie_avg_budget_encoded
 
-    def __encode_all(self, l):
-        return movie_avg_budgets_pb2.MovieAvgBudgets(list=l).SerializeToString()
+    def __encode_all(self, a_list):
+        return movie_avg_budgets_pb2.MovieAvgBudgets(list=a_list).SerializeToString()
 
     def __to_movie_avg_budget(self, movie_avg_budget_pb2) -> MovieAvgBudget:
         movie_id = movie_avg_budget_pb2.id

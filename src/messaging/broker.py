@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Callable
 import pika
 
+
 class Broker(ABC):
     @abstractmethod
     def exchange_declare(self, exchange_name: str, exchange_type: str):
@@ -30,26 +31,38 @@ class Broker(ABC):
 
 class RabbitMQBroker(Broker):
     def __init__(self, host: str):
-        self.__connection = pika.BlockingConnection(pika.ConnectionParameters(host=host))
+        self.__connection = pika.BlockingConnection(
+            pika.ConnectionParameters(host=host)
+        )
         self.__channel = self.__connection.channel()
 
     def exchange_declare(self, exchange_name: str, exchange_type: str):
-        self.__channel.exchange_declare(exchange=exchange_name, exchange_type=exchange_type)
+        self.__channel.exchange_declare(
+            exchange=exchange_name, exchange_type=exchange_type
+        )
 
-    def queue_declare(self, queue_name: str = '', exclusive: bool = False, durable: bool = True) -> str:
+    def queue_declare(
+        self, queue_name: str = '', exclusive: bool = False, durable: bool = True
+    ) -> str:
         # Is an exclusive queue (only
         exclusive_actual = exclusive if queue_name else True
-        result = self.__channel.queue_declare(queue=queue_name, exclusive=exclusive_actual, durable=durable)
+        result = self.__channel.queue_declare(
+            queue=queue_name, exclusive=exclusive_actual, durable=durable
+        )
         return result.method.queue
 
     def queue_bind(self, exchange_name: str, queue_name: str):
         self.__channel.queue_bind(exchange=exchange_name, queue=queue_name)
 
     def put(self, exchange: str = '', routing_key: str = '', body: bytes = b''):
-        self.__channel.basic_publish(exchange=exchange, routing_key=routing_key, body=body)
+        self.__channel.basic_publish(
+            exchange=exchange, routing_key=routing_key, body=body
+        )
 
     def consume(self, callback: Callable, queue_name: str):
-        self.__channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
+        self.__channel.basic_consume(
+            queue=queue_name, on_message_callback=callback, auto_ack=False
+        )
         self.__channel.start_consuming()
 
     def close(self):

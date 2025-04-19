@@ -5,7 +5,7 @@ from src.messaging.publisher import Publisher
 from src.messaging.consumer import Consumer
 
 
-class Connection():
+class Connection:
     def __init__(self, broker: Broker, publisher: Publisher, consumer: Consumer):
         self.__broker = broker
         self.__publisher = publisher

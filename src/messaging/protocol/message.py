@@ -34,7 +34,7 @@ class MessageType(Enum):
         return MessageType.Unknown
 
 
-class Message():
+class Message:
     MSG_TYPE_LEN = 1
     MSG_LEN_SIZE = 2
 
@@ -46,20 +46,28 @@ class Message():
         encoder = Message.__get_protocol(self.message_type)
 
         (data_encoded, bytes_amount) = encoder.to_bytes(self.data)
-        msg_type_encoded = Message.__int_to_bytes(self.message_type.value, Message.MSG_TYPE_LEN)
-        bytes_amount_encoded = Message.__int_to_bytes(bytes_amount, Message.MSG_LEN_SIZE)
+        msg_type_encoded = Message.__int_to_bytes(
+            self.message_type.value, Message.MSG_TYPE_LEN
+        )
+        bytes_amount_encoded = Message.__int_to_bytes(
+            bytes_amount, Message.MSG_LEN_SIZE
+        )
 
         return msg_type_encoded + bytes_amount_encoded + data_encoded
 
     @staticmethod
     def from_bytes(buf: bytes):
         msg_type_from_buf = Message.__int_from_bytes(buf, Message.MSG_TYPE_LEN)
-        bytes_amount = Message.__int_from_bytes(buf[Message.MSG_TYPE_LEN:], Message.MSG_LEN_SIZE)
+        bytes_amount = Message.__int_from_bytes(
+            buf[Message.MSG_TYPE_LEN :], Message.MSG_LEN_SIZE
+        )
 
         msg_type = MessageType(msg_type_from_buf)
         decoder = Message.__get_protocol(msg_type)
 
-        data: list | None = decoder.from_bytes(buf[Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE:], bytes_amount)
+        data: list | None = decoder.from_bytes(
+            buf[Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE :], bytes_amount
+        )
 
         return Message(msg_type, data)
 
@@ -72,7 +80,7 @@ class Message():
         return value.to_bytes(bytes_amount, 'big', signed=False)
 
     @staticmethod
-    def __get_protocol(msg_type: MessageType) -> MessageProtocol: # pylint: disable=too-many-return-statements
+    def __get_protocol(msg_type: MessageType) -> MessageProtocol:
         match msg_type:
             case MessageType.Movie:
                 return MovieProtocol()

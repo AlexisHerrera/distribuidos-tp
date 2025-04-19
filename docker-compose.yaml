@@ -30,31 +30,45 @@ services:
       - SERVER_HOST=cleaner
       - SERVER_PORT=12345
       - BATCH_SIZE=20
+      - PYTHONPATH=/app
     networks:
       - testing_net
     volumes:
       - ./.data:/app/.data
+    depends_on:
+      cleaner:
+        condition: service_started
 
   cleaner:
     container_name: cleaner
-    image: cleaner:latest
+    build:
+      context: .
+      dockerfile: src/server/cleaner/Dockerfile
     environment:
+      - PYTHONUNBUFFERED=1
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
       - BATCH_SIZE=20
+      - RABBIT_HOST=rabbitmq
+      - OUTPUT_QUEUE=movies_cleaned_queue
+      - PYTHONPATH=/app
     networks:
       - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
   filter_single_country:
     container_name: filter_single_country
     build:
       context: .
-      dockerfile: src/server/filter/Dockerfile
+      dockerfile: src/server/filters/Dockerfile
     environment:
       - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
+      - PYTHONPATH=/app
     networks:
       - testing_net
     depends_on:

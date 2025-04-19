@@ -19,7 +19,7 @@ class Consumer(ABC):
                 callback(message)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             except Exception as e:
-                logging.error("%s", e)
+                logging.error('%s', e)
                 ch.basic_nack(delivery_tag=method.delivery_tag)
 
         return __callback
@@ -49,7 +49,7 @@ class NamedQueueConsumer(Consumer):
                 callback(message)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             except Exception as e:
-                logging.error("%s", e)
+                logging.error('%s', e)
                 ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
         broker.consume(__callback_wrapper, self.__queue_name)

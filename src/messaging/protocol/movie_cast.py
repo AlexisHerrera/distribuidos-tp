@@ -1,4 +1,3 @@
-# pylint: disable=no-member
 from src.messaging.protobuf import movie_casts_pb2
 from src.messaging.protocol.message_protocol import MessageProtocol
 from src.model.movie_cast import MovieCast
@@ -6,10 +5,12 @@ from src.model.movie_cast import MovieCast
 
 class MovieCastProtocol(MessageProtocol):
     def __init__(self):
-        super().__init__(item_to_bytes=self.__to_movie_cast_pb,
-                        encode_all=self.__encode_all,
-                        bytes_to_item=self.__to_movie_cast,
-                        decode_all=self.__decode_all)
+        super().__init__(
+            item_to_bytes=self.__to_movie_cast_pb,
+            encode_all=self.__encode_all,
+            bytes_to_item=self.__to_movie_cast,
+            decode_all=self.__decode_all,
+        )
 
     def __to_movie_cast_pb(self, movie_cast: MovieCast):
         movie_cast_encoded = movie_casts_pb2.MovieCast()
@@ -20,8 +21,8 @@ class MovieCastProtocol(MessageProtocol):
 
         return movie_cast_encoded
 
-    def __encode_all(self, l):
-        return movie_casts_pb2.MovieCasts(list=l).SerializeToString()
+    def __encode_all(self, a_list):
+        return movie_casts_pb2.MovieCasts(list=a_list).SerializeToString()
 
     def __to_movie_cast(self, movie_cast_pb2) -> MovieCast:
         movie_id = movie_cast_pb2.id

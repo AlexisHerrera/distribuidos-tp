@@ -1,4 +1,3 @@
-# pylint: disable=no-member
 from src.messaging.protobuf import movies_pb2
 from src.messaging.protocol.message_protocol import MessageProtocol
 from src.model.movie import Movie
@@ -6,10 +5,12 @@ from src.model.movie import Movie
 
 class MovieProtocol(MessageProtocol):
     def __init__(self):
-        super().__init__(item_to_bytes=self.__to_movie_pb,
-                        encode_all=self.__encode_all,
-                        bytes_to_item=self.__to_movie,
-                        decode_all=self.__decode_all)
+        super().__init__(
+            item_to_bytes=self.__to_movie_pb,
+            encode_all=self.__encode_all,
+            bytes_to_item=self.__to_movie,
+            decode_all=self.__decode_all,
+        )
 
     def __to_movie_pb(self, movie: Movie):
         movie_encoded = movies_pb2.Movie()
@@ -31,8 +32,8 @@ class MovieProtocol(MessageProtocol):
 
         return movie_encoded
 
-    def __encode_all(self, l):
-        return movies_pb2.Movies(list=l).SerializeToString()
+    def __encode_all(self, a_list):
+        return movies_pb2.Movies(list=a_list).SerializeToString()
 
     def __to_movie(self, movie_pb2) -> Movie:
         movie_id = movie_pb2.id
@@ -44,7 +45,16 @@ class MovieProtocol(MessageProtocol):
         revenue = movie_pb2.revenue
         overview = movie_pb2.overview
 
-        return Movie(movie_id, title, genres, release_date, production_countries, budget, revenue, overview)
+        return Movie(
+            movie_id,
+            title,
+            genres,
+            release_date,
+            production_countries,
+            budget,
+            revenue,
+            overview,
+        )
 
     def __decode_all(self, buf: bytes, bytes_amount: int):
         pb2_list = movies_pb2.Movies()

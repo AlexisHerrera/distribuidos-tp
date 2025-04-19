@@ -1,4 +1,3 @@
-# pylint: disable=no-member
 from src.messaging.protobuf import movie_sentiments_pb2
 from src.messaging.protocol.message_protocol import MessageProtocol
 from src.model.movie_sentiment import MovieSentiment
@@ -6,11 +5,12 @@ from src.model.movie_sentiment import MovieSentiment
 
 class MovieSentimentProtocol(MessageProtocol):
     def __init__(self):
-        super().__init__(item_to_bytes=self.__to_movie_sentiment_pb,
-                        encode_all=self.__encode_all,
-                        bytes_to_item=self.__to_movie_sentiment,
-                        decode_all=self.__decode_all)
-
+        super().__init__(
+            item_to_bytes=self.__to_movie_sentiment_pb,
+            encode_all=self.__encode_all,
+            bytes_to_item=self.__to_movie_sentiment,
+            decode_all=self.__decode_all,
+        )
 
     def __to_movie_sentiment_pb(self, movie_sentiment: MovieSentiment):
         movie_sentiment_encoded = movie_sentiments_pb2.MovieSentiments()
@@ -23,8 +23,8 @@ class MovieSentimentProtocol(MessageProtocol):
 
         return movie_sentiment_encoded
 
-    def __encode_all(self, l):
-        return movie_sentiments_pb2.MovieSentiments(list=l).SerializeToString()
+    def __encode_all(self, a_list):
+        return movie_sentiments_pb2.MovieSentiments(list=a_list).SerializeToString()
 
     def __to_movie_sentiment(self, movie_sentiment_pb2) -> MovieSentiment:
         movie_id = movie_sentiment_pb2.id

@@ -5,8 +5,9 @@ from src.utils.log import initialize_log, logging
 from src.messaging.connection_creator import ConnectionCreator
 from src.utils.config import Config
 
+
 def callback(body: Message):
-    logging.info(f"{body.message_type} {body.data}")
+    logging.info(f'{body.message_type} {body.data}')
 
 
 def main():
@@ -23,5 +24,5 @@ def main():
     conn.recv(callback=callback)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
