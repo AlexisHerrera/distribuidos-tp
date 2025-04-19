@@ -1,11 +1,9 @@
 import unittest
 from unittest.mock import patch
-import logging
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie import Movie
 from src.server.filters.main import MovieFilter
-from src.utils.config import Config
 from tests.mocks.mock_broker import MockBroker, MockChannel, MockMethod
 
 # logging.disable(logging.CRITICAL)
@@ -38,8 +36,11 @@ class TestMovieFilter(unittest.TestCase):
         self.movie_filter.connection.recv(self.movie_filter.process_message)
         registered_callbacks = self.mock_broker_instance.consumers
 
-        self.assertIn(self.input_queue, registered_callbacks,
-                      f"No consumer registered for queue '{self.input_queue}' in mock after calling connection.recv")
+        self.assertIn(
+            self.input_queue,
+            registered_callbacks,
+            f"No consumer registered for queue '{self.input_queue}' in mock after calling connection.recv",
+        )
         consumer_callback_wrapper = registered_callbacks.get(self.input_queue)
         self.consumer_callback_wrapper = consumer_callback_wrapper
 
@@ -53,7 +54,7 @@ class TestMovieFilter(unittest.TestCase):
         return message.to_bytes()
 
     def test_process_message_pass_single_country(self):
-        movie_bytes = self._create_movie_message(1, "Relatos Salvajes", ["Argentina"])
+        movie_bytes = self._create_movie_message(1, 'Relatos Salvajes', ['Argentina'])
         delivery_tag = 101
 
         mock_channel = MockChannel()
@@ -61,11 +62,11 @@ class TestMovieFilter(unittest.TestCase):
         self.consumer_callback_wrapper(mock_channel, mock_method, None, movie_bytes)
 
         published = self.mock_broker_instance.get_published_messages(self.output_queue)
-        self.assertEqual(len(published), 1, "Should publish 1 message")
+        self.assertEqual(len(published), 1, 'Should publish 1 message')
         published_msg = Message.from_bytes(published[0])
         self.assertEqual(published_msg.message_type, MessageType.Movie)
         self.assertEqual(published_msg.data[0].id, 1)
-        self.assertEqual(published_msg.data[0].production_countries, ["Argentina"])
+        self.assertEqual(published_msg.data[0].production_countries, ['Argentina'])
 
         mock_channel.basic_ack.assert_called_once_with(delivery_tag=delivery_tag)
         mock_channel.basic_nack.assert_not_called()

@@ -11,12 +11,12 @@ def main():
     conn = ConnectionCreator.create(config)
     initialize_log()
 
-    message = Message(MessageType.Movie, [Movie(1, "Toy Story"), Movie(2, "Shrek")])
+    message = Message(MessageType.Movie, [Movie(1, 'Toy Story'), Movie(2, 'Shrek')])
 
     conn.send(message)
 
     conn.close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

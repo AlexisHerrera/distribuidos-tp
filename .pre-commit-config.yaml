@@ -1,0 +1,18 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 'v0.11.6'
+    hooks:
+      - id: ruff
+        # args: [--fix, --exit-non-zero-on-fix]
+        args: [--show-fixes]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: pytest
+        name: Run Pytest
+        entry: pytest
+        language: system
+        types: [python]
+        pass_filenames: false
+        # stages: [commit]
+        # verbose: true

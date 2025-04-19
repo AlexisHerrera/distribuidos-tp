@@ -1,4 +1,3 @@
-# pylint: disable=no-member
 from src.messaging.protobuf import movie_ratings_avgs_pb2
 from src.messaging.protocol.message_protocol import MessageProtocol
 from src.model.movie_rating_avg import MovieRatingAvg
@@ -6,10 +5,12 @@ from src.model.movie_rating_avg import MovieRatingAvg
 
 class MovieRatingAvgProtocol(MessageProtocol):
     def __init__(self):
-        super().__init__(item_to_bytes=self.__to_movie_rating_avg_pb,
-                        encode_all=self.__encode_all,
-                        bytes_to_item=self.__to_movie_rating_avg,
-                        decode_all=self.__decode_all)
+        super().__init__(
+            item_to_bytes=self.__to_movie_rating_avg_pb,
+            encode_all=self.__encode_all,
+            bytes_to_item=self.__to_movie_rating_avg,
+            decode_all=self.__decode_all,
+        )
 
     def __to_movie_rating_avg_pb(self, movie_rating_avg: MovieRatingAvg):
         movie_rating_avg_encoded = movie_ratings_avgs_pb2.MovieRatingAvg()
@@ -20,8 +21,8 @@ class MovieRatingAvgProtocol(MessageProtocol):
 
         return movie_rating_avg_encoded
 
-    def __encode_all(self, l):
-        return movie_ratings_avgs_pb2.MovieRatingAvgs(list=l).SerializeToString()
+    def __encode_all(self, a_list):
+        return movie_ratings_avgs_pb2.MovieRatingAvgs(list=a_list).SerializeToString()
 
     def __to_movie_rating_avg(self, movie_rating_avg_pb2) -> MovieRatingAvg:
         movie_id = movie_rating_avg_pb2.id

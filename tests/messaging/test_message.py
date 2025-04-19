@@ -5,10 +5,11 @@ from src.model.cast import Cast
 from src.model.movie import Movie
 from src.model.rating import Rating
 
+
 class TestMessage:
     class TestMovie:
         def test_encode_movie(self):
-            movie = Movie(1, "Toy Story")
+            movie = Movie(1, 'Toy Story')
             message = Message(MessageType.Movie, [movie])
 
             message_bytes = message.to_bytes()
@@ -20,7 +21,7 @@ class TestMessage:
             assert len(message_bytes[3:]) == bytes_amount
 
         def test_encode_and_decode_movie_should_return_same_movie(self):
-            movie = Movie(1, "Toy Story")
+            movie = Movie(1, 'Toy Story')
             message = Message(MessageType.Movie, [movie])
 
             message_bytes = message.to_bytes()
@@ -35,7 +36,6 @@ class TestMessage:
 
             assert result_movie.id == movie.id
             assert result_movie.title == movie.title
-
 
     class TestRating:
         def test_encode_rating(self):
@@ -69,7 +69,7 @@ class TestMessage:
 
     class TestCast:
         def test_encode_cast(self):
-            cast = Cast(1, ["Ricardo Darín", "Guillermo Francella"])
+            cast = Cast(1, ['Ricardo Darín', 'Guillermo Francella'])
             message = Message(MessageType.Cast, [cast])
 
             message_bytes = message.to_bytes()
@@ -81,7 +81,7 @@ class TestMessage:
             assert len(message_bytes[3:]) == bytes_amount
 
         def test_encode_and_decode_cast_should_return_same_cast(self):
-            cast = Cast(1, ["Ricardo Darín", "Guillermo Francella"])
+            cast = Cast(1, ['Ricardo Darín', 'Guillermo Francella'])
             message = Message(MessageType.Cast, [cast])
 
             message_bytes = message.to_bytes()
@@ -104,8 +104,13 @@ class TestMessage:
 
             result = message.to_bytes()
 
-            assert result[:Message.MSG_TYPE_LEN] == MessageType.EOF.value.to_bytes()
-            assert result[Message.MSG_TYPE_LEN:Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE] == b'\x00\x00'
+            assert result[: Message.MSG_TYPE_LEN] == MessageType.EOF.value.to_bytes()
+            assert (
+                result[
+                    Message.MSG_TYPE_LEN : Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE
+                ]
+                == b'\x00\x00'
+            )
 
         def test_decode_eof_should_return_eof_type(self):
             message = Message(MessageType.EOF, None)
@@ -118,6 +123,5 @@ class TestMessage:
             assert result.data == message.data
 
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
