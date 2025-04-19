@@ -17,7 +17,7 @@ def receive_movies(client_socket):
             logging.info('EOF_MOVIES message received.')
             break
         else:
-            logging.info(f'Movie Batch: {message}')
+            logging.info(f'Movie Batch Length: {len(message)}')
     client_socket.close()
 
 

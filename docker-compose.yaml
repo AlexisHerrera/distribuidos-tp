@@ -49,7 +49,7 @@ services:
     container_name: filter_single_country
     build:
       context: .
-      dockerfile: src/server/filter/Dockerfile
+      dockerfile: src/server/filters/Dockerfile
     environment:
       - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
