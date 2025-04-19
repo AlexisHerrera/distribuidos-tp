@@ -3,9 +3,9 @@ import signal
 
 from src.messaging.broker import RabbitMQBroker
 from src.messaging.connection import Connection
+from src.messaging.consumer import NamedQueueConsumer
 from src.messaging.protocol.message import Message, MessageType
 from src.messaging.publisher import DirectPublisher
-from src.messaging.consumer import NamedQueueConsumer
 from src.model.movie import Movie
 from src.utils.config import Config
 
