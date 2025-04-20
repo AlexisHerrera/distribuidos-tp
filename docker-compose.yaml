@@ -43,7 +43,8 @@ services:
     container_name: cleaner
     build:
       context: .
-      dockerfile: src/server/cleaner/Dockerfile
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/cleaner/main.py"]
     environment:
       - PYTHONUNBUFFERED=1
       - SERVER_PORT=12345
@@ -62,7 +63,8 @@ services:
     container_name: filter_single_country
     build:
       context: .
-      dockerfile: src/server/filters/Dockerfile
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/single_country.py"]
     environment:
       - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
@@ -81,7 +83,8 @@ services:
     container_name: country_budget_counter
     build:
       context: .
-      dockerfile: src/server/counters/Dockerfile
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/country_budget.py"]
     environment:
       - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
