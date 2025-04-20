@@ -12,5 +12,3 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy all code from src
 COPY src/ ./src/
-
-ENTRYPOINT ["python", "src/client/main.py", ".data/movies_metadata.csv", ".data/ratings.csv", ".data/credits.csv"]
