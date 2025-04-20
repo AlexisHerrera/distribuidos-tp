@@ -1,0 +1,79 @@
+name: tp-escalabilidad
+
+services:
+  rabbitmq:
+    container_name: rabbitmq
+    build:
+      context: .
+      dockerfile: rabbitmq/Dockerfile
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    environment:
+      - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing_net
+
+  cleaner:
+    container_name: cleaner
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/cleaner/main.py"]
+    environment:
+      - SERVER_PORT=12345
+      - LISTENING_BACKLOG=3
+      - BATCH_SIZE=20
+      - RABBIT_HOST=rabbitmq
+      - OUTPUT_QUEUE=movies_cleaned_queue
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  filter_single_country-1:
+    container_name: filter_single_country-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/single_country.py"]
+    environment:
+      - RABBIT_HOST=rabbitmq
+      - INPUT_QUEUE=movies_cleaned_queue
+      - OUTPUT_QUEUE=movies_single_country_queue
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  country_budget_counter:
+    container_name: country_budget_counter
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/country_budget.py"]
+    environment:
+      - RABBIT_HOST=rabbitmq
+      - INPUT_QUEUE=movies_single_country_queue
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    
+networks:
+  testing_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.125.0/24
+    
