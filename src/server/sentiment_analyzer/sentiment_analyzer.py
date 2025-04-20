@@ -1,4 +1,5 @@
 import logging
+import signal
 
 from transformers import pipeline
 
@@ -19,12 +20,16 @@ class SentimentAnalyzer:
             'sentiment-analysis',
             model='distilbert-base-uncased-finetuned-sst-2-english',
         )
+        signal.signal(signal.SIGTERM, self._handle_termination)
+        signal.signal(signal.SIGINT, self._handle_termination)
 
-    def _handle_termination(self, signum, frame):
+    def _handle_termination(self, signum, _frame):
         logger.warning(f'SIGTERM signal received ({signum}). Closing connection...')
         self.running = False
+
         if self.connection:
             self.connection.close()
+
         logger.warning('Connection closed.')
 
     def process_message(self, message: Message):
@@ -39,6 +44,8 @@ class SentimentAnalyzer:
                 self.__handle_movies(message.data)
             case MessageType.EOF:
                 self.__handle_eof()
+            case _:
+                logger.warning(f'Unknown message: {message.message_type}')
 
     def __handle_movies(self, movies: list[Movie]):
         analyzed_movies = []
