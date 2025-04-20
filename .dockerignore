@@ -17,3 +17,6 @@ protobuf
 .gitignore
 generate-compose.py
 Makefile
+**/*.ini
+**/*.json
+**/Dockerfile
