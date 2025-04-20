@@ -12,6 +12,7 @@ class MockChannel:
     def __init__(self):
         self.basic_ack = MagicMock()
         self.basic_nack = MagicMock()
+        self.is_open = True
 
 
 class MockMethod:

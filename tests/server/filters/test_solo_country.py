@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie import Movie
-from src.server.filters.main import MovieFilter
+from src.server.filters.single_country import MovieFilter
 from tests.mocks.mock_broker import MockBroker, MockChannel, MockMethod
 
 # logging.disable(logging.CRITICAL)
@@ -22,7 +22,7 @@ class MockConfig:
 
 
 class TestMovieFilter(unittest.TestCase):
-    @patch('src.server.filters.main.RabbitMQBroker')
+    @patch('src.server.filters.single_country.RabbitMQBroker')
     def setUp(self, broker):
         self.mock_broker_instance = MockBroker()
         broker.return_value = self.mock_broker_instance
