@@ -25,15 +25,14 @@ services:
     container_name: cleaner
     build:
       context: .
-      dockerfile: src/server/cleaner/Dockerfile
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/cleaner/main.py"]
     environment:
-      - PYTHONUNBUFFERED=1
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
       - BATCH_SIZE=20
       - RABBIT_HOST=rabbitmq
       - OUTPUT_QUEUE=movies_cleaned_queue
-      - PYTHONPATH=/app
     networks:
       - testing_net
     depends_on:
@@ -44,13 +43,12 @@ services:
     container_name: filter_single_country-1
     build:
       context: .
-      dockerfile: src/server/filters/Dockerfile
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/single_country.py"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
     networks:
       - testing_net
     depends_on:
@@ -61,34 +59,17 @@ services:
     container_name: country_budget_counter
     build:
       context: .
-      dockerfile: src/server/counters/Dockerfile
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/country_budget.py"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
     
-  sentiment_analyzer-1:
-    container_name: sentiment_analyzer-1
-    build:
-      context: .
-      dockerfile: src/server/sentiment-analyzer/Dockerfile
-    environment:
-      - PYTHONUNBUFFERED=1
-      - RABBIT_HOST=rabbitmq
-      - PYTHONPATH=/app
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-  
 networks:
   testing_net:
     ipam:

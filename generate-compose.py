@@ -37,15 +37,14 @@ def create_cleaner():
     container_name: cleaner
     build:
       context: .
-      dockerfile: src/server/cleaner/Dockerfile
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/cleaner/main.py"]
     environment:
-      - PYTHONUNBUFFERED=1
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
       - BATCH_SIZE=20
       - RABBIT_HOST=rabbitmq
       - OUTPUT_QUEUE=movies_cleaned_queue
-      - PYTHONPATH=/app
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -61,13 +60,12 @@ def create_solo_country(n: int):
     container_name: filter_single_country-{i}
     build:
       context: .
-      dockerfile: src/server/filters/Dockerfile
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/single_country.py"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -85,12 +83,11 @@ def create_country_budget_counter():
     container_name: country_budget_counter
     build:
       context: .
-      dockerfile: src/server/counters/Dockerfile
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/country_budget.py"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -106,17 +103,14 @@ def create_sentiment_analyzer(n: int):
     container_name: sentiment_analyzer-{i}
     build:
       context: .
-      dockerfile: src/server/sentiment-analyzer/Dockerfile
+      dockerfile: src/server/Dockerfile
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
-      - PYTHONPATH=/app
     networks:
       - {NETWORK_NAME}
     depends_on:
       rabbitmq:
         condition: service_healthy
-    volumes:
   """
 
         nodes += node
@@ -130,14 +124,13 @@ def create_services(args):
     cleaner = create_cleaner()
     solo_country = create_solo_country(args.scf)
     country_budget_counter = create_country_budget_counter()
-    sentiment_analyzer = create_sentiment_analyzer(args.sa)
+    # sentiment_analyzer = create_sentiment_analyzer(args.sa)
     return f"""
 services:
   {rabbitmq}
   {cleaner}
   {solo_country}
   {country_budget_counter}
-  {sentiment_analyzer}
 """
 
 
