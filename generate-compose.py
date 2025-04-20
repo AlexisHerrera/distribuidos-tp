@@ -120,7 +120,7 @@ def create_sentiment_analyzer(n: int):
 
 def create_services(args):
     rabbitmq = create_rabbitmq()
-    # client = cretae_client()
+    # client = create_client()
     cleaner = create_cleaner()
     solo_country = create_solo_country(args.scf)
     country_budget_counter = create_country_budget_counter()
