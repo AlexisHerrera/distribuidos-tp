@@ -16,7 +16,7 @@ services:
       # - RABBITMQ_DEFAULT_USER=user
       # - RABBITMQ_DEFAULT_PASS=password
     healthcheck:
-      test: [ "CMD", "rabbitmqctl", "status" ]
+      test: ["CMD", "rabbitmqctl", "status"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,6 +25,17 @@ services:
 
   client:
     container_name: client
+    build:
+      context: .
+      dockerfile: src/client/Dockerfile
+    command:
+      [
+        "python",
+        "src/client/main.py",
+        ".data/movies_metadata.csv",
+        ".data/ratings.csv",
+        ".data/credits.csv",
+      ]
     image: client:latest
     environment:
       - SERVER_HOST=cleaner
@@ -95,7 +106,6 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-
 
 networks:
   testing_net:
