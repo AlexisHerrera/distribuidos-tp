@@ -40,7 +40,6 @@ services:
       - SERVER_HOST=cleaner
       - SERVER_PORT=12345
       - BATCH_SIZE=20
-      - PYTHONPATH=/app
     networks:
       - testing_net
     volumes:
@@ -60,7 +59,8 @@ services:
       - LISTENING_BACKLOG=3
       - BATCH_SIZE=20
       - RABBIT_HOST=rabbitmq
-      - OUTPUT_QUEUE=movies_cleaned_queue
+      - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
+      - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
     networks:
       - testing_net
     depends_on:
@@ -74,11 +74,9 @@ services:
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/filters/main.py", "solo_country"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
       - LOG_LEVEL=INFO
     networks:
       - testing_net
@@ -92,11 +90,9 @@ services:
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/filters/main.py", "solo_country"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
       - LOG_LEVEL=INFO
     networks:
       - testing_net
@@ -112,10 +108,8 @@ services:
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/counters/main.py", "country_budget"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
     networks:
       - testing_net
     depends_on:
@@ -129,15 +123,14 @@ services:
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/counters/main.py", "country_budget"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
+
 
 networks:
   testing_net:

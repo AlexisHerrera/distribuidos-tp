@@ -52,7 +52,6 @@ def create_client():
       - SERVER_HOST=cleaner
       - SERVER_PORT=12345
       - BATCH_SIZE=20
-      - PYTHONPATH=/app
     networks:
       - {NETWORK_NAME}
     volumes:
@@ -75,7 +74,8 @@ def create_cleaner():
       - LISTENING_BACKLOG=3
       - BATCH_SIZE=20
       - RABBIT_HOST=rabbitmq
-      - OUTPUT_QUEUE=movies_cleaned_queue
+      - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
+      - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
     networks:
       - {NETWORK_NAME}
     depends_on:

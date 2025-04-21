@@ -40,7 +40,6 @@ services:
       - SERVER_HOST=cleaner
       - SERVER_PORT=12345
       - BATCH_SIZE=20
-      - PYTHONPATH=/app
     networks:
       - testing_net
     volumes:
@@ -60,7 +59,8 @@ services:
       - LISTENING_BACKLOG=3
       - BATCH_SIZE=20
       - RABBIT_HOST=rabbitmq
-      - OUTPUT_QUEUE=movies_cleaned_queue
+      - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
+      - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
     networks:
       - testing_net
     depends_on:
@@ -131,21 +131,6 @@ services:
       rabbitmq:
         condition: service_healthy
     
-  sentiment_analyzer-1:
-    container_name: sentiment_analyzer-1
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/sentiment_analyzer/main.py"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/sentiment_analyzer/config.ini:/app/config.ini
   
 networks:
   testing_net:
