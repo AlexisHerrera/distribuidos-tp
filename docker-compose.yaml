@@ -82,6 +82,7 @@ services:
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
       - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
     networks:
       - testing_net
     depends_on:
