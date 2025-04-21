@@ -44,7 +44,7 @@ services:
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/filters/single_country.py"]
+    command: ["python", "src/server/filters/single_country_logic.py"]
     environment:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
