@@ -139,6 +139,22 @@ services:
       rabbitmq:
         condition: service_healthy
     
+  sentiment_analyzer-1:
+    container_name: sentiment_analyzer-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sentiment_analyzer/main.py"]
+    environment:
+      - RABBIT_HOST=rabbitmq
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
+  
 networks:
   testing_net:
     ipam:

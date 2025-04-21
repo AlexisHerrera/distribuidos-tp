@@ -145,6 +145,7 @@ def create_sentiment_analyzer(n: int):
     build:
       context: .
       dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sentiment_analyzer/main.py"]
     environment:
       - RABBIT_HOST=rabbitmq
     networks:
@@ -152,6 +153,8 @@ def create_sentiment_analyzer(n: int):
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - ./src/server/sentiment_analyzer/config.ini:/app/config.ini
   """
 
         nodes += node
@@ -166,6 +169,8 @@ def create_services(args):
     solo_country = create_solo_country(args.scf)
     country_budget_counter = create_country_budget_counter(args.cbc)
     # sentiment_analyzer = create_sentiment_analyzer(args.sa)
+    country_budget_counter = create_country_budget_counter()
+    sentiment_analyzer = create_sentiment_analyzer(args.sa)
     return f"""
 services:
   {rabbitmq}
@@ -173,6 +178,7 @@ services:
   {cleaner}
   {solo_country}
   {country_budget_counter}
+  {sentiment_analyzer}
 """
 
 

@@ -1,0 +1,10 @@
+rabbit:
+  host: rabbitmq
+exchange:
+  consumer: movies_metadata_clean
+  publisher: ~
+queue:
+  output: sentiment_analyzed
+  input: ~
+log:
+  level: ERROR

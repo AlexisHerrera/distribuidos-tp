@@ -27,8 +27,8 @@ class SentimentAnalyzer:
         logger.warning(f'SIGTERM signal received ({signum}). Closing connection...')
         self.running = False
 
-        if self.connection:
-            self.connection.close()
+        if self.__connection:
+            self.__connection.close()
 
         logger.warning('Connection closed.')
 
