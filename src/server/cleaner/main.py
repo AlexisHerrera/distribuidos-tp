@@ -14,7 +14,9 @@ from src.common.socket_communication import (
 from src.messaging.broker import RabbitMQBroker
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie import Movie
+from src.model.cast import Cast
 from src.server.cleaner.clean_movies import parse_line_to_movie
+from src.server.cleaner.clean_credits import parse_line_to_credits
 from src.utils.config import Config
 
 logging.basicConfig(
@@ -37,7 +39,10 @@ class Cleaner:
             self.backlog = int(os.getenv('LISTENING_BACKLOG', '3'))
             self.rabbit_host = self.config.rabbit_host
             self.output_queue_movies = self.config.get_env_var(
-                'OUTPUT_QUEUE', 'movies_cleaned_queue'
+                'MOVIES_CLEANED_QUEUE', 'movies_cleaned_queue'
+            )
+            self.output_queue_credits = self.config.get_env_var(
+                'CREDITS_CLEANED_QUEUE', 'credits_cleaned_queue'
             )
 
             if not self.rabbit_host or not self.output_queue_movies:
@@ -117,10 +122,10 @@ class Cleaner:
     def batch_to_list_objects(self, batch: Batch) -> list:
         if batch.type == BatchType.MOVIES:
             return self._batch_data_to_movies(batch.data)
+        elif batch.type == BatchType.CREDITS:
+            return self._batch_data_to_credits(batch.data)
         # elif batch.type == BatchType.RATINGS:
         #     return self._batch_data_to_ratings(batch.data)
-        # elif batch.type == BatchType.CREDITS:
-        #     return self._batch_data_to_credits(batch.data)
         else:
             logger.warning(f'No parser implemented for BatchType: {batch.type.name}')
             return []
@@ -137,8 +142,21 @@ class Cleaner:
                 parsed_movies.append(movie)
 
         return parsed_movies
+    
+    def _batch_data_to_credits(self, data_lines: list[str]) -> list[Cast]:
+        parsed_credits = []
+        for line in data_lines:
+            if not self.is_running:
+                break
+            if not line.strip():
+                continue
+            credits = parse_line_to_credits(line)
+            if credits:
+                parsed_credits.append(credits)
 
-    def _process_client_data(self):
+        return parsed_credits
+
+    def _process_client_data(self, type_of_data):
         if not self.is_running or not self.client_socket or not self.broker:
             logger.error(
                 'Cannot process client data: component missing or not running.'
@@ -171,9 +189,11 @@ class Cleaner:
                     logger.info(
                         'EOF Batch received from client. Signaling end of all streams.'
                     )
-                    self._publish_eof(self.output_queue_movies)
+                    if type_of_data == BatchType.MOVIES:
+                        self._publish_eof(self.output_queue_movies)
+                    elif type_of_data == BatchType.CREDITS:
+                        self._publish_eof(self.output_queue_credits)
                     # self._publish_eof(self.output_queue_ratings)
-                    # self._publish_eof(self.output_queue_credits)
                     break
 
                 object_list = self.batch_to_list_objects(batch)
@@ -183,12 +203,12 @@ class Cleaner:
                 if batch.type == BatchType.MOVIES:
                     target_queue = self.output_queue_movies
                     message_type_enum = MessageType.Movie
+                elif batch.type == BatchType.CREDITS:
+                    target_queue = self.output_queue_credits
+                    message_type_enum = MessageType.Cast
                 # elif batch.type == BatchType.RATINGS:
                 #     target_queue = self.output_queue_ratings
                 #     message_type_enum = MessageType.Rating
-                # elif batch.type == BatchType.CREDITS:
-                #     target_queue = self.output_queue_credits
-                #     message_type_enum = MessageType.???
 
                 if not target_queue or not message_type_enum:
                     logger.warning(
@@ -289,7 +309,10 @@ class Cleaner:
                 return
 
             if self._accept_client():
-                self._process_client_data()
+                logger.info('Beginning to receive movies...')
+                self._process_client_data(BatchType.MOVIES)
+                logger.info('Beginning to receive credits...')
+                self._process_client_data(BatchType.CREDITS)
 
         except Exception as e:
             logger.critical(f'Fatal error during Cleaner execution: {e}', exc_info=True)
