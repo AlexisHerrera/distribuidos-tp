@@ -123,7 +123,7 @@ def create_country_budget_counter(n: int):
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
     networks:
-      - testing_net
+      - {NETWORK_NAME}
     depends_on:
       rabbitmq:
         condition: service_healthy
