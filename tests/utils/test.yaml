@@ -1,11 +1,11 @@
 rabbit:
-  host: rabbitmq
+  host: rabbit
 connection:
   consumer:
     - type: broadcast
-      queue: movies_metadata_clean
+      queue: some_queue
   publisher:
     - type: direct
-      queue: sentiment_analyzed
+      queue: another_queue
 log:
   level: ERROR
