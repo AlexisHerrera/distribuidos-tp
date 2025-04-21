@@ -6,7 +6,3 @@ class BaseFilterLogic(ABC):
     @abstractmethod
     def should_pass(self, movie: Movie) -> bool:
         pass
-
-    @abstractmethod
-    def setup(self):
-        pass

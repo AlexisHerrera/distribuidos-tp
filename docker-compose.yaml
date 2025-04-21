@@ -84,7 +84,7 @@ services:
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/counters/country_budget.py"]
+    command: ["python", "src/server/counters/main.py", "country_budget"]
     environment:
       - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
