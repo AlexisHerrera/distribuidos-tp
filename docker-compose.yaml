@@ -75,7 +75,7 @@ services:
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/filters/single_country.py"]
+    command: ["python", "src/server/filters/main.py", "solo_country"]
     environment:
       - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
@@ -95,7 +95,7 @@ services:
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/counters/country_budget.py"]
+    command: ["python", "src/server/counters/main.py", "country_budget"]
     environment:
       - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
