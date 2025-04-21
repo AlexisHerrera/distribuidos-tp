@@ -59,6 +59,8 @@ class GenericCounterNode(BaseNode):
 
         try:
             if message.message_type == MessageType.EOF:
+                logger.info('EOF Received by CounterNode. Ignoring EOF')
+                return
                 with self.lock:
                     if self.final_results_logged:
                         return
@@ -80,6 +82,7 @@ class GenericCounterNode(BaseNode):
 
             elif self.logic:
                 self.logic.process_message(message)
+                self.logic.log_final_results()
             else:
                 logger.warning(
                     f'Received message type {message.message_type} but no logic loaded.'

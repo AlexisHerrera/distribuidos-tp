@@ -1,4 +1,5 @@
-name: tpEscalabilidad
+name: tp-escalabilidad
+
 services:
   rabbitmq:
     container_name: rabbitmq
@@ -12,16 +13,14 @@ services:
       - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
     environment:
       - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
-      # User and pass config
-      # - RABBITMQ_DEFAULT_USER=user
-      # - RABBITMQ_DEFAULT_PASS=password
     healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
+      test: [ "CMD", "rabbitmqctl", "status" ]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - testing_net
+
 
   client:
     container_name: client
@@ -57,21 +56,19 @@ services:
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/cleaner/main.py"]
     environment:
-      - PYTHONUNBUFFERED=1
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
       - BATCH_SIZE=20
       - RABBIT_HOST=rabbitmq
       - OUTPUT_QUEUE=movies_cleaned_queue
-      - PYTHONPATH=/app
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
 
-  filter_single_country:
-    container_name: filter_single_country
+  filter_single_country-1:
+    container_name: filter_single_country-1
     build:
       context: .
       dockerfile: src/server/Dockerfile
@@ -88,11 +85,45 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    # deploy:
-    #   replicas: 3
+  filter_single_country-2:
+    container_name: filter_single_country-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "solo_country"]
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RABBIT_HOST=rabbitmq
+      - INPUT_QUEUE=movies_cleaned_queue
+      - OUTPUT_QUEUE=movies_single_country_queue
+      - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
-  country_budget_counter:
-    container_name: country_budget_counter
+
+  country_budget_counter-1:
+    container_name: country_budget_counter-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/main.py", "country_budget"]
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RABBIT_HOST=rabbitmq
+      - INPUT_QUEUE=movies_single_country_queue
+      - PYTHONPATH=/app
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  country_budget_counter-2:
+    container_name: country_budget_counter-2
     build:
       context: .
       dockerfile: src/server/Dockerfile

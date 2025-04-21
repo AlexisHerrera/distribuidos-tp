@@ -171,7 +171,7 @@ class Cleaner:
                     logger.info(
                         'EOF Batch received from client. Signaling end of all streams.'
                     )
-                    self._publish_eof(self.output_queue_movies)
+                    # self._publish_eof(self.output_queue_movies)
                     # self._publish_eof(self.output_queue_ratings)
                     # self._publish_eof(self.output_queue_credits)
                     break
