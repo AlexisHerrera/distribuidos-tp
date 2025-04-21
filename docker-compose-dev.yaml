@@ -74,11 +74,9 @@ services:
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/filters/main.py", "solo_country"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
       - LOG_LEVEL=INFO
     networks:
       - testing_net
@@ -92,11 +90,9 @@ services:
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/filters/main.py", "solo_country"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
       - LOG_LEVEL=INFO
     networks:
       - testing_net
@@ -112,10 +108,8 @@ services:
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/counters/main.py", "country_budget"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
     networks:
       - testing_net
     depends_on:
@@ -129,10 +123,8 @@ services:
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/counters/main.py", "country_budget"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
     networks:
       - testing_net
     depends_on:
@@ -153,7 +145,7 @@ services:
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
+      - ./src/server/sentiment_analyzer/config.ini:/app/config.ini
   
 networks:
   testing_net:

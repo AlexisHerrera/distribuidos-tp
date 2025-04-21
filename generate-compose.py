@@ -94,11 +94,9 @@ def create_solo_country(n: int):
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/filters/main.py", "solo_country"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
       - LOG_LEVEL=INFO
     networks:
       - {NETWORK_NAME}
@@ -122,10 +120,8 @@ def create_country_budget_counter(n: int):
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/counters/main.py", "country_budget"]
     environment:
-      - PYTHONUNBUFFERED=1
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
-      - PYTHONPATH=/app
     networks:
       - testing_net
     depends_on:
@@ -168,8 +164,6 @@ def create_services(args):
     cleaner = create_cleaner()
     solo_country = create_solo_country(args.scf)
     country_budget_counter = create_country_budget_counter(args.cbc)
-    # sentiment_analyzer = create_sentiment_analyzer(args.sa)
-    country_budget_counter = create_country_budget_counter()
     sentiment_analyzer = create_sentiment_analyzer(args.sa)
     return f"""
 services:
@@ -207,8 +201,8 @@ def parse_args():
         argument_default=DEFAULT_NODES,
     )
 
-    parser.add_argument('--scf', '--solo-country-filter', type=int, default=1)
-    parser.add_argument('--cbc', '--country-budget-counter', type=int, default=1)
+    parser.add_argument('--scf', '--solo-country-filter', type=int)
+    parser.add_argument('--cbc', '--country-budget-counter', type=int)
     parser.add_argument('--sa', '--sentiment-analyzer', type=int)
 
     return parser.parse_args()
