@@ -7,7 +7,6 @@ from src.server.filters.main import FilterNode
 from src.server.filters.single_country_logic import SingleCountryLogic
 from tests.mocks.mock_broker import MockBroker, MockChannel, MockMethod
 
-# Descomenta si quieres ver logs de DEBUG durante el test
 # logging.basicConfig(level=logging.DEBUG)
 # logging.disable(logging.NOTSET)
 
