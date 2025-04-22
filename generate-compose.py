@@ -42,7 +42,9 @@ def create_cleaner():
     environment:
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
-      - BATCH_SIZE=20
+      - BATCH_SIZE_MOVIES=20
+      - BATCH_SIZE_RATINGS=100
+      - BATCH_SIZE_CREDITS=20
       - RABBIT_HOST=rabbitmq
       - OUTPUT_QUEUE=movies_cleaned_queue
     networks:
