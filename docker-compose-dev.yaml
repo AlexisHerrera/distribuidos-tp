@@ -133,6 +133,19 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/argentina_config.yaml:/app/config.yaml
+  filter_argentina_and_spain-1:
+    container_name: filter_argentina_and_spain-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "argentina_and_spain"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/argentina_and_spain_config.yaml:/app/config.yaml
   
 networks:
   testing_net:
