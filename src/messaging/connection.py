@@ -52,3 +52,6 @@ class MultiPublisherConnection:
 
     def recv(self, callback: Callable[[Message], None]):
         self.__consumer.consume(self.__broker, callback)
+
+    def close(self):
+        self.__broker.close()
