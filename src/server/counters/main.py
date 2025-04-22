@@ -34,34 +34,27 @@ class GenericCounterNode(BaseNode):
 
         try:
             if message.message_type == MessageType.EOF:
-                logger.info('EOF Received by CounterNode. Ignoring EOF')
-                return
                 with self.lock:
                     if self.final_results_logged:
                         return
                     logger.info('EOF Received by CounterNode. Finalizing results...')
                     self.final_results_logged = True
-
-                if self.logic:
-                    try:
-                        self.logic.log_final_results()
-                    except Exception as logic_err:
-                        logger.error(
-                            f'Error during final result logging: {logic_err}',
-                            exc_info=True,
-                        )
-                else:
-                    logger.warning('No counter logic loaded to process results.')
-
-                self.shutdown()
-
-            elif self.logic:
+                try:
+                    self.logic.log_final_results()
+                    results_dict = self.logic.get_results()
+                    result_message = Message(
+                        MessageType.MovieBudgetCounter, results_dict
+                    )
+                    self.publisher.put(self.broker, result_message)
+                    logger.info('Final results published.')
+                except Exception as logic_err:
+                    logger.error(
+                        f'Error during final result logging: {logic_err}',
+                        exc_info=True,
+                    )
+            else:
                 self.logic.process_message(message)
                 self.logic.log_final_results()
-            else:
-                logger.warning(
-                    f'Received message type {message.message_type} but no logic loaded.'
-                )
 
         except Exception as e:
             logger.error(f'Error processing message in CounterNode: {e}', exc_info=True)

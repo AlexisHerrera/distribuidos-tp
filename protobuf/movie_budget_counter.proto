@@ -1,0 +1,9 @@
+edition = "2023";
+
+package protobuf;
+
+option features.field_presence = EXPLICIT;
+
+message MovieBudgetCounter {
+  map<string, int64> country_budgets = 1;
+}
