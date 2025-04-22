@@ -65,6 +65,8 @@ class SentimentAnalyzer:
 
     def __handle_eof(self):
         logger.info('Received EOF')
+        self.__connection.send(Message(MessageType.EOF, None))
+        logger.info('Propagated EOF')
 
     def run(self):
         logger.info('Start reading messages...')

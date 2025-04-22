@@ -74,8 +74,6 @@ services:
       context: .
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/filters/main.py", "solo_country"]
-    environment:
-      - RABBIT_HOST=rabbitmq
     networks:
       - testing_net
     depends_on:
@@ -83,17 +81,12 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/single_country_config.yaml:/app/config.yaml
-  
-  
   country_budget_counter-1:
     container_name: country_budget_counter-1
     build:
       context: .
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/counters/main.py", "country_budget"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=movies_single_country_queue
     networks:
       - testing_net
     depends_on:
@@ -101,15 +94,12 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/config.yaml:/app/config.yaml
-    
   sentiment_analyzer-1:
     container_name: sentiment_analyzer-1
     build:
       context: .
       dockerfile: src/server/sentiment_analyzer/Dockerfile
     command: ["python", "src/server/sentiment_analyzer/main.py"]
-    environment:
-      - RABBIT_HOST=rabbitmq
     networks:
       - testing_net
     depends_on:
@@ -117,6 +107,32 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
+  filter_post_2000-1:
+    container_name: filter_post_2000-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "post_2000"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/post_2000_config.yaml:/app/config.yaml
+  filter_post_2000-2:
+    container_name: filter_post_2000-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "post_2000"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/post_2000_config.yaml:/app/config.yaml
   
 networks:
   testing_net:
