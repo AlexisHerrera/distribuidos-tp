@@ -1,4 +1,3 @@
-# src/server/base_node.py
 import logging
 import os
 import signal
@@ -7,9 +6,11 @@ import threading
 import argparse
 from abc import ABC, abstractmethod
 from typing import Dict, Type, Any
+
+from src.messaging.publisher import DirectPublisher
 from src.utils.config import Config
 from src.messaging.broker import RabbitMQBroker
-from src.messaging.consumer import Consumer
+from src.messaging.consumer import Consumer, NamedQueueConsumer
 from src.messaging.protocol.message import Message
 
 logger = logging.getLogger(__name__)
@@ -27,12 +28,15 @@ class BaseNode(ABC):
 
         self.broker: RabbitMQBroker | None = None
         self.consumer: Consumer | None = None
+        self.publisher: DirectPublisher | None = None
         self.input_queue: str | None = None
+        self.output_queue: str | None = None
 
         try:
             self._load_logic()
             self._read_and_validate_config()
             self._setup_signal_handlers()
+            self._setup_messaging_components()
             logger.info(f"BaseNode for '{self.node_type}' initialized.")
         except Exception as e:
             logger.critical(
@@ -74,25 +78,23 @@ class BaseNode(ABC):
         try:
             self.rabbit_host = self.config.rabbit_host
             self.input_queue = self.config.input_queue
+            self.output_queue = self.config.output_queue
 
             if not self.rabbit_host:
                 raise ValueError('RABBIT_HOST missing')
             if not self.input_queue:
                 raise ValueError('INPUT_QUEUE missing')
+            if not self.output_queue:
+                raise ValueError('OUTPUT_QUEUE missing')
 
             logger.debug(
                 f'Common config OK: HOST={self.rabbit_host}, IN_Q={self.input_queue}'
             )
-            self._check_specific_config()
 
         except Exception as e:
             logger.critical(f'Configuration error in BaseNode: {e}', exc_info=True)
             self._is_running = False
             raise
-
-    @abstractmethod
-    def _check_specific_config(self):
-        pass
 
     def _setup_signal_handlers(self):
         def signal_handler(signum, frame):
@@ -118,9 +120,15 @@ class BaseNode(ABC):
             self.shutdown(force=True)
             return False
 
-    @abstractmethod
     def _setup_messaging_components(self):
-        pass
+        logger.info(f'Starting Node (Type: {self.node_type})...')
+        if not self._connect_rabbitmq():
+            self.shutdown(force=True)
+            raise ConnectionError('Could not connect to rabbit')
+        logger.info(f'Setting up data consumer for queue: {self.input_queue}')
+        self.consumer = NamedQueueConsumer(self.broker, self.input_queue)
+        logger.info(f'Setting up publisher for queue: {self.output_queue}')
+        self.publisher = DirectPublisher(self.broker, self.output_queue)
 
     @abstractmethod
     def process_message(self, message: Message):
@@ -130,15 +138,7 @@ class BaseNode(ABC):
         if not self.is_running():
             logger.critical('Node init failed.')
             return
-        logger.info(f'Starting Node (Type: {self.node_type})...')
-        if not self._connect_rabbitmq():
-            self.shutdown(force=True)
-            return
-
         try:
-            self._setup_messaging_components()
-            if not self.consumer:
-                raise RuntimeError('Consumer not set up by subclass.')
             processing_callback = self.process_message
             if self.broker:
                 in_q = self.input_queue
@@ -167,12 +167,6 @@ class BaseNode(ABC):
             logger.info(f"Shutdown requested for node '{logic_name}'. Force={force}")
             self._is_running = False
             self._shutdown_initiated = True
-        # logger.debug('Attempting to cancel consumer...')
-        # if self.consumer:
-        #     try:
-        #         self.consumer.cancel()
-        #     except Exception as e:
-        #         logger.debug(f'Ignoring error cancelling consumer: {e}')
         logger.debug('Closing broker connection...')
         if self.broker:
             try:
@@ -212,7 +206,9 @@ class BaseNode(ABC):
         )
         logger = logging.getLogger(cls.__name__)
         try:
+            # Type of node
             args = cls._parse_args(logic_registry)
+            # Env vars
             config = Config()
 
             node_instance = cls(config, args.node_type)

@@ -122,6 +122,7 @@ def create_country_budget_counter(n: int):
     environment:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
+      - OUTPUT_QUEUE=budget_counter_queue
     networks:
       - {NETWORK_NAME}
     depends_on:

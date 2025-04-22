@@ -110,6 +110,7 @@ services:
     environment:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
+      - OUTPUT_QUEUE=budget_counter_queue
     networks:
       - testing_net
     depends_on:
@@ -125,6 +126,7 @@ services:
     environment:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
+      - OUTPUT_QUEUE=budget_counter_queue
     networks:
       - testing_net
     depends_on:
