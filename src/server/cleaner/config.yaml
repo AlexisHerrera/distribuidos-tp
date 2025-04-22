@@ -7,5 +7,6 @@ connection:
   publisher:
     - type: broadcast
       queue: movies_metadata_clean
+      msg_type: Movie
 log:
   level: ERROR

@@ -13,11 +13,11 @@ from src.common.socket_communication import (
 from src.messaging.broker import RabbitMQBroker
 from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
-from src.model.movie import Movie
 from src.model.cast import Cast
+from src.model.movie import Movie
 from src.model.rating import Rating
-from src.server.cleaner.clean_movies import parse_line_to_movie
 from src.server.cleaner.clean_credits import parse_line_to_credits
+from src.server.cleaner.clean_movies import parse_line_to_movie
 from src.server.cleaner.clean_ratings import parse_line_to_rating
 from src.utils.config import Config
 
@@ -33,23 +33,23 @@ class Cleaner:
         self.config = config
         self.is_running = True
         self.broker: RabbitMQBroker | None = None
-        self.connection = ConnectionCreator.create(config)
+        self.connection = ConnectionCreator.create_multipublisher(config)
         self.server_socket = None
         self.client_socket = None
 
         try:
             self.port = int(os.getenv('SERVER_PORT', '12345'))
             self.backlog = int(os.getenv('LISTENING_BACKLOG', '3'))
-            self.rabbit_host = self.config.rabbit_host
-            self.output_queue_movies = self.config.get_env_var(
-                'MOVIES_CLEANED_QUEUE', 'movies_cleaned_queue'
-            )
-            self.output_queue_credits = self.config.get_env_var(
-                'CREDITS_CLEANED_QUEUE', 'credits_cleaned_queue'
-            )
-            self.output_queue_ratings = self.config.get_env_var(
-                'RATINGS_CLEANED_QUEUE', 'ratings_cleaned_queue'
-            )
+            # self.rabbit_host = self.config.rabbit_host
+            # self.output_queue_movies = self.config.get_env_var(
+            #     'MOVIES_CLEANED_QUEUE', 'movies_cleaned_queue'
+            # )
+            # self.output_queue_credits = self.config.get_env_var(
+            #     'CREDITS_CLEANED_QUEUE', 'credits_cleaned_queue'
+            # )
+            # self.output_queue_ratings = self.config.get_env_var(
+            #     'RATINGS_CLEANED_QUEUE', 'ratings_cleaned_queue'
+            # )
 
             # if not self.rabbit_host or not self.output_queue_movies:
             #     raise ValueError(
@@ -176,7 +176,7 @@ class Cleaner:
         return parsed_ratings
 
     def _process_client_data(self, type_of_data):
-        if not self.is_running or not self.client_socket or not self.broker:
+        if not self.is_running or not self.client_socket:  # or not self.broker:
             logger.error(
                 'Cannot process client data: component missing or not running.'
             )
@@ -218,31 +218,27 @@ class Cleaner:
 
                 object_list = self.batch_to_list_objects(batch)
 
-                target_queue = None
                 message_type_enum = None
                 if batch.type == BatchType.MOVIES:
-                    target_queue = 'queue'  # self.output_queue_movies
                     message_type_enum = MessageType.Movie
                 elif batch.type == BatchType.CREDITS:
-                    target_queue = self.output_queue_credits
                     message_type_enum = MessageType.Cast
                 elif batch.type == BatchType.RATINGS:
-                    target_queue = self.output_queue_ratings
                     message_type_enum = MessageType.Rating
 
-                if not target_queue or not message_type_enum:
+                if not message_type_enum:
                     logger.warning(
                         f'No target queue or message type defined for BatchType: {batch.type.name}. Skipping batch.'
                     )
                     continue
 
                 count_in_batch = 0
-                movies = []
+                model_object_list = []
                 for model_object in object_list:
                     if not self.is_running:
                         break
                     try:
-                        movies.append(model_object)
+                        model_object_list.append(model_object)
                         # self.broker.put(
                         #     routing_key=target_queue, body=output_message.to_bytes()
                         # )
@@ -250,11 +246,11 @@ class Cleaner:
                     except Exception as e:
                         obj_id = getattr(model_object, 'id', 'N/A')
                         logger.error(
-                            f"Error publishing {message_type_enum.name} ID {obj_id} to '{target_queue}': {e}",
+                            f'Error publishing {message_type_enum.name} ID {obj_id}: {e}',
                             exc_info=True,
                         )
 
-                output_message = Message(message_type_enum, movies)
+                output_message = Message(message_type_enum, model_object_list)
                 self.connection.send(output_message)
 
                 if count_in_batch > 0:
@@ -283,7 +279,8 @@ class Cleaner:
         if self.broker and target_queue:
             try:
                 eof_message = Message(MessageType.EOF, None)
-                self.broker.put(routing_key=target_queue, body=eof_message.to_bytes())
+                # self.broker.put(routing_key=target_queue, body=eof_message.to_bytes())
+                self.connection.put(eof_message)
                 logger.info(f"EOF message published to '{target_queue}'")
             except Exception as e:
                 logger.error(

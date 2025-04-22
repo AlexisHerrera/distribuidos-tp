@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import Mock
+
 from src.messaging.broker import Broker
 from src.messaging.connection import Connection
 from src.messaging.consumer import Consumer
