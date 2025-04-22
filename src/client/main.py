@@ -58,6 +58,7 @@ def read_next_batch(csv_file, batch_size):
         batch.append(line.strip())
     return batch
 
+
 def send_movies(client_socket, args):
     logging.info('Beginning to send movies...')
     if not send_data(client_socket, args.movies_path, BatchType.MOVIES, BATCH_SIZE_MOVIES):
@@ -67,6 +68,7 @@ def send_movies(client_socket, args):
     eof_bytes = eof_batch.to_bytes()
     send_message(client_socket, eof_bytes)
     logging.info('Final EOF marker sent.')
+
 
 def send_cast(client_socket, args):
     logging.info('Beginning to send credits...')

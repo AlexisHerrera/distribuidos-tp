@@ -32,6 +32,36 @@ def create_rabbitmq():
 """
 
 
+def create_client():
+    return f"""
+  client:
+    container_name: client
+    build:
+      context: .
+      dockerfile: src/client/Dockerfile
+    command:
+      [
+        "python",
+        "src/client/main.py",
+        ".data/movies_metadata.csv",
+        ".data/ratings.csv",
+        ".data/credits.csv",
+      ]
+    image: client:latest
+    environment:
+      - SERVER_HOST=cleaner
+      - SERVER_PORT=12345
+      - BATCH_SIZE=20
+    networks:
+      - {NETWORK_NAME}
+    volumes:
+      - ./.data:/app/.data
+    depends_on:
+      cleaner:
+        condition: service_started
+"""
+
+
 def create_cleaner():
     return f"""cleaner:
     container_name: cleaner
@@ -46,7 +76,8 @@ def create_cleaner():
       - BATCH_SIZE_RATINGS=100
       - BATCH_SIZE_CREDITS=20
       - RABBIT_HOST=rabbitmq
-      - OUTPUT_QUEUE=movies_cleaned_queue
+      - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
+      - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -63,30 +94,33 @@ def create_solo_country(n: int):
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/filters/single_country.py"]
+    command: ["python", "src/server/filters/main.py", "solo_country"]
     environment:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
+      - LOG_LEVEL=INFO
     networks:
       - {NETWORK_NAME}
     depends_on:
       rabbitmq:
         condition: service_healthy
   """
-
         nodes += node
 
     return nodes
 
 
-def create_country_budget_counter():
-    return f"""country_budget_counter:
-    container_name: country_budget_counter
+def create_country_budget_counter(n: int):
+    nodes = ''
+    for i in range(1, n + 1):
+        node = f"""
+  country_budget_counter-{i}:
+    container_name: country_budget_counter-{i}
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/counters/country_budget.py"]
+    command: ["python", "src/server/counters/main.py", "country_budget"]
     environment:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
@@ -96,6 +130,9 @@ def create_country_budget_counter():
       rabbitmq:
         condition: service_healthy
     """
+        nodes += node
+
+    return nodes
 
 
 def create_sentiment_analyzer(n: int):
@@ -125,14 +162,15 @@ def create_sentiment_analyzer(n: int):
 
 def create_services(args):
     rabbitmq = create_rabbitmq()
-    # client = create_client()
+    client = create_client()
     cleaner = create_cleaner()
     solo_country = create_solo_country(args.scf)
-    country_budget_counter = create_country_budget_counter()
+    country_budget_counter = create_country_budget_counter(args.cbc)
     sentiment_analyzer = create_sentiment_analyzer(args.sa)
     return f"""
 services:
   {rabbitmq}
+  {client}
   {cleaner}
   {solo_country}
   {country_budget_counter}
@@ -166,6 +204,7 @@ def parse_args():
     )
 
     parser.add_argument('--scf', '--solo-country-filter', type=int)
+    parser.add_argument('--cbc', '--country-budget-counter', type=int)
     parser.add_argument('--sa', '--sentiment-analyzer', type=int)
 
     return parser.parse_args()

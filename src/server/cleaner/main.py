@@ -147,7 +147,7 @@ class Cleaner:
                 parsed_movies.append(movie)
 
         return parsed_movies
-    
+
     def _batch_data_to_credits(self, data_lines: list[str]) -> list[Cast]:
         parsed_credits = []
         for line in data_lines:
