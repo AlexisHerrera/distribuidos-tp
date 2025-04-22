@@ -127,6 +127,8 @@ def create_country_budget_counter(n: int):
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - ./src/server/counters/config.yaml:/app/config.yaml
     """
         nodes += node
 

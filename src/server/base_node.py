@@ -7,9 +7,7 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Type
 
-from src.messaging.broker import RabbitMQBroker
 from src.messaging.connection_creator import ConnectionCreator
-from src.messaging.consumer import Consumer
 from src.messaging.protocol.message import Message
 from src.utils.config import Config
 from src.utils.log import initialize_log
@@ -26,10 +24,6 @@ class BaseNode(ABC):
         self.lock = threading.Lock()
         self._is_running = True
         self._shutdown_initiated = False
-
-        self.broker: RabbitMQBroker | None = None
-        self.consumer: Consumer | None = None
-        self.input_queue: str | None = None
 
         self.connection = ConnectionCreator.create(config)
 
@@ -107,19 +101,6 @@ class BaseNode(ABC):
         signal.signal(signal.SIGTERM, signal_handler)
         signal.signal(signal.SIGINT, signal_handler)
         logger.info('Signal handlers configured.')
-
-    def _connect_rabbitmq(self) -> bool:
-        if not self.is_running():
-            return False
-        try:
-            logger.info(f'Connecting to RabbitMQ at {self.rabbit_host}...')
-            self.broker = RabbitMQBroker(self.rabbit_host)
-            logger.info('Connected.')
-            return True
-        except Exception as e:
-            logger.critical(f'Failed to connect RabbitMQ: {e}')
-            self.shutdown(force=True)
-            return False
 
     @abstractmethod
     def _setup_messaging_components(self):
