@@ -28,20 +28,6 @@ class FilterNode(BaseNode):
     def _get_logic_registry(self) -> Dict[str, Type]:
         return AVAILABLE_FILTER_LOGICS
 
-    def _signal_eof_downstream(self):
-        if self.publisher:
-            try:
-                logger.info('Propagating EOF to output queue...')
-                eof_message = Message(MessageType.EOF, None)
-                self.publisher.put(self.broker, eof_message)
-                logger.info('EOF propagated.')
-            except Exception as e:
-                logger.error(
-                    f'Failed propagating EOF via publisher: {e}', exc_info=True
-                )
-        else:
-            logger.error('Cannot propagate EOF: Publisher not initialized.')
-
     def process_message(self, message: Message):
         if not self.is_running():
             return
@@ -67,18 +53,13 @@ class FilterNode(BaseNode):
                             logger.error('Publisher missing!')
                             continue
                         output_message = Message(MessageType.Movie, [movie])
+                        logger.info('Movie passed filter!')
                         self.publisher.put(self.broker, output_message)
                     except Exception as e:
                         logger.error(
                             f'Error Publishing ID={getattr(movie, "id", "N/A")}: {e}',
                             exc_info=True,
                         )
-
-        elif message.message_type == MessageType.EOF:
-            logger.info('EOF Received on data queue. Propagating and shutting down...')
-            self._signal_eof_downstream()
-            self.shutdown()
-
         else:
             logger.warning(f'Unknown message type received: {message.message_type}')
 

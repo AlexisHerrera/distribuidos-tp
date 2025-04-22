@@ -61,6 +61,7 @@ services:
       - RABBIT_HOST=rabbitmq
       - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
       - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
+      - PUBLISHER_EXCHANGE=eof_cleaner
     networks:
       - testing_net
     depends_on:
@@ -77,6 +78,8 @@ services:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
+      - CONSUMER_EXCHANGE=eof_cleaner
+      - PUBLISHER_EXCHANGE=eof_filter_solo_country
       - LOG_LEVEL=INFO
     networks:
       - testing_net
@@ -93,6 +96,8 @@ services:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
+      - CONSUMER_EXCHANGE=eof_cleaner
+      - PUBLISHER_EXCHANGE=eof_filter_solo_country
       - LOG_LEVEL=INFO
     networks:
       - testing_net
@@ -111,6 +116,8 @@ services:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
       - OUTPUT_QUEUE=budget_counter_queue
+      - CONSUMER_EXCHANGE=eof_filter_solo_country
+      - PUBLISHER_EXCHANGE=eof_budget_counter
     networks:
       - testing_net
     depends_on:
@@ -127,6 +134,8 @@ services:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
       - OUTPUT_QUEUE=budget_counter_queue
+      - CONSUMER_EXCHANGE=eof_filter_solo_country
+      - PUBLISHER_EXCHANGE=eof_budget_counter
     networks:
       - testing_net
     depends_on:
@@ -144,6 +153,9 @@ services:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=budget_counter_queue
       - OUTPUT_QUEUE=reporter_queue
+      - CONSUMER_EXCHANGE=eof_budget_counter
+      - PUBLISHER_EXCHANGE=eof_sink_q2
+      - EOF_REQUIRED=2
     networks:
       - testing_net
     depends_on:

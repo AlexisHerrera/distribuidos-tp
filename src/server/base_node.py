@@ -7,11 +7,11 @@ import argparse
 from abc import ABC, abstractmethod
 from typing import Dict, Type, Any
 
-from src.messaging.publisher import DirectPublisher
+from src.messaging.publisher import DirectPublisher, BroadcastPublisher
 from src.utils.config import Config
 from src.messaging.broker import RabbitMQBroker
-from src.messaging.consumer import Consumer, NamedQueueConsumer
-from src.messaging.protocol.message import Message
+from src.messaging.consumer import Consumer, NamedQueueConsumer, BroadcastConsumer
+from src.messaging.protocol.message import Message, MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +24,17 @@ class BaseNode(ABC):
 
         self.lock = threading.Lock()
         self._is_running = True
+        self._eof_event = threading.Event()
+        self._consumer_tag: str | None = None
         self._shutdown_initiated = False
-
+        self._eof_required = int(config.get_env_var('EOF_REQUIRED', '1'))
         self.broker: RabbitMQBroker | None = None
         self.consumer: Consumer | None = None
         self.publisher: DirectPublisher | None = None
         self.input_queue: str | None = None
         self.output_queue: str | None = None
+        self.broadcaster: BroadcastPublisher | None = None
+        self.eof_consumer: BroadcastConsumer | None = None
 
         try:
             self._load_logic()
@@ -129,6 +133,30 @@ class BaseNode(ABC):
         self.consumer = NamedQueueConsumer(self.broker, self.input_queue)
         logger.info(f'Setting up publisher for queue: {self.output_queue}')
         self.publisher = DirectPublisher(self.broker, self.output_queue)
+        if self.config.publisher_exchange:
+            logger.info(
+                f"Declaring fanout exchange for EOF on '{self.config.publisher_exchange}'"
+            )
+        self.broadcaster = BroadcastPublisher(
+            self.broker, self.config.publisher_exchange
+        )
+
+        if self.config.consumer_exchange:
+            logger.info(
+                f"Subscribing to EOF broadcast on '{self.config.consumer_exchange}'"
+            )
+            eof_broker = RabbitMQBroker(self.rabbit_host)
+            self.eof_consumer = BroadcastConsumer(
+                eof_broker, self.config.consumer_exchange
+            )
+
+            threading.Thread(
+                target=lambda: self.eof_consumer.consume(
+                    eof_broker, self._handle_eof_broadcast
+                ),
+                daemon=True,
+                name='EOFConsumerThread',
+            ).start()
 
     @abstractmethod
     def process_message(self, message: Message):
@@ -147,7 +175,15 @@ class BaseNode(ABC):
                     f"Node '{logic_name}' running. Consuming from '{in_q}'. Waiting..."
                 )
 
-                self.consumer.consume(self.broker, processing_callback)
+                self._consumer_tag = self.consumer.consume(
+                    self.broker, self._wrapped_callback(processing_callback)
+                )
+                logger.info(f'Consumer tag is: {self._consumer_tag}')
+
+                logger.info('Consumer loop ha terminado.')
+
+                if self._eof_event.is_set():
+                    self._drain_queue()
 
             logger.info('Consumer loop finished.')
         except KeyboardInterrupt:
@@ -227,3 +263,45 @@ class BaseNode(ABC):
         if node_instance and isinstance(node_instance, BaseNode):
             node_instance.shutdown(force=True)
         sys.exit(1)
+
+    def _wrapped_callback(self, callback):
+        def wrapper(message: Message):
+            callback(message)
+
+        return wrapper
+
+    def _handle_eof_broadcast(self, message: Message):
+        if message.message_type == MessageType.EOF:
+            self._eof_required -= 1
+            logger.info(
+                f"EOF received in '{self.config.consumer_exchange}'."
+                f'{self._eof_required} EOF(s) required to close'
+            )
+            if self._eof_required > 0:
+                return
+
+            eof_msg = Message(MessageType.EOF, None)
+            if self.broadcaster:
+                self.broadcaster.put(self.broker, eof_msg)
+                logger.info('Published EOF to next nodes!')
+
+            self._eof_event.set()
+            try:
+                self.broker.stop_consuming(self._consumer_tag)
+            except Exception:
+                pass
+
+    def _drain_queue(self):
+        logger.info('Drenando cola restante tras EOF…')
+        while True:
+            method, props, body = self.broker.basic_get(self.input_queue)
+            if body is None:
+                break
+
+            try:
+                msg = Message.from_bytes(body)
+                self.logic.process_message(msg)
+                self.broker.ack(method.delivery_tag)
+            except Exception as e:
+                logger.error(f'Error procesando mensaje drenado: {e}', exc_info=True)
+        logger.info('Drenado completado.')

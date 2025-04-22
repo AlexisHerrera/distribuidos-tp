@@ -31,33 +31,26 @@ class GenericCounterNode(BaseNode):
     def process_message(self, message: Message):
         if not self.is_running():
             return
-
         try:
-            if message.message_type == MessageType.EOF:
-                with self.lock:
-                    if self.final_results_logged:
-                        return
-                    logger.info('EOF Received by CounterNode. Finalizing results...')
-                    self.final_results_logged = True
-                try:
-                    self.logic.log_final_results()
-                    results_dict = self.logic.get_results()
-                    result_message = Message(
-                        MessageType.MovieBudgetCounter, results_dict
-                    )
-                    self.publisher.put(self.broker, result_message)
-                    logger.info('Final results published.')
-                except Exception as logic_err:
-                    logger.error(
-                        f'Error during final result logging: {logic_err}',
-                        exc_info=True,
-                    )
-            else:
+            if message.message_type == MessageType.Movie:
                 self.logic.process_message(message)
-                # self.logic.log_final_results()
+            else:
+                logger.warning(f'Unknown message: {message}')
 
         except Exception as e:
             logger.error(f'Error processing message in CounterNode: {e}', exc_info=True)
+
+    def _handle_eof_broadcast(self, message: Message):
+        if message.message_type == MessageType.EOF:
+            results = self.logic.get_results()
+            out_msg = Message(MessageType.MovieBudgetCounter, results)
+            if self.publisher:
+                self.publisher.put(self.broker, out_msg)
+                logger.info('Published aggregated counter results to sink queue')
+        super()._handle_eof_broadcast(message)
+
+    def _drain_queue(self):
+        pass
 
 
 if __name__ == '__main__':

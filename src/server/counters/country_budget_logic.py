@@ -20,6 +20,7 @@ class CountryBudgetLogic(BaseCounterLogic):
         country = production_countries[0]
         budget = int(movie.budget)
         self.country_budgets[country] += budget
+        # self.log_final_results()
 
     def get_results(self) -> dict:
         return dict(self.country_budgets)

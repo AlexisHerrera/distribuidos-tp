@@ -12,7 +12,7 @@ from src.messaging.protocol.message import Message
 
 class Consumer(ABC):
     @abstractmethod
-    def consume(self, broker: Broker, callback: Callable[[Message], None]):
+    def consume(self, broker: Broker, callback: Callable[[Message], None]) -> str:
         pass
 
     def _create_callback(
@@ -73,7 +73,9 @@ class BroadcastConsumer(Consumer):
         broker.queue_bind(exchange_name, self.__queue_name)
 
     def consume(self, broker: Broker, callback: Callable[[Message], None]):
-        broker.consume(self._create_callback(callback=callback), self.__queue_name)
+        return broker.consume(
+            self._create_callback(callback=callback), self.__queue_name
+        )
 
 
 class NamedQueueConsumer(Consumer):
@@ -84,6 +86,6 @@ class NamedQueueConsumer(Consumer):
         self.__queue_name = queue_name
 
     def consume(self, broker: RabbitMQBroker, callback: Callable[[Message], None]):
-        broker.consume(
+        return broker.consume(
             self._create_callback(callback=callback, requeue=False), self.__queue_name
         )

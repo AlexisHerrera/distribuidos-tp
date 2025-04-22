@@ -76,6 +76,7 @@ def create_cleaner():
       - RABBIT_HOST=rabbitmq
       - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
       - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
+      - PUBLISHER_EXCHANGE=eof_cleaner
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -97,6 +98,8 @@ def create_solo_country(n: int):
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
+      - CONSUMER_EXCHANGE=eof_cleaner
+      - PUBLISHER_EXCHANGE=eof_filter_solo_country
       - LOG_LEVEL=INFO
     networks:
       - {NETWORK_NAME}
@@ -109,9 +112,9 @@ def create_solo_country(n: int):
     return nodes
 
 
-def create_country_budget_counter(n: int):
+def create_country_budget_counter(n_counters):
     nodes = ''
-    for i in range(1, n + 1):
+    for i in range(1, n_counters + 1):
         node = f"""
   country_budget_counter-{i}:
     container_name: country_budget_counter-{i}
@@ -123,6 +126,8 @@ def create_country_budget_counter(n: int):
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
       - OUTPUT_QUEUE=budget_counter_queue
+      - CONSUMER_EXCHANGE=eof_filter_solo_country
+      - PUBLISHER_EXCHANGE=eof_budget_counter
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -159,7 +164,7 @@ def create_sentiment_analyzer(n: int):
     return nodes
 
 
-def create_sink_q2():
+def create_sink_q2(n_counters: int):
     return f"""q2_sink:
     container_name: q2_sink
     build:
@@ -170,6 +175,9 @@ def create_sink_q2():
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=budget_counter_queue
       - OUTPUT_QUEUE=reporter_queue
+      - CONSUMER_EXCHANGE=eof_budget_counter
+      - PUBLISHER_EXCHANGE=eof_sink_q2
+      - EOF_REQUIRED={n_counters}
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -185,7 +193,7 @@ def create_services(args):
     solo_country = create_solo_country(args.scf)
     country_budget_counter = create_country_budget_counter(args.cbc)
     sentiment_analyzer = create_sentiment_analyzer(args.sa)
-    sink_q2 = create_sink_q2()
+    sink_q2 = create_sink_q2(args.cbc)
     return f"""
 services:
   {rabbitmq}

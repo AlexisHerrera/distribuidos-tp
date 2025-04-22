@@ -9,7 +9,3 @@ class BaseSinkLogic(ABC):
     @abstractmethod
     def process_message(self, message: Message):
         pass
-
-    @abstractmethod
-    def finalize_and_log(self):
-        pass

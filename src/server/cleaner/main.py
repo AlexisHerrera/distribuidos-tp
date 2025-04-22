@@ -13,6 +13,7 @@ from src.common.socket_communication import (
 
 from src.messaging.broker import RabbitMQBroker
 from src.messaging.protocol.message import Message, MessageType
+from src.messaging.publisher import BroadcastPublisher
 from src.model.movie import Movie
 from src.model.cast import Cast
 from src.server.cleaner.clean_movies import parse_line_to_movie
@@ -33,7 +34,7 @@ class Cleaner:
         self.broker: RabbitMQBroker | None = None
         self.server_socket = None
         self.client_socket = None
-
+        self.broadcaster: BroadcastPublisher | None = None
         try:
             self.port = int(os.getenv('SERVER_PORT', '12345'))
             self.backlog = int(os.getenv('LISTENING_BACKLOG', '3'))
@@ -44,10 +45,14 @@ class Cleaner:
             self.output_queue_credits = self.config.get_env_var(
                 'CREDITS_CLEANED_QUEUE', 'credits_cleaned_queue'
             )
-
-            if not self.rabbit_host or not self.output_queue_movies:
+            self.broadcaster_name = self.config.publisher_exchange
+            if (
+                not self.rabbit_host
+                or not self.output_queue_movies
+                or not self.config.publisher_exchange
+            ):
                 raise ValueError(
-                    'Missing essential configuration: RABBIT_HOST or OUTPUT_QUEUE'
+                    'Missing essential configuration: RABBIT_HOST or OUTPUT_QUEUE OR PUBLISHER_EXCHANGE'
                 )
 
         except (ValueError, KeyError, AttributeError) as e:
@@ -80,6 +85,9 @@ class Cleaner:
             logger.info(f'Declaring output queue: {self.output_queue_movies}')
             self.broker.queue_declare(
                 queue_name=self.output_queue_movies, exclusive=False, durable=True
+            )
+            self.broadcaster = BroadcastPublisher(
+                self.broker, self.config.publisher_exchange
             )
             return True
         except Exception as e:
@@ -189,11 +197,7 @@ class Cleaner:
                     logger.info(
                         'EOF Batch received from client. Signaling end of all streams.'
                     )
-                    if type_of_data == BatchType.MOVIES:
-                        self._publish_eof(self.output_queue_movies)
-                    elif type_of_data == BatchType.CREDITS:
-                        self._publish_eof(self.output_queue_credits)
-                    # self._publish_eof(self.output_queue_ratings)
+                    # self._publish_eof()
                     break
 
                 object_list = self.batch_to_list_objects(batch)
@@ -251,19 +255,20 @@ class Cleaner:
                         f'Unexpected error in receive loop: {e}', exc_info=True
                     )
                 self.is_running = False
-
+        self._publish_eof()
         logger.info('Client data processing finished.')
         logger.info(f'Processing Summary: {dict(processed_counts)}')
 
-    def _publish_eof(self, target_queue: str):
-        if self.broker and target_queue:
+    def _publish_eof(self):
+        if self.broker:
             try:
                 eof_message = Message(MessageType.EOF, None)
-                self.broker.put(routing_key=target_queue, body=eof_message.to_bytes())
-                logger.info(f"EOF message published to '{target_queue}'")
+                self.broadcaster.put(self.broker, eof_message)
+                logger.info(f"EOF message published to '{self.broadcaster_name}'")
             except Exception as e:
                 logger.error(
-                    f"Failed to publish EOF to '{target_queue}': {e}", exc_info=True
+                    f"Failed to publish EOF to '{self.broadcaster_name}': {e}",
+                    exc_info=True,
                 )
 
     def shutdown(self):
