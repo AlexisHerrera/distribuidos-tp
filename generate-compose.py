@@ -159,6 +159,25 @@ def create_sentiment_analyzer(n: int):
     return nodes
 
 
+def create_sink_q2():
+    return f"""q2_sink:
+    container_name: q2_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py", "q2"]
+    environment:
+      - RABBIT_HOST=rabbitmq
+      - INPUT_QUEUE=budget_counter_queue
+      - OUTPUT_QUEUE=reporter_queue
+    networks:
+      - {NETWORK_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+"""
+
+
 def create_services(args):
     rabbitmq = create_rabbitmq()
     client = create_client()
@@ -166,6 +185,7 @@ def create_services(args):
     solo_country = create_solo_country(args.scf)
     country_budget_counter = create_country_budget_counter(args.cbc)
     sentiment_analyzer = create_sentiment_analyzer(args.sa)
+    sink_q2 = create_sink_q2()
     return f"""
 services:
   {rabbitmq}
@@ -174,6 +194,7 @@ services:
   {solo_country}
   {country_budget_counter}
   {sentiment_analyzer}
+  {sink_q2}
 """
 
 

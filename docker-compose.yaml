@@ -134,6 +134,22 @@ services:
         condition: service_healthy
 
 
+  q2_sink:
+    container_name: q2_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py", "q2"]
+    environment:
+      - RABBIT_HOST=rabbitmq
+      - INPUT_QUEUE=budget_counter_queue
+      - OUTPUT_QUEUE=reporter_queue
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
 networks:
   testing_net:
     ipam:
