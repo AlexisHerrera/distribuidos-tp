@@ -76,7 +76,6 @@ class GenericCounterNode(BaseNode):
                         )
                 else:
                     logger.warning('No counter logic loaded to process results.')
-
                 self.shutdown()
 
             elif self.logic:

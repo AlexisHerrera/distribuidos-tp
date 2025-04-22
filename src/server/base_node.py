@@ -66,27 +66,6 @@ class BaseNode(ABC):
                 f'Could not instantiate/setup logic {self.node_type}'
             ) from e
 
-    def _read_and_validate_config(self):
-        logger.debug('Reading common configuration...')
-        try:
-            self.rabbit_host = self.config.rabbit_host
-            self.input_queue = self.config.input_queue
-
-            if not self.rabbit_host:
-                raise ValueError('RABBIT_HOST missing')
-            if not self.input_queue:
-                raise ValueError('INPUT_QUEUE missing')
-
-            logger.debug(
-                f'Common config OK: HOST={self.rabbit_host}, IN_Q={self.input_queue}'
-            )
-            self._check_specific_config()
-
-        except Exception as e:
-            logger.critical(f'Configuration error in BaseNode: {e}', exc_info=True)
-            self._is_running = False
-            raise
-
     @abstractmethod
     def _check_specific_config(self):
         pass

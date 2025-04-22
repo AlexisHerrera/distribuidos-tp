@@ -6,6 +6,6 @@ connection:
       queue: movies_metadata_clean
   publisher:
     - type: direct
-      queue: movies_single_country_queue
+      queue: solo_country
 log:
   level: INFO

@@ -8,4 +8,4 @@ connection:
     - type: direct
       queue: budget_sum
 log:
-  level: ERROR
+  level: INFO
