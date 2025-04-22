@@ -1,7 +1,6 @@
 import logging
 from typing import Dict, Type
 from src.messaging.protocol.message import Message, MessageType
-from src.messaging.publisher import DirectPublisher
 from src.utils.config import Config
 
 from src.server.base_node import BaseNode
@@ -16,7 +15,6 @@ AVAILABLE_FILTER_LOGICS = {
 
 class FilterNode(BaseNode):
     def __init__(self, config: Config, filter_type: str):
-        self.publisher: DirectPublisher | None = None
         self.output_queue: str | None = None
 
         super().__init__(config, filter_type)

@@ -40,17 +40,10 @@ class GenericCounterNode(BaseNode):
         except Exception as e:
             logger.error(f'Error processing message in CounterNode: {e}', exc_info=True)
 
-    def _handle_eof_broadcast(self, message: Message):
-        if message.message_type == MessageType.EOF:
-            results = self.logic.get_results()
-            out_msg = Message(MessageType.MovieBudgetCounter, results)
-            if self.publisher:
-                self.publisher.put(self.broker, out_msg)
-                logger.info('Published aggregated counter results to sink queue')
-        super()._handle_eof_broadcast(message)
-
-    def _drain_queue(self):
-        pass
+    def on_eof(self) -> None:
+        results = self.logic.get_results()
+        out_msg = Message(MessageType.MovieBudgetCounter, results)
+        self.publisher.put(self.broker, out_msg)
 
 
 if __name__ == '__main__':

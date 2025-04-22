@@ -76,7 +76,6 @@ def create_cleaner():
       - RABBIT_HOST=rabbitmq
       - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
       - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
-      - PUBLISHER_EXCHANGE=eof_cleaner
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -98,7 +97,6 @@ def create_solo_country(n: int):
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
-      - CONSUMER_EXCHANGE=eof_cleaner
       - PUBLISHER_EXCHANGE=eof_filter_solo_country
       - LOG_LEVEL=INFO
     networks:
@@ -112,7 +110,7 @@ def create_solo_country(n: int):
     return nodes
 
 
-def create_country_budget_counter(n_counters):
+def create_country_budget_counter(n_counters: int, n_filters: int):
     nodes = ''
     for i in range(1, n_counters + 1):
         node = f"""
@@ -126,8 +124,7 @@ def create_country_budget_counter(n_counters):
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
       - OUTPUT_QUEUE=budget_counter_queue
-      - CONSUMER_EXCHANGE=eof_filter_solo_country
-      - PUBLISHER_EXCHANGE=eof_budget_counter
+      - EOF_REQUIRED={n_filters}
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -175,8 +172,6 @@ def create_sink_q2(n_counters: int):
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=budget_counter_queue
       - OUTPUT_QUEUE=reporter_queue
-      - CONSUMER_EXCHANGE=eof_budget_counter
-      - PUBLISHER_EXCHANGE=eof_sink_q2
       - EOF_REQUIRED={n_counters}
     networks:
       - {NETWORK_NAME}
@@ -191,7 +186,7 @@ def create_services(args):
     client = create_client()
     cleaner = create_cleaner()
     solo_country = create_solo_country(args.scf)
-    country_budget_counter = create_country_budget_counter(args.cbc)
+    country_budget_counter = create_country_budget_counter(args.cbc, args.scf)
     sentiment_analyzer = create_sentiment_analyzer(args.sa)
     sink_q2 = create_sink_q2(args.cbc)
     return f"""
