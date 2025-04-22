@@ -54,4 +54,4 @@ class ConnectionCreator:
 
             publishers[msg_type] = publisher
 
-        return MultiPublisherConnection(broker, publisher, consumer)
+        return MultiPublisherConnection(broker, publishers, consumer)

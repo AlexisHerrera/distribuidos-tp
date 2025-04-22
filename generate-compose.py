@@ -144,7 +144,7 @@ def create_sentiment_analyzer(n: int):
     container_name: sentiment_analyzer-{i}
     build:
       context: .
-      dockerfile: src/server/Dockerfile
+      dockerfile: src/server/sentiment_analyzer/Dockerfile
     command: ["python", "src/server/sentiment_analyzer/main.py"]
     environment:
       - RABBIT_HOST=rabbitmq

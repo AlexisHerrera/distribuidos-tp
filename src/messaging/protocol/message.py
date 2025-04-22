@@ -30,7 +30,11 @@ class MessageType(Enum):
     EOF = 100
 
     @classmethod
-    def _missing_(cls, _value):
+    def _missing_(cls, value):
+        for member in cls:
+            if member.name == value:
+                return member
+
         return MessageType.Unknown
 
 

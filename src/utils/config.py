@@ -19,16 +19,8 @@ class Config:
 
         self.rabbit_host = os.getenv('RABBIT_HOST', rabbit_config['host'])
 
-        self.consumers = []
-
-        for c in connection['consumer']:
-            consumer = {'type': c['type'], 'queue': c['queue']}
-            self.consumers.append(consumer)
-
-        self.publishers = []
-        for p in connection['publisher']:
-            publisher = {'type': p['type'], 'queue': p['queue']}
-            self.publishers.append(publisher)
+        self.consumers = connection['consumer']
+        self.publishers = connection['publisher']
 
         self.log_level = os.getenv('LOG_LEVEL', log_config['level'])
 

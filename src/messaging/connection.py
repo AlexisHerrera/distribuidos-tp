@@ -29,7 +29,7 @@ class MultiPublisherConnection:
     def __init__(
         self,
         broker: Broker,
-        publishers: dict[str, Publisher],
+        publishers: dict[MessageType, Publisher],
         consumer: Consumer,
     ):
         self.__broker = broker
