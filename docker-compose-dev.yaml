@@ -14,12 +14,38 @@ services:
     environment:
       - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
     healthcheck:
-      test: [ "CMD", "rabbitmqctl", "status" ]
+      test: ["CMD", "rabbitmqctl", "status"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - testing_net
+
+  client:
+    container_name: client
+    build:
+      context: .
+      dockerfile: src/client/Dockerfile
+    command:
+      [
+        "python",
+        "src/client/main.py",
+        ".data/movies_metadata.csv",
+        ".data/ratings.csv",
+        ".data/credits.csv",
+      ]
+    image: client:latest
+    environment:
+      - SERVER_HOST=cleaner
+      - SERVER_PORT=12345
+      - BATCH_SIZE=20
+    networks:
+      - testing_net
+    volumes:
+      - ./.data:/app/.data
+    depends_on:
+      cleaner:
+        condition: service_started
 
   cleaner:
     container_name: cleaner
@@ -30,9 +56,12 @@ services:
     environment:
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
-      - BATCH_SIZE=20
+      - BATCH_SIZE_MOVIES=20
+      - BATCH_SIZE_RATINGS=100
+      - BATCH_SIZE_CREDITS=20
       - RABBIT_HOST=rabbitmq
-      - OUTPUT_QUEUE=movies_cleaned_queue
+      - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
+      - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
     networks:
       - testing_net
     depends_on:
@@ -46,23 +75,40 @@ services:
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/filters/single_country.py"]
+    command: ["python", "src/server/filters/main.py", "solo_country"]
     environment:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue
       - OUTPUT_QUEUE=movies_single_country_queue
+      - LOG_LEVEL=INFO
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
-  
-  country_budget_counter:
-    container_name: country_budget_counter
+  filter_single_country-2:
+    container_name: filter_single_country-2
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/counters/country_budget.py"]
+    command: ["python", "src/server/filters/main.py", "solo_country"]
+    environment:
+      - RABBIT_HOST=rabbitmq
+      - INPUT_QUEUE=movies_cleaned_queue
+      - OUTPUT_QUEUE=movies_single_country_queue
+      - LOG_LEVEL=INFO
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  country_budget_counter-1:
+    container_name: country_budget_counter-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/main.py", "country_budget"]
     environment:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_single_country_queue
@@ -71,15 +117,16 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    
-  sentiment_analyzer-1:
-    container_name: sentiment_analyzer-1
+
+  country_budget_counter-2:
+    container_name: country_budget_counter-2
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/sentiment_analyzer/main.py"]
+    command: ["python", "src/server/counters/main.py", "country_budget"]
     environment:
       - RABBIT_HOST=rabbitmq
+      - INPUT_QUEUE=movies_single_country_queue
     networks:
       - testing_net
     depends_on:
@@ -87,11 +134,10 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
-  
+
 networks:
   testing_net:
     ipam:
       driver: default
       config:
         - subnet: 172.25.125.0/24
-    
