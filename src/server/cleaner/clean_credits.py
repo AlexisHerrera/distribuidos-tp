@@ -7,6 +7,7 @@ from src.model.cast import Cast
 
 logger = logging.getLogger(__name__)
 
+
 def parse_line_to_credits(csv_line: str) -> Cast | None:
     f = io.StringIO(csv_line)
     reader = csv.reader(f, delimiter=',', quotechar='"', skipinitialspace=True)
@@ -17,7 +18,7 @@ def parse_line_to_credits(csv_line: str) -> Cast | None:
     except Exception as e:
         logger.warning(f"CSV parsing error for line: '{csv_line[:100]}...': {e}")
         return None
-    
+
     COL_MOVIE_ID = 2
     COL_CAST = 0
     EXPECTED_COLS = 3
@@ -27,7 +28,7 @@ def parse_line_to_credits(csv_line: str) -> Cast | None:
             f"Incorrect field count ({len(fields)}/{EXPECTED_COLS}) in line: '{csv_line[:100]}...'. Skipping."
         )
         return None
-    
+
     try:
         movie_id_str = fields[COL_MOVIE_ID].strip()
         if not movie_id_str:
@@ -52,7 +53,7 @@ def parse_line_to_credits(csv_line: str) -> Cast | None:
             movie_id=movie_id,
             cast=cast_list,
         )
-    
+
     except ValueError as e:
         logger.warning(
             f'Value error processing fields for cast in movie {fields[COL_MOVIE_ID]}: {e}. Skipping.'
