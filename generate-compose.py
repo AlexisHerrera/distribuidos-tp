@@ -50,6 +50,8 @@ def create_cleaner():
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - ./src/server/cleaner/config.yaml:/app/config.yaml
 """
 
 
@@ -113,7 +115,7 @@ def create_sentiment_analyzer(n: int):
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/sentiment_analyzer/config.ini:/app/config.ini
+      - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
   """
 
         nodes += node

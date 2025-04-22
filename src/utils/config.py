@@ -35,8 +35,8 @@ class Config:
     def get_env_var(self, var_name: str, default: str = None) -> str | None:
         return os.getenv(var_name, default)
 
-    def __str__(self):
-        return f'Rabbit host: {self.rabbit_host} - Publisher exchange: {self.publisher_exchange} - Consumer exchange: {self.consumer_exchange} - Output queue: {self.output_queue} - Input queue: {self.input_queue}'
+    # def __str__(self):
+    #     return f'Rabbit host: {self.rabbit_host} - Publisher exchange: {self.publisher_exchange} - Consumer exchange: {self.consumer_exchange} - Output queue: {self.output_queue} - Input queue: {self.input_queue}'
 
 
 def print_config(config: Config):

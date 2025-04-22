@@ -38,13 +38,15 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - ./src/server/cleaner/config.yaml:/app/config.yaml
 
   filter_single_country-1:
     container_name: filter_single_country-1
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/filters/single_country_logic.py"]
+    command: ["python", "src/server/filters/single_country.py"]
     environment:
       - RABBIT_HOST=rabbitmq
       - INPUT_QUEUE=movies_cleaned_queue

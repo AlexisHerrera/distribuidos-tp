@@ -6,12 +6,12 @@ from collections import defaultdict
 
 from src.common.protocol.batch import Batch, BatchType
 from src.common.socket_communication import (
-    receive_message,
     accept_new_connection,
     create_server_socket,
+    receive_message,
 )
-
 from src.messaging.broker import RabbitMQBroker
+from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie import Movie
 from src.server.cleaner.clean_movies import parse_line_to_movie
@@ -29,21 +29,22 @@ class Cleaner:
         self.config = config
         self.is_running = True
         self.broker: RabbitMQBroker | None = None
+        self.connection = ConnectionCreator.create(config)
         self.server_socket = None
         self.client_socket = None
 
         try:
             self.port = int(os.getenv('SERVER_PORT', '12345'))
             self.backlog = int(os.getenv('LISTENING_BACKLOG', '3'))
-            self.rabbit_host = self.config.rabbit_host
-            self.output_queue_movies = self.config.get_env_var(
-                'OUTPUT_QUEUE', 'movies_cleaned_queue'
-            )
+            # self.rabbit_host = self.config.rabbit_host
+            # self.output_queue_movies = self.config.get_env_var(
+            #     'OUTPUT_QUEUE', 'movies_cleaned_queue'
+            # )
 
-            if not self.rabbit_host or not self.output_queue_movies:
-                raise ValueError(
-                    'Missing essential configuration: RABBIT_HOST or OUTPUT_QUEUE'
-                )
+            # if not self.rabbit_host or not self.output_queue_movies:
+            #     raise ValueError(
+            #         'Missing essential configuration: RABBIT_HOST or OUTPUT_QUEUE'
+            #     )
 
         except (ValueError, KeyError, AttributeError) as e:
             logger.critical(
@@ -139,7 +140,7 @@ class Cleaner:
         return parsed_movies
 
     def _process_client_data(self):
-        if not self.is_running or not self.client_socket or not self.broker:
+        if not self.is_running or not self.client_socket:  # or not self.broker:
             logger.error(
                 'Cannot process client data: component missing or not running.'
             )
@@ -171,7 +172,7 @@ class Cleaner:
                     logger.info(
                         'EOF Batch received from client. Signaling end of all streams.'
                     )
-                    self._publish_eof(self.output_queue_movies)
+                    # self._publish_eof(self.output_queue_movies)
                     # self._publish_eof(self.output_queue_ratings)
                     # self._publish_eof(self.output_queue_credits)
                     break
@@ -181,7 +182,7 @@ class Cleaner:
                 target_queue = None
                 message_type_enum = None
                 if batch.type == BatchType.MOVIES:
-                    target_queue = self.output_queue_movies
+                    target_queue = 'queue'  # self.output_queue_movies
                     message_type_enum = MessageType.Movie
                 # elif batch.type == BatchType.RATINGS:
                 #     target_queue = self.output_queue_ratings
@@ -197,14 +198,15 @@ class Cleaner:
                     continue
 
                 count_in_batch = 0
+                movies = []
                 for model_object in object_list:
                     if not self.is_running:
                         break
                     try:
-                        output_message = Message(message_type_enum, [model_object])
-                        self.broker.put(
-                            routing_key=target_queue, body=output_message.to_bytes()
-                        )
+                        movies.append(model_object)
+                        # self.broker.put(
+                        #     routing_key=target_queue, body=output_message.to_bytes()
+                        # )
                         count_in_batch += 1
                     except Exception as e:
                         obj_id = getattr(model_object, 'id', 'N/A')
@@ -212,6 +214,9 @@ class Cleaner:
                             f"Error publishing {message_type_enum.name} ID {obj_id} to '{target_queue}': {e}",
                             exc_info=True,
                         )
+
+                output_message = Message(message_type_enum, movies)
+                self.connection.send(output_message)
 
                 if count_in_batch > 0:
                     processed_counts[batch.type] += count_in_batch
@@ -283,8 +288,8 @@ class Cleaner:
         self._setup_signal_handlers()
 
         try:
-            if not self._connect_rabbitmq():
-                return
+            # if not self._connect_rabbitmq():
+            #     return
             if not self._setup_server_socket():
                 return
 

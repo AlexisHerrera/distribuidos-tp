@@ -10,14 +10,20 @@ class ConnectionCreator:
     def create(config: Config) -> Connection:
         broker = RabbitMQBroker(config.rabbit_host)
 
-        if config.output_queue:
-            publisher = DirectPublisher(broker, config.output_queue)
-        else:
-            publisher = BroadcastPublisher(broker, config.publisher_exchange)
+        consumers_config = config.consumers
 
-        if config.input_queue:
-            consumer = NamedQueueConsumer(broker, config.input_queue)
-        else:
-            consumer = BroadcastConsumer(broker, config.consumer_exchange)
+        if len(consumers_config) > 0:
+            if consumers_config[0]['type'] == 'broadcast':
+                consumer = BroadcastConsumer(broker, consumers_config[0]['queue'])
+            else:
+                consumer = NamedQueueConsumer(broker, consumers_config[0]['queue'])
+
+        publiser_config = config.publishers
+
+        if len(publiser_config) > 0:
+            if publiser_config[0]['type'] == 'broadcast':
+                publisher = BroadcastPublisher(broker, publiser_config[0]['queue'])
+            else:
+                publisher = DirectPublisher(broker, publiser_config[0]['queue'])
 
         return Connection(broker, publisher, consumer)

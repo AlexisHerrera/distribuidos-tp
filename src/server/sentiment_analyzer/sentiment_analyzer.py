@@ -37,7 +37,7 @@ class SentimentAnalyzer:
             logger.warning('Message received during closing connection, ignoring.')
             return
 
-        logger.info(f'Message received {message}')
+        logger.info(f'Message received of type {message.message_type}')
 
         match message.message_type:
             case MessageType.Movie:
