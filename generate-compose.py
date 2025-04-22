@@ -175,6 +175,7 @@ def parse_args():
     parser.add_argument('--p2000', '--post-2000', type=int)
     parser.add_argument('--arg', '--argentina', type=int)
     parser.add_argument('--argspa', '--argentina-and-spain', type=int)
+    parser.add_argument('--d00', '--decade-00', type=int)
 
     return parser.parse_args()
 
@@ -220,6 +221,12 @@ def main():
             nodes=args.argspa,
             command='["python", "src/server/filters/main.py", "argentina_and_spain"]',
             config_file='./src/server/filters/argentina_and_spain_config.yaml',
+        ),
+        ScalableService(
+            name='filter_decade_00',
+            nodes=args.d00,
+            command='["python", "src/server/filters/main.py", "decade_00"]',
+            config_file='./src/server/filters/decade_00_config.yaml',
         ),
     ]
 
