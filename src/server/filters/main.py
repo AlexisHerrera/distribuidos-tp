@@ -60,6 +60,7 @@ class FilterNode(BaseNode):
             if len(movies) > 0:
                 try:
                     self.connection.send(Message(MessageType.Movie, movies))
+                    # logger.info(f"Se envió al counter {len(movies)}")
                 except Exception as e:
                     logger.error(
                         f'Error Publishing movies: {e}',
@@ -68,7 +69,6 @@ class FilterNode(BaseNode):
 
         elif message.message_type == MessageType.EOF:
             logger.info('EOF Received on data queue. Propagating and shutting down...')
-            self._signal_eof_downstream()
             self.shutdown()
 
         else:

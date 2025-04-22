@@ -34,16 +34,15 @@ class GenericCounterNode(BaseNode):
         try:
             if message.message_type == MessageType.Movie:
                 self.logic.process_message(message)
+            elif message.message_type == MessageType.EOF:
+                results = self.logic.get_results()
+                out_msg = Message(MessageType.MovieBudgetCounter, results)
+                self.connection.send(out_msg)
             else:
                 logger.warning(f'Unknown message: {message}')
 
         except Exception as e:
             logger.error(f'Error processing message in CounterNode: {e}', exc_info=True)
-
-    def on_eof(self) -> None:
-        results = self.logic.get_results()
-        out_msg = Message(MessageType.MovieBudgetCounter, results)
-        self.publisher.put(self.broker, out_msg)
 
 
 if __name__ == '__main__':

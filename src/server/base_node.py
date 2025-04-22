@@ -4,13 +4,11 @@ import sys
 import argparse
 from abc import ABC, abstractmethod
 
-from src.messaging.publisher import DirectPublisher
 from typing import Any, Dict, Type
 
 from src.messaging.connection_creator import ConnectionCreator
 from src.utils.config import Config
-from src.messaging.consumer import NamedQueueConsumer
-from src.messaging.protocol.message import Message, MessageType
+from src.messaging.protocol.message import Message
 from src.utils.log import initialize_log
 
 logger = logging.getLogger(__name__)
@@ -31,7 +29,6 @@ class BaseNode(ABC):
         try:
             self._load_logic()
             self._setup_signal_handlers()
-            self._setup_messaging_components()
             logger.info(f"BaseNode for '{self.node_type}' initialized.")
         except Exception as e:
             logger.critical(
@@ -68,10 +65,6 @@ class BaseNode(ABC):
                 f'Could not instantiate/setup logic {self.node_type}'
             ) from e
 
-    @abstractmethod
-    def _check_specific_config(self):
-        pass
-
     def _setup_signal_handlers(self):
         def signal_handler(signum, frame):
             logger.warning(
@@ -82,17 +75,6 @@ class BaseNode(ABC):
         signal.signal(signal.SIGTERM, signal_handler)
         signal.signal(signal.SIGINT, signal_handler)
         logger.info('Signal handlers configured.')
-
-    @abstractmethod
-    def _setup_messaging_components(self):
-        logger.info(f'Starting Node (Type: {self.node_type})...')
-        if not self._connect_rabbitmq():
-            self.shutdown(force=True)
-            raise ConnectionError('Could not connect to rabbit')
-        logger.info(f'Setting up data consumer for queue: {self.config.input_queue}')
-        self.consumer = NamedQueueConsumer(self.broker, self.config.input_queue)
-        logger.info(f'Setting up data publisher for queue: {self.config.output_queue}')
-        self.publisher = DirectPublisher(self.broker, self.config.output_queue)
 
     @abstractmethod
     def process_message(self, message: Message):
@@ -173,26 +155,3 @@ class BaseNode(ABC):
         if node_instance and isinstance(node_instance, BaseNode):
             node_instance.shutdown(force=True)
         sys.exit(1)
-
-    def _wrapped_callback(self, callback):
-        def wrapper(message: Message):
-            if message.message_type == MessageType.EOF:
-                self._eof_required -= 1
-                logger.info(f'EOF Received. {self._eof_required} left to process.')
-                if self._eof_required <= 0:
-                    try:
-                        self.on_eof()
-                    except AttributeError:
-                        pass
-                    eof_msg = Message(MessageType.EOF, None)
-                    self.publisher.put(self.broker, eof_msg)
-                    logger.info('EOF Published!')
-                    self.shutdown()
-                return
-            callback(message)
-
-        return wrapper
-
-    @abstractmethod
-    def on_eof(self):
-        pass

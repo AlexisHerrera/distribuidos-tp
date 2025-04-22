@@ -81,6 +81,19 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/single_country_config.yaml:/app/config.yaml
+  filter_single_country-2:
+    container_name: filter_single_country-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "solo_country"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/single_country_config.yaml:/app/config.yaml
   country_budget_counter-1:
     container_name: country_budget_counter-1
     build:
@@ -94,19 +107,19 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/config.yaml:/app/config.yaml
-  sentiment_analyzer-1:
-    container_name: sentiment_analyzer-1
+  country_budget_counter-2:
+    container_name: country_budget_counter-2
     build:
       context: .
-      dockerfile: src/server/sentiment_analyzer/Dockerfile
-    command: ["python", "src/server/sentiment_analyzer/main.py"]
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/main.py", "country_budget"]
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
+      - ./src/server/counters/config.yaml:/app/config.yaml
   filter_post_2000-1:
     container_name: filter_post_2000-1
     build:
@@ -160,6 +173,20 @@ services:
     volumes:
       - ./src/server/filters/decade_00_config.yaml:/app/config.yaml
   
+  q2_sink:
+    container_name: q2_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sinks/config.yaml:/app/config.yaml
+
 networks:
   testing_net:
     ipam:
