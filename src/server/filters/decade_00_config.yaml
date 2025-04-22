@@ -1,0 +1,11 @@
+rabbit:
+  host: rabbitmq
+connection:
+  consumer:
+    - type: direct
+      queue: argentina_and_spain
+  publisher:
+    - type: direct
+      queue: decade_00
+log:
+  level: INFO

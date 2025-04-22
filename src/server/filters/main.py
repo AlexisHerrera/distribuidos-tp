@@ -8,6 +8,7 @@ from src.server.base_node import BaseNode
 from src.server.filters.argentina_filter import ArgentinaLogic
 from src.server.filters.argentina_spain_filter import ArgentinaAndSpainLogic
 from src.server.filters.base_filter_logic import BaseFilterLogic
+from src.server.filters.decade_00_filter import Decade00Logic
 from src.server.filters.post_2000_logic import Post2000Logic
 from src.server.filters.single_country_logic import SingleCountryLogic
 from src.utils.config import Config
@@ -18,6 +19,7 @@ AVAILABLE_FILTER_LOGICS = {
     'post_2000': Post2000Logic,
     'argentina': ArgentinaLogic,
     'argentina_and_spain': ArgentinaAndSpainLogic,
+    'decade_00': Decade00Logic,
 }
 
 

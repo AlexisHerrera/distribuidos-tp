@@ -146,6 +146,19 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/argentina_and_spain_config.yaml:/app/config.yaml
+  filter_decade_00-1:
+    container_name: filter_decade_00-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "decade_00"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/decade_00_config.yaml:/app/config.yaml
   
 networks:
   testing_net:
