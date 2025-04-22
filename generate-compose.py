@@ -173,6 +173,7 @@ def parse_args():
     parser.add_argument('--cbc', '--country-budget-counter', type=int)
     parser.add_argument('--sa', '--sentiment-analyzer', type=int)
     parser.add_argument('--p2000', '--post-2000', type=int)
+    parser.add_argument('--arg', '--argentina', type=int)
 
     return parser.parse_args()
 
@@ -206,6 +207,12 @@ def main():
             nodes=args.p2000,
             command='["python", "src/server/filters/main.py", "post_2000"]',
             config_file='./src/server/filters/post_2000_config.yaml',
+        ),
+        ScalableService(
+            name='filter_argentina',
+            nodes=args.arg,
+            command='["python", "src/server/filters/main.py", "argentina"]',
+            config_file='./src/server/filters/argentina_config.yaml',
         ),
     ]
 
