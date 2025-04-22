@@ -89,10 +89,15 @@ class RabbitMQBroker(Broker):
         self.__channel.basic_ack(delivery_tag=delivery_tag)
 
     def stop_consuming(self, consumer_tag: str):
+        if consumer_tag:
+            try:
+                self.__channel.basic_cancel(consumer_tag=consumer_tag)
+            except Exception:
+                pass
         try:
-            self.__channel.basic_cancel(consumer_tag=consumer_tag)
-        except Exception:
             self.__channel.stop_consuming()
+        except Exception:
+            pass
 
     def close(self):
         self.__channel.close()

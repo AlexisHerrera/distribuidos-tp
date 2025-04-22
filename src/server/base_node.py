@@ -183,6 +183,10 @@ class BaseNode(ABC):
                 logger.info('Consumer loop ha terminado.')
 
                 if self._eof_event.is_set():
+                    eof_msg = Message(MessageType.EOF, None)
+                    if self.broadcaster:
+                        self.broadcaster.put(self.broker, eof_msg)
+                        logger.info('Published EOF to connected nodes')
                     self._drain_queue()
 
             logger.info('Consumer loop finished.')
@@ -271,25 +275,21 @@ class BaseNode(ABC):
         return wrapper
 
     def _handle_eof_broadcast(self, message: Message):
-        if message.message_type == MessageType.EOF:
-            self._eof_required -= 1
-            logger.info(
-                f"EOF received in '{self.config.consumer_exchange}'."
-                f'{self._eof_required} EOF(s) required to close'
-            )
-            if self._eof_required > 0:
-                return
+        if message.message_type != MessageType.EOF:
+            return
 
-            eof_msg = Message(MessageType.EOF, None)
-            if self.broadcaster:
-                self.broadcaster.put(self.broker, eof_msg)
-                logger.info('Published EOF to next nodes!')
-
-            self._eof_event.set()
-            try:
-                self.broker.stop_consuming(self._consumer_tag)
-            except Exception:
-                pass
+        self._eof_required -= 1
+        logger.info(
+            f"EOF received in '{self.config.consumer_exchange}'."
+            f'{self._eof_required} EOF(s) required to close'
+        )
+        if self._eof_required > 0:
+            return
+        self._eof_event.set()
+        try:
+            self.broker.stop_consuming(self._consumer_tag)
+        except Exception:
+            pass
 
     def _drain_queue(self):
         logger.info('Drenando cola restante tras EOF…')
