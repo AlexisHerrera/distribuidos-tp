@@ -6,6 +6,7 @@ from src.messaging.protocol.message import Message, MessageType
 from src.messaging.publisher import DirectPublisher
 from src.server.base_node import BaseNode
 from src.server.filters.argentina_filter import ArgentinaLogic
+from src.server.filters.argentina_spain_filter import ArgentinaAndSpainLogic
 from src.server.filters.base_filter_logic import BaseFilterLogic
 from src.server.filters.post_2000_logic import Post2000Logic
 from src.server.filters.single_country_logic import SingleCountryLogic
@@ -16,6 +17,7 @@ AVAILABLE_FILTER_LOGICS = {
     'solo_country': SingleCountryLogic,
     'post_2000': Post2000Logic,
     'argentina': ArgentinaLogic,
+    'argentina_and_spain': ArgentinaAndSpainLogic,
 }
 
 

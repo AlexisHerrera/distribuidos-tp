@@ -174,6 +174,7 @@ def parse_args():
     parser.add_argument('--sa', '--sentiment-analyzer', type=int)
     parser.add_argument('--p2000', '--post-2000', type=int)
     parser.add_argument('--arg', '--argentina', type=int)
+    parser.add_argument('--argspa', '--argentina-and-spain', type=int)
 
     return parser.parse_args()
 
@@ -213,6 +214,12 @@ def main():
             nodes=args.arg,
             command='["python", "src/server/filters/main.py", "argentina"]',
             config_file='./src/server/filters/argentina_config.yaml',
+        ),
+        ScalableService(
+            name='filter_argentina_and_spain',
+            nodes=args.argspa,
+            command='["python", "src/server/filters/main.py", "argentina_and_spain"]',
+            config_file='./src/server/filters/argentina_and_spain_config.yaml',
         ),
     ]
 
