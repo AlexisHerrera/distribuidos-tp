@@ -61,7 +61,9 @@ def read_next_batch(csv_file, batch_size):
 
 def send_movies(client_socket, args):
     logging.info('Beginning to send movies...')
-    if not send_data(client_socket, args.movies_path, BatchType.MOVIES, BATCH_SIZE_MOVIES):
+    if not send_data(
+        client_socket, args.movies_path, BatchType.MOVIES, BATCH_SIZE_MOVIES
+    ):
         logging.error('Error sending movies')
     logging.info('Sending final EOF marker...')
     eof_batch = Batch(BatchType.EOF, None)
@@ -72,7 +74,9 @@ def send_movies(client_socket, args):
 
 def send_cast(client_socket, args):
     logging.info('Beginning to send credits...')
-    if not send_data(client_socket, args.cast_path, BatchType.CREDITS, BATCH_SIZE_CREDITS):
+    if not send_data(
+        client_socket, args.cast_path, BatchType.CREDITS, BATCH_SIZE_CREDITS
+    ):
         logging.error('Error sending credits')
     logging.info('Sending final EOF marker...')
     eof_batch = Batch(BatchType.EOF, None)
@@ -80,9 +84,12 @@ def send_cast(client_socket, args):
     send_message(client_socket, eof_bytes)
     logging.info('Final EOF marker sent.')
 
+
 def send_ratings(client_socket, args):
     logging.info('Beginning to send ratings...')
-    if not send_data(client_socket, args.ratings_path, BatchType.RATINGS, BATCH_SIZE_RATINGS):
+    if not send_data(
+        client_socket, args.ratings_path, BatchType.RATINGS, BATCH_SIZE_RATINGS
+    ):
         logging.error('Error sending ratings')
     logging.info('Sending final EOF marker...')
     eof_batch = Batch(BatchType.EOF, None)
@@ -90,7 +97,10 @@ def send_ratings(client_socket, args):
     send_message(client_socket, eof_bytes)
     logging.info('Final EOF marker sent.')
 
-def send_data(client_socket, file_object: io.TextIOWrapper, batch_type: BatchType, batch_size):
+
+def send_data(
+    client_socket, file_object: io.TextIOWrapper, batch_type: BatchType, batch_size
+):
     if not client_socket:
         logging.error('Cannot send data, client socket is not valid.')
         return False
@@ -193,9 +203,9 @@ def main():
                 'Could not connect to server after multiple retries. Exiting.'
             )
             return
-        send_movies(client_socket,args)
-        send_cast(client_socket,args)
-        send_ratings(client_socket,args)
+        send_movies(client_socket, args)
+        send_cast(client_socket, args)
+        send_ratings(client_socket, args)
         logging.info('Waiting for response.')
         time.sleep(60 * 10)
         client_socket.close()

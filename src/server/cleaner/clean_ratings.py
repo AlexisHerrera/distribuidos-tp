@@ -6,6 +6,7 @@ from src.model.rating import Rating
 
 logger = logging.getLogger(__name__)
 
+
 def parse_line_to_rating(csv_line: str) -> Rating | None:
     f = io.StringIO(csv_line)
     reader = csv.reader(f, delimiter=',', quotechar='"', skipinitialspace=True)
@@ -16,7 +17,7 @@ def parse_line_to_rating(csv_line: str) -> Rating | None:
     except Exception as e:
         logger.warning(f"CSV parsing error for line: '{csv_line[:100]}...': {e}")
         return None
-    
+
     COL_MOVIE_ID = 1
     COL_RATING = 2
     EXPECTED_COLS = 4
@@ -26,7 +27,7 @@ def parse_line_to_rating(csv_line: str) -> Rating | None:
             f"Incorrect field count ({len(fields)}/{EXPECTED_COLS}) in line: '{csv_line[:100]}...'. Skipping."
         )
         return None
-    
+
     try:
         movie_id_str = fields[COL_MOVIE_ID].strip()
         if not movie_id_str:
@@ -40,11 +41,8 @@ def parse_line_to_rating(csv_line: str) -> Rating | None:
         except (ValueError, TypeError):
             pass
 
-        return Rating(
-            movie_id=movie_id,
-            rating=rating
-        )
-    
+        return Rating(movie_id=movie_id, rating=rating)
+
     except ValueError as e:
         logger.warning(
             f'Value error processing fields for rating in movie {fields[COL_MOVIE_ID]}: {e}. Skipping.'

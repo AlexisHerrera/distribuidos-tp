@@ -75,14 +75,13 @@ def create_cleaner():
       - BATCH_SIZE_MOVIES=20
       - BATCH_SIZE_RATINGS=100
       - BATCH_SIZE_CREDITS=20
-      - RABBIT_HOST=rabbitmq
-      - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
-      - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
     networks:
       - {NETWORK_NAME}
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - ./src/server/cleaner/config.yaml:/app/config.yaml
 """
 
 
@@ -97,14 +96,13 @@ def create_solo_country(n: int):
     command: ["python", "src/server/filters/main.py", "solo_country"]
     environment:
       - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=movies_cleaned_queue
-      - OUTPUT_QUEUE=movies_single_country_queue
-      - LOG_LEVEL=INFO
     networks:
       - {NETWORK_NAME}
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - ./src/server/filters/single_country_config.yaml:/app/config.yaml
   """
         nodes += node
 
@@ -129,6 +127,8 @@ def create_country_budget_counter(n: int):
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - ./src/server/counters/config.yaml:/app/config.yaml
     """
         nodes += node
 
@@ -142,7 +142,7 @@ def create_sentiment_analyzer(n: int):
     container_name: sentiment_analyzer-{i}
     build:
       context: .
-      dockerfile: src/server/Dockerfile
+      dockerfile: src/server/sentiment_analyzer/Dockerfile
     command: ["python", "src/server/sentiment_analyzer/main.py"]
     environment:
       - RABBIT_HOST=rabbitmq
@@ -152,7 +152,7 @@ def create_sentiment_analyzer(n: int):
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/sentiment_analyzer/config.ini:/app/config.ini
+      - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
   """
 
         nodes += node

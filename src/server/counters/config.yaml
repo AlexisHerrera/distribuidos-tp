@@ -2,10 +2,10 @@ rabbit:
   host: rabbitmq
 connection:
   consumer:
-    - type: broadcast
-      queue: movies_metadata_clean
+    - type: direct
+      queue: solo_country
   publisher:
     - type: direct
-      queue: sentiment_analyzed
+      queue: budget_sum
 log:
   level: INFO

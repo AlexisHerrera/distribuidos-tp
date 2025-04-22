@@ -1,7 +1,6 @@
 import logging
 from typing import Dict, Type
 
-from src.messaging.consumer import NamedQueueConsumer
 from src.messaging.protocol.message import Message, MessageType
 from src.server.base_node import BaseNode
 from src.server.counters.base_counter_logic import BaseCounterLogic
@@ -32,20 +31,20 @@ class GenericCounterNode(BaseNode):
     def _check_specific_config(self):
         logger.debug('Checking counter-specific config...')
 
-        if not self.input_queue:
-            raise ValueError('CounterNode requires INPUT_QUEUE configuration')
+        # if not self.input_queue:
+        #     raise ValueError('CounterNode requires INPUT_QUEUE configuration')
 
-        logger.debug(f'Counter config OK: IN_Q={self.input_queue}')
+        # logger.debug(f'Counter config OK: IN_Q={self.input_queue}')
 
     def _setup_messaging_components(self):
         try:
-            if not self.broker:
-                raise RuntimeError('Broker not initialized.')
-            if not self.input_queue:
-                raise RuntimeError('Input queue not configured.')
+            # if not self.broker:
+            #     raise RuntimeError('Broker not initialized.')
+            # if not self.input_queue:
+            #     raise RuntimeError('Input queue not configured.')
 
             logger.info(f'Setting up data consumer for queue: {self.input_queue}')
-            self.consumer = NamedQueueConsumer(self.broker, self.input_queue)
+            # self.consumer = NamedQueueConsumer(self.broker, self.input_queue)
 
         except Exception as e:
             logger.error(
@@ -77,10 +76,10 @@ class GenericCounterNode(BaseNode):
                         )
                 else:
                     logger.warning('No counter logic loaded to process results.')
-
                 self.shutdown()
 
             elif self.logic:
+                logger.info(f'Received message {message.message_type}')
                 self.logic.process_message(message)
                 self.logic.log_final_results()
             else:
