@@ -14,14 +14,13 @@ services:
     environment:
       - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
     healthcheck:
-      test: [ "CMD", "rabbitmqctl", "status" ]
+      test: ["CMD", "rabbitmqctl", "status"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - testing_net
 
-  
   client:
     container_name: client
     build:
@@ -57,7 +56,9 @@ services:
     environment:
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
-      - BATCH_SIZE=20
+      - BATCH_SIZE_MOVIES=20
+      - BATCH_SIZE_RATINGS=100
+      - BATCH_SIZE_CREDITS=20
       - RABBIT_HOST=rabbitmq
       - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
       - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
@@ -99,8 +100,7 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-  
-  
+
   country_budget_counter-1:
     container_name: country_budget_counter-1
     build:
@@ -115,7 +115,7 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    
+
   country_budget_counter-2:
     container_name: country_budget_counter-2
     build:
@@ -130,12 +130,12 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    
-  
+    volumes:
+      - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
+
 networks:
   testing_net:
     ipam:
       driver: default
       config:
         - subnet: 172.25.125.0/24
-    
