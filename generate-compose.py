@@ -5,6 +5,22 @@ DOCKER_COMPOSE_FILENAME = 'docker-compose-dev.yaml'
 NETWORK_NAME = 'testing_net'
 
 
+class ScalableService:
+    def __init__(
+        self,
+        name: str,
+        nodes: int,
+        command: str,
+        config_file: str,
+        dockerfile: str = 'src/server/Dockerfile',
+    ):
+        self.name = name
+        self.nodes = nodes
+        self.command = command
+        self.config_file = config_file
+        self.dockerfile = dockerfile
+
+
 def create_docker_compose_base():
     return 'name: tp-escalabilidad\n'
 
@@ -72,132 +88,59 @@ def create_cleaner():
     environment:
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
-      - BATCH_SIZE=20
-      - RABBIT_HOST=rabbitmq
-      - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
-      - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
-    networks:
-      - {NETWORK_NAME}
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-"""
-
-
-def create_solo_country(n: int):
-    nodes = ''
-    for i in range(1, n + 1):
-        node = f"""filter_single_country-{i}:
-    container_name: filter_single_country-{i}
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/filters/main.py", "solo_country"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=movies_cleaned_queue
-      - OUTPUT_QUEUE=movies_single_country_queue
-      - PUBLISHER_EXCHANGE=eof_filter_solo_country
-      - LOG_LEVEL=INFO
-    networks:
-      - {NETWORK_NAME}
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-  """
-        nodes += node
-
-    return nodes
-
-
-def create_country_budget_counter(n_counters: int, n_filters: int):
-    nodes = ''
-    for i in range(1, n_counters + 1):
-        node = f"""
-  country_budget_counter-{i}:
-    container_name: country_budget_counter-{i}
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/counters/main.py", "country_budget"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=movies_single_country_queue
-      - OUTPUT_QUEUE=budget_counter_queue
-      - EOF_REQUIRED={n_filters}
-    networks:
-      - {NETWORK_NAME}
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    """
-        nodes += node
-
-    return nodes
-
-
-def create_sentiment_analyzer(n: int):
-    nodes = ''
-    for i in range(1, n + 1):
-        node = f"""sentiment_analyzer-{i}:
-    container_name: sentiment_analyzer-{i}
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/sentiment_analyzer/main.py"]
-    environment:
-      - RABBIT_HOST=rabbitmq
+      - BATCH_SIZE_MOVIES=20
+      - BATCH_SIZE_RATINGS=100
+      - BATCH_SIZE_CREDITS=20
     networks:
       - {NETWORK_NAME}
     depends_on:
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/sentiment_analyzer/config.ini:/app/config.ini
-  """
-
-        nodes += node
-
-    return nodes
+      - ./src/server/cleaner/config.yaml:/app/config.yaml
+"""
 
 
-def create_sink_q2(n_counters: int):
-    return f"""q2_sink:
-    container_name: q2_sink
+def create_node(service: ScalableService, index: int):
+    return f"""{service.name}-{index}:
+    container_name: {service.name}-{index}
     build:
       context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/sinks/main.py", "q2"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=budget_counter_queue
-      - OUTPUT_QUEUE=reporter_queue
-      - EOF_REQUIRED={n_counters}
+      dockerfile: {service.dockerfile}
+    command: {service.command}
     networks:
       - {NETWORK_NAME}
     depends_on:
       rabbitmq:
         condition: service_healthy
-"""
+    volumes:
+      - {service.config_file}:/app/config.yaml
+  """
 
 
-def create_services(args):
+def create_scalable(service: ScalableService):
+    nodes = ''
+    for i in range(1, service.nodes + 1):
+        nodes += create_node(service, i)
+
+    return nodes
+
+
+def create_services(scalable_services: list[ScalableService]):
     rabbitmq = create_rabbitmq()
     client = create_client()
     cleaner = create_cleaner()
-    solo_country = create_solo_country(args.scf)
-    country_budget_counter = create_country_budget_counter(args.cbc, args.scf)
-    sentiment_analyzer = create_sentiment_analyzer(args.sa)
-    sink_q2 = create_sink_q2(args.cbc)
+
+    services = ''
+    for service in scalable_services:
+        services += create_scalable(service)
+
     return f"""
 services:
   {rabbitmq}
   {client}
   {cleaner}
-  {solo_country}
-  {country_budget_counter}
-  {sentiment_analyzer}
-  {sink_q2}
+  {services}
 """
 
 
@@ -211,9 +154,9 @@ def create_networks():
     """
 
 
-def create_docker_compose_data(args):
+def create_docker_compose_data(scalable_services: list[ScalableService]):
     base = create_docker_compose_base()
-    services = create_services(args)
+    services = create_services(scalable_services)
     networks = create_networks()
 
     return base + services + networks
@@ -229,6 +172,10 @@ def parse_args():
     parser.add_argument('--scf', '--solo-country-filter', type=int)
     parser.add_argument('--cbc', '--country-budget-counter', type=int)
     parser.add_argument('--sa', '--sentiment-analyzer', type=int)
+    parser.add_argument('--p2000', '--post-2000', type=int)
+    parser.add_argument('--arg', '--argentina', type=int)
+    parser.add_argument('--argspa', '--argentina-and-spain', type=int)
+    parser.add_argument('--d00', '--decade-00', type=int)
 
     return parser.parse_args()
 
@@ -236,7 +183,54 @@ def parse_args():
 def main():
     args = parse_args()
 
-    content = create_docker_compose_data(args)
+    # To add an scalable service append it here
+    scalable_services = [
+        ScalableService(
+            name='filter_single_country',
+            nodes=args.scf,
+            command='["python", "src/server/filters/main.py", "solo_country"]',
+            config_file='./src/server/filters/single_country_config.yaml',
+        ),
+        ScalableService(
+            name='country_budget_counter',
+            nodes=args.cbc,
+            command='["python", "src/server/counters/main.py", "country_budget"]',
+            config_file='./src/server/counters/config.yaml',
+        ),
+        ScalableService(
+            name='sentiment_analyzer',
+            nodes=args.sa,
+            command='["python", "src/server/sentiment_analyzer/main.py"]',
+            config_file='./src/server/sentiment_analyzer/config.yaml',
+            dockerfile='src/server/sentiment_analyzer/Dockerfile',
+        ),
+        ScalableService(
+            name='filter_post_2000',
+            nodes=args.p2000,
+            command='["python", "src/server/filters/main.py", "post_2000"]',
+            config_file='./src/server/filters/post_2000_config.yaml',
+        ),
+        ScalableService(
+            name='filter_argentina',
+            nodes=args.arg,
+            command='["python", "src/server/filters/main.py", "argentina"]',
+            config_file='./src/server/filters/argentina_config.yaml',
+        ),
+        ScalableService(
+            name='filter_argentina_and_spain',
+            nodes=args.argspa,
+            command='["python", "src/server/filters/main.py", "argentina_and_spain"]',
+            config_file='./src/server/filters/argentina_and_spain_config.yaml',
+        ),
+        ScalableService(
+            name='filter_decade_00',
+            nodes=args.d00,
+            command='["python", "src/server/filters/main.py", "decade_00"]',
+            config_file='./src/server/filters/decade_00_config.yaml',
+        ),
+    ]
+
+    content = create_docker_compose_data(scalable_services)
 
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.writelines(content)

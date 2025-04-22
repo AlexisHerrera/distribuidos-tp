@@ -1,16 +1,17 @@
 import logging
-import os
 import signal
 import sys
 import argparse
 from abc import ABC, abstractmethod
-from typing import Dict, Type, Any
 
 from src.messaging.publisher import DirectPublisher
+from typing import Any, Dict, Type
+
+from src.messaging.connection_creator import ConnectionCreator
 from src.utils.config import Config
-from src.messaging.broker import RabbitMQBroker
-from src.messaging.consumer import Consumer, NamedQueueConsumer
+from src.messaging.consumer import NamedQueueConsumer
 from src.messaging.protocol.message import Message, MessageType
+from src.utils.log import initialize_log
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +26,10 @@ class BaseNode(ABC):
         self._is_running = True
         self._shutdown_initiated = False
         self._eof_required = int(config.get_env_var('EOF_REQUIRED', '1'))
-        self.broker: RabbitMQBroker | None = None
-        self.consumer: Consumer | None = None
-        self.publisher: DirectPublisher | None = None
+        self.connection = ConnectionCreator.create(config)
 
         try:
             self._load_logic()
-            self._read_and_validate_config()
             self._setup_signal_handlers()
             self._setup_messaging_components()
             logger.info(f"BaseNode for '{self.node_type}' initialized.")
@@ -70,24 +68,9 @@ class BaseNode(ABC):
                 f'Could not instantiate/setup logic {self.node_type}'
             ) from e
 
-    def _read_and_validate_config(self):
-        logger.debug('Reading common configuration...')
-        try:
-            if not self.config.rabbit_host:
-                raise ValueError('RABBIT_HOST missing')
-            if not self.config.input_queue:
-                raise ValueError('INPUT_QUEUE missing')
-            if not self.config.output_queue:
-                raise ValueError('OUTPUT_QUEUE missing')
-
-            logger.debug(
-                f'Common config OK: HOST={self.config.rabbit_host}, IN_Q={self.config.input_queue}'
-            )
-
-        except Exception as e:
-            logger.critical(f'Configuration error in BaseNode: {e}', exc_info=True)
-            self._is_running = False
-            raise
+    @abstractmethod
+    def _check_specific_config(self):
+        pass
 
     def _setup_signal_handlers(self):
         def signal_handler(signum, frame):
@@ -100,19 +83,7 @@ class BaseNode(ABC):
         signal.signal(signal.SIGINT, signal_handler)
         logger.info('Signal handlers configured.')
 
-    def _connect_rabbitmq(self) -> bool:
-        if not self.is_running():
-            return False
-        try:
-            logger.info(f'Connecting to RabbitMQ at {self.config.rabbit_host}...')
-            self.broker = RabbitMQBroker(self.config.rabbit_host)
-            logger.info('Connected.')
-            return True
-        except Exception as e:
-            logger.critical(f'Failed to connect RabbitMQ: {e}')
-            self.shutdown(force=True)
-            return False
-
+    @abstractmethod
     def _setup_messaging_components(self):
         logger.info(f'Starting Node (Type: {self.node_type})...')
         if not self._connect_rabbitmq():
@@ -131,19 +102,15 @@ class BaseNode(ABC):
         if not self.is_running():
             logger.critical('Node init failed.')
             return
-        try:
-            processing_callback = self.process_message
-            if self.broker:
-                in_q = self.config.input_queue
-                logic_name = type(self.logic).__name__ if self.logic else 'N/A'
-                logger.info(
-                    f"Node '{logic_name}' running. Consuming from '{in_q}'. Waiting..."
-                )
+        logger.info(f'Starting Node (Type: {self.node_type})...')
 
-                self.consumer.consume(
-                    self.broker, self._wrapped_callback(processing_callback)
-                )
-                logger.info('Consumer loop finished.')
+        try:
+            logic_name = type(self.logic).__name__ if self.logic else 'N/A'
+            logger.info(f"Node '{logic_name}' running. Consuming. Waiting...")
+
+            self.connection.recv(self.process_message)
+
+            logger.info('Consumer loop finished.')
         except KeyboardInterrupt:
             logger.warning('KeyboardInterrupt (CTRL-C)...')
         except Exception as e:
@@ -158,13 +125,8 @@ class BaseNode(ABC):
         logger.info(f"Shutdown requested for node '{logic_name}'. Force={force}")
         self._is_running = False
         logger.debug('Closing broker connection...')
-        if self.broker:
-            try:
-                self.broker.close()
-                logger.info('RabbitMQ connection closed.')
-            except Exception as e:
-                logger.error(f'Error closing connection: {e}', exc_info=True)
-        self.broker = None
+
+        self.connection.close()
         logger.info(f'Node {self.node_type} shutdown complete.')
 
     def is_running(self) -> bool:
@@ -186,19 +148,14 @@ class BaseNode(ABC):
     @classmethod
     def main(cls, logic_registry: Dict[str, Type]):
         node_instance = None
-        log_level_str = os.getenv('LOG_LEVEL', 'INFO').upper()
-        log_level = getattr(logging, log_level_str, logging.INFO)
-        logging.basicConfig(
-            level=log_level,
-            format='%(asctime)s - %(name)s [%(levelname)s] %(message)s',
-            # force=True
-        )
+        config = Config()
+
+        initialize_log(config.log_level)
         logger = logging.getLogger(cls.__name__)
+
         try:
             # Type of node
             args = cls._parse_args(logic_registry)
-            # Env vars
-            config = Config()
 
             node_instance = cls(config, args.node_type)
             node_instance.run()

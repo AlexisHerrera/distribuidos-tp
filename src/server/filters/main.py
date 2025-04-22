@@ -1,22 +1,27 @@
 import logging
 from typing import Dict, Type
 from src.messaging.protocol.message import Message, MessageType
-from src.utils.config import Config
-
 from src.server.base_node import BaseNode
+from src.server.filters.argentina_filter import ArgentinaLogic
+from src.server.filters.argentina_spain_filter import ArgentinaAndSpainLogic
 from src.server.filters.base_filter_logic import BaseFilterLogic
+from src.server.filters.decade_00_filter import Decade00Logic
+from src.server.filters.post_2000_logic import Post2000Logic
 from src.server.filters.single_country_logic import SingleCountryLogic
+from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
 AVAILABLE_FILTER_LOGICS = {
     'solo_country': SingleCountryLogic,
+    'post_2000': Post2000Logic,
+    'argentina': ArgentinaLogic,
+    'argentina_and_spain': ArgentinaAndSpainLogic,
+    'decade_00': Decade00Logic,
 }
 
 
 class FilterNode(BaseNode):
     def __init__(self, config: Config, filter_type: str):
-        self.output_queue: str | None = None
-
         super().__init__(config, filter_type)
 
         self.logic: BaseFilterLogic
@@ -36,28 +41,36 @@ class FilterNode(BaseNode):
                 logger.warning(f'Expected list, got {type(movies_list)}')
                 return
 
+            movies = []
             for movie in movies_list:
                 if not movie:
                     continue
+
                 passed_filter = False
+
                 try:
                     passed_filter = self.logic.should_pass(movie)
                 except Exception as e:
                     logger.error(f'Filter logic error: {e}', exc_info=True)
 
                 if passed_filter:
-                    try:
-                        if not self.publisher:
-                            logger.error('Publisher missing!')
-                            continue
-                        output_message = Message(MessageType.Movie, [movie])
-                        logger.info('Movie passed filter!')
-                        self.publisher.put(self.broker, output_message)
-                    except Exception as e:
-                        logger.error(
-                            f'Error Publishing ID={getattr(movie, "id", "N/A")}: {e}',
-                            exc_info=True,
-                        )
+                    new_movie = self.logic.map(movie)
+                    movies.append(new_movie)
+
+            if len(movies) > 0:
+                try:
+                    self.connection.send(Message(MessageType.Movie, movies))
+                except Exception as e:
+                    logger.error(
+                        f'Error Publishing movies: {e}',
+                        exc_info=True,
+                    )
+
+        elif message.message_type == MessageType.EOF:
+            logger.info('EOF Received on data queue. Propagating and shutting down...')
+            self._signal_eof_downstream()
+            self.shutdown()
+
         else:
             logger.warning(f'Unknown message type received: {message.message_type}')
 

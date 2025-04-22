@@ -5,7 +5,7 @@ connection:
     - type: broadcast
       queue: movies_metadata_clean
   publisher:
-    - type: direct
-      queue: sentiment_analyzed
+    - type: broadcast
+      queue: post_2000
 log:
   level: INFO

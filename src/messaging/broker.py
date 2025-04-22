@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Callable
+
 import pika
 
 
@@ -100,5 +101,7 @@ class RabbitMQBroker(Broker):
             pass
 
     def close(self):
-        self.__channel.close()
-        self.__connection.close()
+        if self.__channel.is_open:
+            self.__channel.close()
+        if self.__connection.is_open:
+            self.__connection.close()

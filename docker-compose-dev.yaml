@@ -57,15 +57,16 @@ services:
     environment:
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
-      - BATCH_SIZE=20
-      - RABBIT_HOST=rabbitmq
-      - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
-      - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
+      - BATCH_SIZE_MOVIES=20
+      - BATCH_SIZE_RATINGS=100
+      - BATCH_SIZE_CREDITS=20
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - ./src/server/cleaner/config.yaml:/app/config.yaml
 
   filter_single_country-1:
     container_name: filter_single_country-1
@@ -73,88 +74,92 @@ services:
       context: .
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/filters/main.py", "solo_country"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=movies_cleaned_queue
-      - OUTPUT_QUEUE=movies_single_country_queue
-      - PUBLISHER_EXCHANGE=eof_filter_solo_country
-      - LOG_LEVEL=INFO
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
-  filter_single_country-2:
-    container_name: filter_single_country-2
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/filters/main.py", "solo_country"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=movies_cleaned_queue
-      - OUTPUT_QUEUE=movies_single_country_queue
-      - PUBLISHER_EXCHANGE=eof_filter_solo_country
-      - LOG_LEVEL=INFO
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-  
-  
+    volumes:
+      - ./src/server/filters/single_country_config.yaml:/app/config.yaml
   country_budget_counter-1:
     container_name: country_budget_counter-1
     build:
       context: .
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/counters/main.py", "country_budget"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=movies_single_country_queue
-      - OUTPUT_QUEUE=budget_counter_queue
-      - EOF_REQUIRED=2
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
-    
-  country_budget_counter-2:
-    container_name: country_budget_counter-2
+    volumes:
+      - ./src/server/counters/config.yaml:/app/config.yaml
+  sentiment_analyzer-1:
+    container_name: sentiment_analyzer-1
+    build:
+      context: .
+      dockerfile: src/server/sentiment_analyzer/Dockerfile
+    command: ["python", "src/server/sentiment_analyzer/main.py"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
+  filter_post_2000-1:
+    container_name: filter_post_2000-1
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/counters/main.py", "country_budget"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=movies_single_country_queue
-      - OUTPUT_QUEUE=budget_counter_queue
-      - EOF_REQUIRED=2
+    command: ["python", "src/server/filters/main.py", "post_2000"]
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
-    
+    volumes:
+      - ./src/server/filters/post_2000_config.yaml:/app/config.yaml
+  filter_argentina-1:
+    container_name: filter_argentina-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "argentina"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/argentina_config.yaml:/app/config.yaml
+  filter_argentina_and_spain-1:
+    container_name: filter_argentina_and_spain-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "argentina_and_spain"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/argentina_and_spain_config.yaml:/app/config.yaml
+  filter_decade_00-1:
+    container_name: filter_decade_00-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "decade_00"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/decade_00_config.yaml:/app/config.yaml
   
-  q2_sink:
-    container_name: q2_sink
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/sinks/main.py", "q2"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=budget_counter_queue
-      - OUTPUT_QUEUE=reporter_queue
-      - EOF_REQUIRED=2
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
 networks:
   testing_net:
     ipam:

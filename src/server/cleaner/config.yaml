@@ -1,0 +1,18 @@
+rabbit:
+  host: rabbitmq
+connection:
+  consumer:
+    - type: direct
+      queue: report
+  publisher:
+    - type: broadcast
+      queue: movies_metadata_clean
+      msg_type: Movie
+    - type: direct
+      queue: ratings_clean
+      msg_type: Rating
+    - type: direct
+      queue: credits_clean
+      msg_type: Cast
+log:
+  level: ERROR

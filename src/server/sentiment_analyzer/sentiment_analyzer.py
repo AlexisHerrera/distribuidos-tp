@@ -37,7 +37,7 @@ class SentimentAnalyzer:
             logger.warning('Message received during closing connection, ignoring.')
             return
 
-        logger.info(f'Message received {message}')
+        logger.info(f'Message received of type {message.message_type}')
 
         match message.message_type:
             case MessageType.Movie:
@@ -65,6 +65,8 @@ class SentimentAnalyzer:
 
     def __handle_eof(self):
         logger.info('Received EOF')
+        self.__connection.send(Message(MessageType.EOF, None))
+        logger.info('Propagated EOF')
 
     def run(self):
         logger.info('Start reading messages...')

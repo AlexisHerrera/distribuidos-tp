@@ -13,7 +13,7 @@ class MovieSentimentProtocol(MessageProtocol):
         )
 
     def __to_movie_sentiment_pb(self, movie_sentiment: MovieSentiment):
-        movie_sentiment_encoded = movie_sentiments_pb2.MovieSentiments()
+        movie_sentiment_encoded = movie_sentiments_pb2.MovieSentiment()
 
         movie_sentiment_encoded.id = movie_sentiment.id
         movie_sentiment_encoded.title = movie_sentiment.title

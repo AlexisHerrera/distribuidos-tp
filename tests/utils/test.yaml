@@ -1,0 +1,11 @@
+rabbit:
+  host: rabbit
+connection:
+  consumer:
+    - type: broadcast
+      queue: some_queue
+  publisher:
+    - type: direct
+      queue: another_queue
+log:
+  level: ERROR
