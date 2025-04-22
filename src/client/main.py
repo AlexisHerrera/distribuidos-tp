@@ -67,9 +67,19 @@ def send_movies(client_socket, args):
     logging.info('Final EOF marker sent.')
 
 def send_cast(client_socket, args):
-    logging.info('Beginning to send cast...')
+    logging.info('Beginning to send credits...')
     if not send_data(client_socket, args.cast_path, BatchType.CREDITS):
-        logging.error('Error sending cast')
+        logging.error('Error sending credits')
+    logging.info('Sending final EOF marker...')
+    eof_batch = Batch(BatchType.EOF, None)
+    eof_bytes = eof_batch.to_bytes()
+    send_message(client_socket, eof_bytes)
+    logging.info('Final EOF marker sent.')
+
+def send_ratings(client_socket, args):
+    logging.info('Beginning to send ratings...')
+    if not send_data(client_socket, args.ratings_path, BatchType.RATINGS):
+        logging.error('Error sending ratings')
     logging.info('Sending final EOF marker...')
     eof_batch = Batch(BatchType.EOF, None)
     eof_bytes = eof_batch.to_bytes()
@@ -181,6 +191,7 @@ def main():
             return
         send_movies(client_socket,args)
         send_cast(client_socket,args)
+        send_ratings(client_socket,args)
         logging.info('Waiting for response.')
         time.sleep(60 * 10)
         client_socket.close()

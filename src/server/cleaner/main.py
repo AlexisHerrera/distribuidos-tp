@@ -15,8 +15,10 @@ from src.messaging.broker import RabbitMQBroker
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie import Movie
 from src.model.cast import Cast
+from src.model.rating import Rating
 from src.server.cleaner.clean_movies import parse_line_to_movie
 from src.server.cleaner.clean_credits import parse_line_to_credits
+from src.server.cleaner.clean_ratings import parse_line_to_rating
 from src.utils.config import Config
 
 logging.basicConfig(
@@ -43,6 +45,9 @@ class Cleaner:
             )
             self.output_queue_credits = self.config.get_env_var(
                 'CREDITS_CLEANED_QUEUE', 'credits_cleaned_queue'
+            )
+            self.output_queue_ratings = self.config.get_env_var(
+                'RATINGS_CLEANED_QUEUE', 'ratings_cleaned_queue'
             )
 
             if not self.rabbit_host or not self.output_queue_movies:
@@ -124,8 +129,8 @@ class Cleaner:
             return self._batch_data_to_movies(batch.data)
         elif batch.type == BatchType.CREDITS:
             return self._batch_data_to_credits(batch.data)
-        # elif batch.type == BatchType.RATINGS:
-        #     return self._batch_data_to_ratings(batch.data)
+        elif batch.type == BatchType.RATINGS:
+            return self._batch_data_to_ratings(batch.data)
         else:
             logger.warning(f'No parser implemented for BatchType: {batch.type.name}')
             return []
@@ -155,6 +160,19 @@ class Cleaner:
                 parsed_credits.append(credits)
 
         return parsed_credits
+    
+    def _batch_data_to_ratings(self, data_lines: list[str]) -> list[Rating]:
+        parsed_ratings = []
+        for line in data_lines:
+            if not self.is_running:
+                break
+            if not line.strip():
+                continue
+            rating = parse_line_to_rating(line)
+            if rating:
+                parsed_ratings.append(rating)
+
+        return parsed_ratings
 
     def _process_client_data(self, type_of_data):
         if not self.is_running or not self.client_socket or not self.broker:
@@ -193,7 +211,8 @@ class Cleaner:
                         self._publish_eof(self.output_queue_movies)
                     elif type_of_data == BatchType.CREDITS:
                         self._publish_eof(self.output_queue_credits)
-                    # self._publish_eof(self.output_queue_ratings)
+                    elif type_of_data == BatchType.RATINGS:
+                        self._publish_eof(self.output_queue_ratings)
                     break
 
                 object_list = self.batch_to_list_objects(batch)
@@ -206,9 +225,9 @@ class Cleaner:
                 elif batch.type == BatchType.CREDITS:
                     target_queue = self.output_queue_credits
                     message_type_enum = MessageType.Cast
-                # elif batch.type == BatchType.RATINGS:
-                #     target_queue = self.output_queue_ratings
-                #     message_type_enum = MessageType.Rating
+                elif batch.type == BatchType.RATINGS:
+                    target_queue = self.output_queue_ratings
+                    message_type_enum = MessageType.Rating
 
                 if not target_queue or not message_type_enum:
                     logger.warning(
@@ -313,6 +332,8 @@ class Cleaner:
                 self._process_client_data(BatchType.MOVIES)
                 logger.info('Beginning to receive credits...')
                 self._process_client_data(BatchType.CREDITS)
+                logger.info('Beginning to receive ratings...')
+                self._process_client_data(BatchType.RATINGS)
 
         except Exception as e:
             logger.critical(f'Fatal error during Cleaner execution: {e}', exc_info=True)
