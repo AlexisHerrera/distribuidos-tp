@@ -28,64 +28,18 @@ class GenericCounterNode(BaseNode):
     def _get_logic_registry(self) -> Dict[str, Type]:
         return AVAILABLE_COUNTER_LOGICS
 
-    def _check_specific_config(self):
-        logger.debug('Checking counter-specific config...')
-
-        # if not self.input_queue:
-        #     raise ValueError('CounterNode requires INPUT_QUEUE configuration')
-
-        # logger.debug(f'Counter config OK: IN_Q={self.input_queue}')
-
-    def _setup_messaging_components(self):
-        try:
-            # if not self.broker:
-            #     raise RuntimeError('Broker not initialized.')
-            # if not self.input_queue:
-            #     raise RuntimeError('Input queue not configured.')
-
-            logger.info(f'Setting up data consumer for queue: {self.input_queue}')
-            # self.consumer = NamedQueueConsumer(self.broker, self.input_queue)
-
-        except Exception as e:
-            logger.error(
-                f'Failed setup counter messaging components: {e}', exc_info=True
-            )
-            raise
-
     def process_message(self, message: Message):
         if not self.is_running():
             return
-
         try:
-            if message.message_type == MessageType.EOF:
-                logger.info('EOF Received by CounterNode. Ignoring EOF')
-                return
-                with self.lock:
-                    if self.final_results_logged:
-                        return
-                    logger.info('EOF Received by CounterNode. Finalizing results...')
-                    self.final_results_logged = True
-
-                if self.logic:
-                    try:
-                        self.logic.log_final_results()
-                    except Exception as logic_err:
-                        logger.error(
-                            f'Error during final result logging: {logic_err}',
-                            exc_info=True,
-                        )
-                else:
-                    logger.warning('No counter logic loaded to process results.')
-                self.shutdown()
-
-            elif self.logic:
-                logger.info(f'Received message {message.message_type}')
+            if message.message_type == MessageType.Movie:
                 self.logic.process_message(message)
-                self.logic.log_final_results()
+            elif message.message_type == MessageType.EOF:
+                results = self.logic.get_results()
+                out_msg = Message(MessageType.MovieBudgetCounter, results)
+                self.connection.send(out_msg)
             else:
-                logger.warning(
-                    f'Received message type {message.message_type} but no logic loaded.'
-                )
+                logger.warning(f'Unknown message: {message}')
 
         except Exception as e:
             logger.error(f'Error processing message in CounterNode: {e}', exc_info=True)

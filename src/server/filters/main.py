@@ -1,9 +1,6 @@
 import logging
 from typing import Dict, Type
-
-from src.messaging.consumer import NamedQueueConsumer
 from src.messaging.protocol.message import Message, MessageType
-from src.messaging.publisher import DirectPublisher
 from src.server.base_node import BaseNode
 from src.server.filters.argentina_filter import ArgentinaLogic
 from src.server.filters.argentina_spain_filter import ArgentinaAndSpainLogic
@@ -34,46 +31,6 @@ class FilterNode(BaseNode):
     def _get_logic_registry(self) -> Dict[str, Type]:
         return AVAILABLE_FILTER_LOGICS
 
-    def _check_specific_config(self):
-        logger.debug('Checking filter-specific config...')
-        if not self.input_queue:
-            raise ValueError('FilterNode requires INPUT_QUEUE configuration')
-        self.output_queue = self.config.get_env_var('OUTPUT_QUEUE')
-        if not self.output_queue:
-            raise ValueError('FilterNode requires OUTPUT_QUEUE configuration')
-        logger.debug(
-            f'Filter config OK: IN_Q={self.input_queue}, OUT_Q={self.output_queue}'
-        )
-
-    def _setup_messaging_components(self):
-        try:
-            if not self.broker:
-                raise RuntimeError('Broker not initialized.')
-            if not self.output_queue:
-                raise RuntimeError('Output queue not configured.')
-            if not self.input_queue:
-                raise RuntimeError('Input queue not configured.')
-
-            logger.info(f'Setting up publisher for queue: {self.output_queue}')
-            self.publisher = DirectPublisher(self.broker, self.output_queue)
-
-            logger.info(f'Setting up data consumer for queue: {self.input_queue}')
-            self.consumer = NamedQueueConsumer(self.broker, self.input_queue)
-        except Exception as e:
-            logger.error(
-                f'Failed to setup filter messaging components: {e}', exc_info=True
-            )
-            raise
-
-    def _signal_eof_downstream(self):
-        try:
-            logger.info('Propagating EOF to output queue...')
-            eof_message = Message(MessageType.EOF, None)
-            self.connection.send(eof_message)
-            logger.info('EOF propagated.')
-        except Exception as e:
-            logger.error(f'Failed propagating EOF via publisher: {e}', exc_info=True)
-
     def process_message(self, message: Message):
         if not self.is_running():
             return
@@ -103,6 +60,7 @@ class FilterNode(BaseNode):
             if len(movies) > 0:
                 try:
                     self.connection.send(Message(MessageType.Movie, movies))
+                    # logger.info(f"Se envió al counter {len(movies)}")
                 except Exception as e:
                     logger.error(
                         f'Error Publishing movies: {e}',
@@ -111,7 +69,6 @@ class FilterNode(BaseNode):
 
         elif message.message_type == MessageType.EOF:
             logger.info('EOF Received on data queue. Propagating and shutting down...')
-            self._signal_eof_downstream()
             self.shutdown()
 
         else:

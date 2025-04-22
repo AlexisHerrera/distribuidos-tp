@@ -1,15 +1,14 @@
-# src/server/base_node.py
-import argparse
 import logging
 import signal
 import sys
-import threading
+import argparse
 from abc import ABC, abstractmethod
+
 from typing import Any, Dict, Type
 
 from src.messaging.connection_creator import ConnectionCreator
-from src.messaging.protocol.message import Message
 from src.utils.config import Config
+from src.messaging.protocol.message import Message
 from src.utils.log import initialize_log
 
 logger = logging.getLogger(__name__)
@@ -19,12 +18,12 @@ class BaseNode(ABC):
     def __init__(self, config: Config, node_type_arg: str):
         self.config = config
         self.node_type = node_type_arg
+        # Eg: single_country_logic
         self.logic: Any = None
 
-        self.lock = threading.Lock()
         self._is_running = True
         self._shutdown_initiated = False
-
+        self._eof_required = int(config.get_env_var('EOF_REQUIRED', '1'))
         self.connection = ConnectionCreator.create(config)
 
         try:
@@ -66,10 +65,6 @@ class BaseNode(ABC):
                 f'Could not instantiate/setup logic {self.node_type}'
             ) from e
 
-    @abstractmethod
-    def _check_specific_config(self):
-        pass
-
     def _setup_signal_handlers(self):
         def signal_handler(signum, frame):
             logger.warning(
@@ -80,10 +75,6 @@ class BaseNode(ABC):
         signal.signal(signal.SIGTERM, signal_handler)
         signal.signal(signal.SIGINT, signal_handler)
         logger.info('Signal handlers configured.')
-
-    @abstractmethod
-    def _setup_messaging_components(self):
-        pass
 
     @abstractmethod
     def process_message(self, message: Message):
@@ -110,29 +101,18 @@ class BaseNode(ABC):
             self.shutdown(force=True)
 
     def shutdown(self, force=False):
-        with self.lock:
-            if not self._is_running and not force:
-                return
-            if self._shutdown_initiated and not force:
-                return
-            logic_name = type(self.logic).__name__ if self.logic else self.node_type
-            logger.info(f"Shutdown requested for node '{logic_name}'. Force={force}")
-            self._is_running = False
-            self._shutdown_initiated = True
-        # logger.debug('Attempting to cancel consumer...')
-        # if self.consumer:
-        #     try:
-        #         self.consumer.cancel()
-        #     except Exception as e:
-        #         logger.debug(f'Ignoring error cancelling consumer: {e}')
+        if not self._is_running and not force:
+            return
+        logic_name = type(self.logic).__name__ if self.logic else self.node_type
+        logger.info(f"Shutdown requested for node '{logic_name}'. Force={force}")
+        self._is_running = False
         logger.debug('Closing broker connection...')
 
         self.connection.close()
         logger.info(f'Node {self.node_type} shutdown complete.')
 
     def is_running(self) -> bool:
-        with self.lock:
-            return self._is_running
+        return self._is_running
 
     @staticmethod
     def _parse_args(available_logics: dict) -> argparse.Namespace:
@@ -156,6 +136,7 @@ class BaseNode(ABC):
         logger = logging.getLogger(cls.__name__)
 
         try:
+            # Type of node
             args = cls._parse_args(logic_registry)
 
             node_instance = cls(config, args.node_type)
