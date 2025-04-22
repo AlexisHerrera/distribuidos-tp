@@ -1,13 +1,13 @@
 import logging
 from typing import Dict, Type
+
 from src.messaging.consumer import NamedQueueConsumer
 from src.messaging.protocol.message import Message, MessageType
 from src.messaging.publisher import DirectPublisher
-from src.utils.config import Config
-
 from src.server.base_node import BaseNode
 from src.server.filters.base_filter_logic import BaseFilterLogic
 from src.server.filters.single_country_logic import SingleCountryLogic
+from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
 AVAILABLE_FILTER_LOGICS = {
@@ -17,9 +17,6 @@ AVAILABLE_FILTER_LOGICS = {
 
 class FilterNode(BaseNode):
     def __init__(self, config: Config, filter_type: str):
-        self.publisher: DirectPublisher | None = None
-        self.output_queue: str | None = None
-
         super().__init__(config, filter_type)
 
         self.logic: BaseFilterLogic
@@ -61,18 +58,13 @@ class FilterNode(BaseNode):
             raise
 
     def _signal_eof_downstream(self):
-        if self.publisher:
-            try:
-                logger.info('Propagating EOF to output queue...')
-                eof_message = Message(MessageType.EOF, None)
-                self.publisher.put(self.broker, eof_message)
-                logger.info('EOF propagated.')
-            except Exception as e:
-                logger.error(
-                    f'Failed propagating EOF via publisher: {e}', exc_info=True
-                )
-        else:
-            logger.error('Cannot propagate EOF: Publisher not initialized.')
+        try:
+            logger.info('Propagating EOF to output queue...')
+            eof_message = Message(MessageType.EOF, None)
+            self.connection.send(eof_message)
+            logger.info('EOF propagated.')
+        except Exception as e:
+            logger.error(f'Failed propagating EOF via publisher: {e}', exc_info=True)
 
     def process_message(self, message: Message):
         if not self.is_running():
@@ -84,27 +76,29 @@ class FilterNode(BaseNode):
                 logger.warning(f'Expected list, got {type(movies_list)}')
                 return
 
+            movies = []
             for movie in movies_list:
                 if not movie:
                     continue
+
                 passed_filter = False
+
                 try:
                     passed_filter = self.logic.should_pass(movie)
                 except Exception as e:
                     logger.error(f'Filter logic error: {e}', exc_info=True)
 
                 if passed_filter:
-                    try:
-                        if not self.publisher:
-                            logger.error('Publisher missing!')
-                            continue
-                        output_message = Message(MessageType.Movie, [movie])
-                        self.publisher.put(self.broker, output_message)
-                    except Exception as e:
-                        logger.error(
-                            f'Error Publishing ID={getattr(movie, "id", "N/A")}: {e}',
-                            exc_info=True,
-                        )
+                    movies.append(movie)
+
+            if len(movies) > 0:
+                try:
+                    self.connection.send(Message(MessageType.Movie, movies))
+                except Exception as e:
+                    logger.error(
+                        f'Error Publishing movies: {e}',
+                        exc_info=True,
+                    )
 
         elif message.message_type == MessageType.EOF:
             logger.info('EOF Received on data queue. Propagating and shutting down...')

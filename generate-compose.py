@@ -75,9 +75,6 @@ def create_cleaner():
       - BATCH_SIZE_MOVIES=20
       - BATCH_SIZE_RATINGS=100
       - BATCH_SIZE_CREDITS=20
-      - RABBIT_HOST=rabbitmq
-      - MOVIES_CLEANED_QUEUE=movies_cleaned_queue
-      - CREDITS_CLEANED_QUEUE=credits_cleaned_queue
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -99,14 +96,13 @@ def create_solo_country(n: int):
     command: ["python", "src/server/filters/main.py", "solo_country"]
     environment:
       - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=movies_cleaned_queue
-      - OUTPUT_QUEUE=movies_single_country_queue
-      - LOG_LEVEL=INFO
     networks:
       - {NETWORK_NAME}
     depends_on:
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - ./src/server/filters/single_country_config.yaml:/app/config.yaml
   """
         nodes += node
 
