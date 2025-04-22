@@ -6,12 +6,14 @@ from src.messaging.protocol.message import Message, MessageType
 from src.messaging.publisher import DirectPublisher
 from src.server.base_node import BaseNode
 from src.server.filters.base_filter_logic import BaseFilterLogic
+from src.server.filters.post_2000_logic import Post2000Logic
 from src.server.filters.single_country_logic import SingleCountryLogic
 from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
 AVAILABLE_FILTER_LOGICS = {
     'solo_country': SingleCountryLogic,
+    'post_2000': Post2000Logic,
 }
 
 
@@ -89,7 +91,8 @@ class FilterNode(BaseNode):
                     logger.error(f'Filter logic error: {e}', exc_info=True)
 
                 if passed_filter:
-                    movies.append(movie)
+                    new_movie = self.logic.map(movie)
+                    movies.append(new_movie)
 
             if len(movies) > 0:
                 try:

@@ -94,8 +94,6 @@ def create_solo_country(n: int):
       context: .
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/filters/main.py", "solo_country"]
-    environment:
-      - RABBIT_HOST=rabbitmq
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -119,9 +117,6 @@ def create_country_budget_counter(n: int):
       context: .
       dockerfile: src/server/Dockerfile
     command: ["python", "src/server/counters/main.py", "country_budget"]
-    environment:
-      - RABBIT_HOST=rabbitmq
-      - INPUT_QUEUE=movies_single_country_queue
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -144,8 +139,6 @@ def create_sentiment_analyzer(n: int):
       context: .
       dockerfile: src/server/sentiment_analyzer/Dockerfile
     command: ["python", "src/server/sentiment_analyzer/main.py"]
-    environment:
-      - RABBIT_HOST=rabbitmq
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -160,6 +153,23 @@ def create_sentiment_analyzer(n: int):
     return nodes
 
 
+def create_post_2000():
+    return f"""filter_post_2000:
+    container_name: filter_post_2000
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "post_2000"]
+    networks:
+      - {NETWORK_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/post_2000_config.yaml:/app/config.yaml
+  """
+
+
 def create_services(args):
     rabbitmq = create_rabbitmq()
     client = create_client()
@@ -167,6 +177,7 @@ def create_services(args):
     solo_country = create_solo_country(args.scf)
     country_budget_counter = create_country_budget_counter(args.cbc)
     sentiment_analyzer = create_sentiment_analyzer(args.sa)
+    post_2000 = create_post_2000()
     return f"""
 services:
   {rabbitmq}
@@ -175,6 +186,7 @@ services:
   {solo_country}
   {country_budget_counter}
   {sentiment_analyzer}
+  {post_2000}
 """
 
 
