@@ -149,9 +149,6 @@ class BaseNode(ABC):
             logger.info(f"Shutdown requested for node '{logic_name}'")
             self._is_running = False
             try:
-                logger.info('Stopping consumer...')
-                self.connection.stop_consuming()
-                logger.info('Consumer stopped...')
                 logging.info('Now closing broker connection...')
                 self.connection.close()
                 logging.info('Connection closed')

@@ -24,11 +24,23 @@ class Connection:
         self.__consumer.start_consuming(self.__broker, callback)
 
     def close(self):
-        self.__broker.close()
+        try:
+            logger.info('Closing broker channel and connection…')
+            self.__broker.close()
+        except Exception as e:
+            logger.error(f'Error closing broker: {e}')
 
     def stop_consuming(self):
-        logger.info(f'Consumer tag to stop: {self.consumer_tag}')
-        self.__broker.stop_consuming(self.consumer_tag)
+        if self.consumer_tag:
+            try:
+                logger.info(f'Cancelling consumer {self.consumer_tag}')
+                self.__broker.basic_cancel(self.consumer_tag)
+            except Exception:
+                logger.error('Error sending basic_cancel')
+        try:
+            self.__broker.process_data_events(time_limit=1)
+        except Exception as e:
+            logger.error(f'Stop consuming: {e}')
 
 
 class MultiPublisherConnection:
