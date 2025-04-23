@@ -30,7 +30,7 @@ class Broker(ABC):
         pass
 
     @abstractmethod
-    def stop_consuming(self, consumer_tag: str):
+    def basic_cancel(self, consumer_tag: str):
         pass
 
     @abstractmethod
@@ -43,6 +43,10 @@ class Broker(ABC):
 
     @abstractmethod
     def ack(self, delivery_tag: int):
+        pass
+
+    @abstractmethod
+    def process_data_events(self, time_limit: int):
         pass
 
 
@@ -90,19 +94,14 @@ class RabbitMQBroker(Broker):
     def ack(self, delivery_tag: int):
         self.__channel.basic_ack(delivery_tag=delivery_tag)
 
-    def stop_consuming(self, consumer_tag: str):
-        if consumer_tag:
-            try:
-                self.__channel.basic_cancel(consumer_tag=consumer_tag)
-            except Exception:
-                pass
-        try:
-            self.__channel.stop_consuming()
-        except Exception:
-            pass
-
     def close(self):
         if self.__channel.is_open:
             self.__channel.close()
         if self.__connection.is_open:
             self.__connection.close()
+
+    def basic_cancel(self, consumer_tag: str):
+        self.__channel.basic_cancel(consumer_tag)
+
+    def process_data_events(self, time_limit: int):
+        self.__connection.process_data_events(time_limit=time_limit)
