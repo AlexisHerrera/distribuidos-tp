@@ -23,26 +23,6 @@ class GenericCounterNode(BaseNode):
         self._final_results_sent = False
         logger.info(f"GenericCounterNode '{counter_type}' initialized.")
 
-    def _start_eof_monitor(self):
-        if not self.leader.enabled:
-            return
-
-        self.leader.wait_for_eof()
-        logger.info('EOF detected by monitor in Counter')
-
-        self._send_final_results()
-
-        if self.leader.is_leader:
-            logger.info('Leader waiting for DONE from followers…')
-            self.leader.wait_for_done()
-            logger.info('All followers DONE; propagating EOF downstream')
-            self._propagate_eof()
-        else:
-            logger.info('Follower sending DONE to leader')
-            self.leader.send_done()
-
-        self.shutdown()
-
     def _send_final_results(self):
         if self._final_results_sent:
             return
