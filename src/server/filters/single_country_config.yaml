@@ -12,7 +12,6 @@ log:
 
 replication:
   enabled: true
-  node_id: "${HOSTNAME}"
   port: 6000
   peers:
     - "filter_single_country-1:6000"

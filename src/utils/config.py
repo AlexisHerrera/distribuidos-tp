@@ -27,7 +27,7 @@ class Config:
 
         # Replication config
         self.replication_enabled = replication_config.get('enabled', False)
-        self.node_id = replication_config.get('node_id', '')
+        self.node_id = os.getenv('NODE_ID', '')
         self.port = replication_config.get('port', 6000)
         self.peers = replication_config.get('peers', [])
 

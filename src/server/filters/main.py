@@ -36,6 +36,7 @@ class FilterNode(BaseNode):
             return
 
         if message.message_type == MessageType.EOF:
+            # Starts election!
             self.leader.on_local_eof()
             return
 

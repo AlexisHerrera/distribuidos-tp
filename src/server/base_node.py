@@ -10,7 +10,7 @@ from typing import Any, Dict, Type
 from src.messaging.connection_creator import ConnectionCreator
 from src.server.leader_election import LeaderElection
 from src.utils.config import Config
-from src.messaging.protocol.message import Message
+from src.messaging.protocol.message import Message, MessageType
 from src.utils.log import initialize_log
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class BaseNode(ABC):
         self._shutdown_initiated = False
         # Lock to ensure thread-safe shutdown
         self._shutdown_lock = threading.Lock()
-        self._eof_required = int(config.get_env_var('EOF_REQUIRED', '1'))
+        self._eof_sent = False
         self.connection = ConnectionCreator.create(config)
         self.leader = LeaderElection(self.config)
 
@@ -123,7 +123,16 @@ class BaseNode(ABC):
             logic_name = type(self.logic).__name__ if self.logic else self.node_type
             logger.info(f"Shutdown requested for node '{logic_name}'. Force={force}")
             self._is_running = False
-            logger.debug('Closing broker connection...')
+            logger.debug('Coordinating EOF propagation and connection close...')
+
+            # Leader sends EOF message to the next stage
+            if self.leader.enabled and self.leader.is_leader and not self._eof_sent:
+                try:
+                    logger.info('Leader propagating EOF to downstream...')
+                    self.connection.send(Message(MessageType.EOF, None))
+                    self._eof_sent = True
+                except Exception as e:
+                    logger.debug(f'Ignoring EOF publish error: {e}')
 
             try:
                 self.connection.close()

@@ -3,6 +3,7 @@ import argparse
 DEFAULT_NODES = 1
 DOCKER_COMPOSE_FILENAME = 'docker-compose-dev.yaml'
 NETWORK_NAME = 'testing_net'
+BASE_PORT = 6000
 
 
 class ScalableService:
@@ -12,12 +13,14 @@ class ScalableService:
         nodes: int,
         command: str,
         config_file: str,
+        port: int,
         dockerfile: str = 'src/server/Dockerfile',
     ):
         self.name = name
         self.nodes = nodes
         self.command = command
         self.config_file = config_file
+        self.port = port
         self.dockerfile = dockerfile
 
 
@@ -119,12 +122,24 @@ def create_sink_q2():
 
 
 def create_node(service: ScalableService, index: int):
-    return f"""{service.name}-{index}:
-    container_name: {service.name}-{index}
+    container = f'{service.name}-{index}'
+    peers = [
+        f'{service.name}-{i}:{service.port}'
+        for i in range(1, service.nodes + 1)
+        if i != index
+    ]
+    peers_env = ','.join(peers)
+    return f"""{container}:
+    container_name: {container}
     build:
       context: .
       dockerfile: {service.dockerfile}
     command: {service.command}
+    environment:
+      - NODE_ID={container}
+      - REPLICAS={service.nodes}
+      - PORT={service.port}
+      - PEERS={peers_env}
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -200,58 +215,78 @@ def parse_args():
 
 def main():
     args = parse_args()
-
-    # To add an scalable service append it here
-    scalable_services = [
-        ScalableService(
-            name='filter_single_country',
-            nodes=args.scf,
-            command='["python", "src/server/filters/main.py", "solo_country"]',
-            config_file='./src/server/filters/single_country_config.yaml',
+    scalable_services = []
+    base = BASE_PORT
+    mapping = [
+        (
+            'filter_single_country',
+            args.scf,
+            'src/server/filters/main.py',
+            'solo_country',
+            './src/server/filters/single_country_config.yaml',
         ),
-        ScalableService(
-            name='country_budget_counter',
-            nodes=args.cbc,
-            command='["python", "src/server/counters/main.py", "country_budget"]',
-            config_file='./src/server/counters/config.yaml',
+        (
+            'country_budget_counter',
+            args.cbc,
+            'src/server/counters/main.py',
+            'country_budget',
+            './src/server/counters/config.yaml',
         ),
-        ScalableService(
-            name='sentiment_analyzer',
-            nodes=args.sa,
-            command='["python", "src/server/sentiment_analyzer/main.py"]',
-            config_file='./src/server/sentiment_analyzer/config.yaml',
-            dockerfile='src/server/sentiment_analyzer/Dockerfile',
+        (
+            'sentiment_analyzer',
+            args.sa,
+            'src/server/sentiment_analyzer/main.py',
+            None,
+            './src/server/sentiment_analyzer/config.yaml',
         ),
-        ScalableService(
-            name='filter_post_2000',
-            nodes=args.p2000,
-            command='["python", "src/server/filters/main.py", "post_2000"]',
-            config_file='./src/server/filters/post_2000_config.yaml',
+        (
+            'filter_post_2000',
+            args.p2000,
+            'src/server/filters/main.py',
+            'post_2000',
+            './src/server/filters/post_2000_config.yaml',
         ),
-        ScalableService(
-            name='filter_argentina',
-            nodes=args.arg,
-            command='["python", "src/server/filters/main.py", "argentina"]',
-            config_file='./src/server/filters/argentina_config.yaml',
+        (
+            'filter_argentina',
+            args.arg,
+            'src/server/filters/main.py',
+            'argentina',
+            './src/server/filters/argentina_config.yaml',
         ),
-        ScalableService(
-            name='filter_argentina_and_spain',
-            nodes=args.argspa,
-            command='["python", "src/server/filters/main.py", "argentina_and_spain"]',
-            config_file='./src/server/filters/argentina_and_spain_config.yaml',
+        (
+            'filter_argentina_and_spain',
+            args.argspa,
+            'src/server/filters/main.py',
+            'argentina_and_spain',
+            './src/server/filters/argentina_and_spain_config.yaml',
         ),
-        ScalableService(
-            name='filter_decade_00',
-            nodes=args.d00,
-            command='["python", "src/server/filters/main.py", "decade_00"]',
-            config_file='./src/server/filters/decade_00_config.yaml',
+        (
+            'filter_decade_00',
+            args.d00,
+            'src/server/filters/main.py',
+            'decade_00',
+            './src/server/filters/decade_00_config.yaml',
         ),
     ]
-
+    for idx, (name, count, script, logic, cfg) in enumerate(mapping):
+        if count and count > 0:
+            port = base + idx
+            if logic:
+                cmd = f'["python", "{script}", "{logic}"]'
+            else:
+                cmd = f'["python", "{script}"]'
+            scalable_services.append(
+                ScalableService(
+                    name=name,
+                    nodes=count,
+                    command=cmd,
+                    config_file=cfg,
+                    port=port,
+                )
+            )
     content = create_docker_compose_data(scalable_services)
-
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
-        f.writelines(content)
+        f.write(content)
 
 
 if __name__ == '__main__':
