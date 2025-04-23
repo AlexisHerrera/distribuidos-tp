@@ -94,11 +94,20 @@ class RabbitMQBroker(Broker):
     def ack(self, delivery_tag: int):
         self.__channel.basic_ack(delivery_tag=delivery_tag)
 
+    def _threadsafe_teardown(self):
+        try:
+            if self.__channel.is_open:
+                self.__channel.close()
+        except Exception:
+            pass
+        try:
+            if self.__connection.is_open:
+                self.__connection.close()
+        except Exception:
+            pass
+
     def close(self):
-        if self.__channel.is_open:
-            self.__channel.close()
-        if self.__connection.is_open:
-            self.__connection.close()
+        self.__connection.add_callback_threadsafe(self._threadsafe_teardown)
 
     def basic_cancel(self, consumer_tag: str):
         self.__channel.basic_cancel(consumer_tag)
