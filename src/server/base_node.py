@@ -87,6 +87,7 @@ class BaseNode(ABC):
             return
         self.leader.wait_for_eof()
         logger.info('EOF detected by monitor')
+        self._send_final_results()
 
         if self.leader.is_leader:
             logger.info('Leader waiting for DONE from followers…')
@@ -101,6 +102,9 @@ class BaseNode(ABC):
     @abstractmethod
     def handle_message(self, message: Message):
         pass
+
+    def _send_final_results(self):
+        logger.info('Does not send any more data after eof!')
 
     def process_message(self, message: Message):
         if message.message_type == MessageType.EOF:
