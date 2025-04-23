@@ -23,11 +23,11 @@ class SinkNode(BaseNode):
     def _get_logic_registry(self) -> Dict[str, Type]:
         return AVAILABLE_SINK_LOGICS
 
-    def process_message(self, message: Message):
+    def handle_message(self, message: Message):
         try:
             if message.message_type == MessageType.MovieBudgetCounter:
                 if self.logic:
-                    self.logic.process_message(message)
+                    self.logic.merge_results(message)
                 else:
                     logger.warning('Sink received result but no logic loaded.')
             else:

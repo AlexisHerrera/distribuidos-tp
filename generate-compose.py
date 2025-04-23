@@ -110,7 +110,7 @@ def create_sink_q2():
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/sinks/main.py"]
+    command: ["python", "src/server/sinks/main.py", "q2"]
     networks:
       - {NETWORK_NAME}
     depends_on:

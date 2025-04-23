@@ -7,5 +7,5 @@ logger = logging.getLogger(__name__)
 
 class BaseSinkLogic(ABC):
     @abstractmethod
-    def process_message(self, message: Message):
+    def merge_results(self, message: Message):
         pass

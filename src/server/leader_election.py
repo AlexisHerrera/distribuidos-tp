@@ -9,11 +9,11 @@ logger = logging.getLogger(__name__)
 class LeaderElection:
     def __init__(self, config: Config):
         self.enabled = config.replicas_enabled
-        self.node_id = config.node_id
-        self.port = int(config.port)
         if not self.enabled:
             logger.info('LeaderElection disabled in config.')
             return
+        self.node_id = config.node_id
+        self.port = int(config.port)
         peers = config.peers
         # Parse peers list: ["host:port", ...]
         self.peers = []
