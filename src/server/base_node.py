@@ -29,10 +29,8 @@ class BaseNode(ABC):
         self._shutdown_initiated = False
         # Lock to ensure thread-safe shutdown
         self._shutdown_lock = threading.Lock()
-        self._eof_sent = False
         self.connection = ConnectionCreator.create(config)
         self.leader = LeaderElection(self.config)
-        self._consumer_thread = None
 
         try:
             self._load_logic()
@@ -87,10 +85,17 @@ class BaseNode(ABC):
     def _start_eof_monitor(self):
         if not self.leader.enabled:
             return
-        # Espera EOF de líder o de peers
         self.leader.wait_for_eof()
-        logger.info('EOF detected by monitor, closing connection…')
-        # Cerrar conexión de forma segura
+        logger.info('EOF detected by monitor')
+
+        if self.leader.is_leader:
+            logger.info('Leader waiting for DONE from followers…')
+            self.leader.wait_for_done()
+            logger.info('All followers DONE; propagating EOF downstream')
+            self._propagate_eof()
+        else:
+            logger.info('Follower sending DONE to leader')
+            self.leader.send_done()
         self.shutdown()
 
     @abstractmethod
@@ -99,9 +104,14 @@ class BaseNode(ABC):
 
     def process_message(self, message: Message):
         if message.message_type == MessageType.EOF:
-            if self.leader.enabled:
+            logger.info('RECEIVED EOF FROM QUEUE')
+            if not self.leader.enabled:
+                # single node shutdown, there is no monitor
+                self._propagate_eof()
+                self.shutdown()
+            else:
+                # Unlock monitor
                 self.leader.on_local_eof()
-            self.shutdown()
             return
         try:
             self.handle_message(message)
@@ -114,16 +124,13 @@ class BaseNode(ABC):
             return
         logger.info(f'Starting Node (Type: {self.node_type})...')
         if self.leader.enabled:
+            logger.info('Launching monitor thread')
             threading.Thread(target=self._start_eof_monitor, daemon=True).start()
         try:
             logic_name = type(self.logic).__name__ if self.logic else 'N/A'
             logger.info(f"Node '{logic_name}' running. Consuming. Waiting...")
 
-            self._consumer_thread = threading.Thread(
-                target=lambda: self.connection.recv(self.process_message), daemon=False
-            )
-            self._consumer_thread.start()
-            self._consumer_thread.join()
+            self.connection.recv(self.process_message)
             logger.info('Consumer loop finished.')
         except KeyboardInterrupt:
             logger.warning('KeyboardInterrupt (CTRL-C)...')
@@ -141,37 +148,29 @@ class BaseNode(ABC):
             logic_name = type(self.logic).__name__ if self.logic else self.node_type
             logger.info(f"Shutdown requested for node '{logic_name}'")
             self._is_running = False
-            logger.debug('Coordinating EOF propagation and connection close...')
-
             try:
-                logger.info('Shutting down consumer first')
+                logger.info('Stopping consumer...')
                 self.connection.stop_consuming()
-                self._consumer_thread.join(timeout=5)
-                logger.info('Thread joined!')
-            except Exception as e:
-                logger.warning(f'Stop consumming error: {e}')
-            # Leader sends EOF message to the next stage
-            if not self.leader.enabled or (
-                self.leader.enabled and self.leader.is_leader and not self._eof_sent
-            ):
-                try:
-                    logger.info('Propagating EOF to next stage...')
-                    eof_broker = RabbitMQBroker(self.config.rabbit_host)
-                    eof_publisher = DirectPublisher(
-                        eof_broker, self.config.publishers[0]['queue']
-                    )
-                    eof_publisher.put(eof_broker, Message(MessageType.EOF, None))
-                    self._eof_sent = True
-                except Exception as e:
-                    logger.error(f'Could not publish EOF: {e}')
-
-            try:
-                logging.info('Now closing broker connection')
+                logger.info('Consumer stopped...')
+                logging.info('Now closing broker connection...')
                 self.connection.close()
+                logging.info('Connection closed')
+                self.leader.stop()
+                logger.info('LeaderElection detenido')
             except Exception as e:
-                logger.debug(f'Ignoring connection.close error: {e}')
+                logger.error(f'Stopping or closing error: {e}')
 
-            logger.info(f'Node {self.node_type} shutdown complete.')
+    def _propagate_eof(self):
+        try:
+            logger.info('Propagating EOF to next stage...')
+            eof_broker = RabbitMQBroker(self.config.rabbit_host)
+            eof_publisher = DirectPublisher(
+                eof_broker, self.config.publishers[0]['queue']
+            )
+            eof_publisher.put(eof_broker, Message(MessageType.EOF, None))
+            logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')
+        except Exception as e:
+            logger.error(f'Could not publish EOF: {e}')
 
     def is_running(self) -> bool:
         return self._is_running
