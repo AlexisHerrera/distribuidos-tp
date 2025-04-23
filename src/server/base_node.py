@@ -91,8 +91,20 @@ class BaseNode(ABC):
         self.shutdown()
 
     @abstractmethod
-    def process_message(self, message: Message):
+    def handle_message(self, message: Message):
         pass
+
+    def process_message(self, message: Message):
+        if message.message_type == MessageType.EOF:
+            if self.leader.enabled:
+                self.leader.on_local_eof()
+            else:
+                self.shutdown()
+            return
+        try:
+            self.handle_message(message)
+        except Exception as e:
+            logger.error(f'Error en handle_message: {e}', exc_info=True)
 
     def run(self):
         if not self.is_running():

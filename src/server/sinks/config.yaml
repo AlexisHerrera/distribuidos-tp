@@ -4,8 +4,8 @@ connection:
   consumer:
     - type: direct
       queue: budget_sum
-#  publisher:
-#    - type: direct
-#      queue: budget_sum
+  publisher:
+    - type: direct
+      queue: reporter
 log:
   level: INFO

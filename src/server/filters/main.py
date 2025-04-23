@@ -31,18 +31,9 @@ class FilterNode(BaseNode):
     def _get_logic_registry(self) -> Dict[str, Type]:
         return AVAILABLE_FILTER_LOGICS
 
-    def process_message(self, message: Message):
+    def handle_message(self, message: Message):
         if not self.is_running():
             return
-
-        if message.message_type == MessageType.EOF:
-            if self.leader.enabled:
-                # Starts election!
-                self.leader.on_local_eof()
-                return
-            else:
-                self.shutdown()
-                return
 
         if message.message_type == MessageType.Movie:
             movies_list = message.data
