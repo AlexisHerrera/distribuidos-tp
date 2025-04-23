@@ -99,7 +99,8 @@ class BaseNode(ABC):
             logger.critical('Node init failed.')
             return
         logger.info(f'Starting Node (Type: {self.node_type})...')
-        threading.Thread(target=self._start_eof_monitor, daemon=True).start()
+        if self.leader.enabled:
+            threading.Thread(target=self._start_eof_monitor, daemon=True).start()
         try:
             logic_name = type(self.logic).__name__ if self.logic else 'N/A'
             logger.info(f"Node '{logic_name}' running. Consuming. Waiting...")
