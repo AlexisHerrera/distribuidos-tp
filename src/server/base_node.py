@@ -100,9 +100,7 @@ class BaseNode(ABC):
         if message.message_type == MessageType.EOF:
             if self.leader.enabled:
                 self.leader.on_local_eof()
-                self.shutdown()
-            else:
-                self.shutdown()
+            self.shutdown()
             return
         try:
             self.handle_message(message)
