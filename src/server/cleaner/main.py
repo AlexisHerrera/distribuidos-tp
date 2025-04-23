@@ -228,7 +228,7 @@ class Cleaner:
                     logger.error(
                         f'Unexpected error in receive loop: {e}', exc_info=True
                     )
-                self.is_running = False
+                # self.is_running = False
 
         logger.info('Client data processing finished.')
         logger.info(f'Processing Summary: {dict(processed_counts)}')
