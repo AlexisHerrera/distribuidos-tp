@@ -11,28 +11,36 @@ from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
 
-
-AVAILABLE_COUNTER_LOGICS = {
+# Registry of available counter types
+AVAILABLE_COUNTER_LOGICS: Dict[str, Type[BaseCounterLogic]] = {
     'country_budget': CountryBudgetLogic,
 }
 
 
 class GenericCounterNode(BaseNode):
     def __init__(self, config: Config, counter_type: str):
-        self._final_results_sent = False
-
         super().__init__(config, counter_type)
-
-        self.logic: BaseCounterLogic
-
+        self._final_results_sent = False
         logger.info(f"GenericCounterNode '{counter_type}' initialized.")
 
     def _start_eof_monitor(self):
         if not self.leader.enabled:
             return
+
         self.leader.wait_for_eof()
         logger.info('EOF detected by monitor in Counter')
+
         self._send_final_results()
+
+        if self.leader.is_leader:
+            logger.info('Leader waiting for DONE from followers…')
+            self.leader.wait_for_done()
+            logger.info('All followers DONE; propagating EOF downstream')
+            self._propagate_eof()
+        else:
+            logger.info('Follower sending DONE to leader')
+            self.leader.send_done()
+
         self.shutdown()
 
     def _send_final_results(self):
@@ -49,9 +57,6 @@ class GenericCounterNode(BaseNode):
         except Exception as e:
             logger.error(f'Error sending final counter results: {e}', exc_info=True)
 
-    def _get_logic_registry(self) -> Dict[str, Type]:
-        return AVAILABLE_COUNTER_LOGICS
-
     def handle_message(self, message: Message):
         if not self.is_running():
             return
@@ -60,9 +65,11 @@ class GenericCounterNode(BaseNode):
                 self.logic.process_message(message)
             else:
                 logger.warning(f'Unknown message: {message}')
-
         except Exception as e:
             logger.error(f'Error processing message in CounterNode: {e}', exc_info=True)
+
+    def _get_logic_registry(self) -> Dict[str, Type]:
+        return AVAILABLE_COUNTER_LOGICS
 
 
 if __name__ == '__main__':
