@@ -22,7 +22,11 @@ class Broker(ABC):
         pass
 
     @abstractmethod
-    def consume(self, callback: Callable, queue_name: str) -> str:
+    def start_consuming(self, callback: Callable, queue_name: str):
+        pass
+
+    @abstractmethod
+    def basic_consume(self, callback: Callable, queue_name: str) -> str:
         pass
 
     @abstractmethod
@@ -72,16 +76,13 @@ class RabbitMQBroker(Broker):
             exchange=exchange, routing_key=routing_key, body=body
         )
 
-    def consume(self, callback: Callable, queue_name: str):
-        consumer_tag = self.__channel.basic_consume(
+    def start_consuming(self, callback: Callable, queue_name: str):
+        self.__channel.start_consuming()
+
+    def basic_consume(self, callback: Callable, queue_name: str) -> str:
+        return self.__channel.basic_consume(
             queue=queue_name, on_message_callback=callback, auto_ack=False
         )
-        try:
-            self.__channel.start_consuming()
-        except Exception:
-            # TODO: Loggear, aqui debería pasar stop_consuming
-            pass
-        return consumer_tag
 
     def basic_get(self, queue_name: str) -> tuple:
         return self.__channel.basic_get(queue=queue_name, auto_ack=False)

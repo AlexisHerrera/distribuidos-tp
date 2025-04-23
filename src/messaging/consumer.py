@@ -12,7 +12,13 @@ from src.messaging.protocol.message import Message
 
 class Consumer(ABC):
     @abstractmethod
-    def consume(self, broker: Broker, callback: Callable[[Message], None]) -> str:
+    def start_consuming(
+        self, broker: Broker, callback: Callable[[Message], None]
+    ) -> str:
+        pass
+
+    @abstractmethod
+    def basic_consume(self, broker: Broker, callback: Callable[[Message], None]) -> str:
         pass
 
     def _create_callback(
@@ -70,11 +76,19 @@ class BroadcastConsumer(Consumer):
     def __init__(self, broker: Broker, exchange_name: str):
         broker.exchange_declare(exchange_name, 'fanout')
         self.__queue_name = broker.queue_declare()
+        self.tag = None
         broker.queue_bind(exchange_name, self.__queue_name)
 
-    def consume(self, broker: Broker, callback: Callable[[Message], None]):
-        return broker.consume(
-            self._create_callback(callback=callback), self.__queue_name
+    def basic_consume(self, broker: Broker, callback: Callable[[Message], None]) -> str:
+        tag = broker.basic_consume(
+            self._create_callback(callback=callback, requeue=False), self.__queue_name
+        )
+        self.tag = tag
+        return tag
+
+    def start_consuming(self, broker: Broker, callback: Callable[[Message], None]):
+        broker.start_consuming(
+            self._create_callback(callback=callback, requeue=False), self.__queue_name
         )
 
 
@@ -84,8 +98,16 @@ class NamedQueueConsumer(Consumer):
         # If it is durable, resists restarts.
         broker.queue_declare(queue_name=queue_name, exclusive=False, durable=True)
         self.__queue_name = queue_name
+        self.tag = None
 
-    def consume(self, broker: RabbitMQBroker, callback: Callable[[Message], None]):
-        return broker.consume(
+    def basic_consume(self, broker: Broker, callback: Callable[[Message], None]) -> str:
+        tag = broker.basic_consume(
+            self._create_callback(callback=callback, requeue=False), self.__queue_name
+        )
+        self.tag = tag
+        return tag
+
+    def start_consuming(self, broker: Broker, callback: Callable[[Message], None]):
+        broker.start_consuming(
             self._create_callback(callback=callback, requeue=False), self.__queue_name
         )

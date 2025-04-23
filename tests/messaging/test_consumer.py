@@ -29,9 +29,9 @@ class TestConsumer:
 
         consumer = BroadcastConsumer(broker, exchange_name)
 
-        consumer.consume(broker, message)
+        consumer.start_consuming(broker, message)
 
-        broker.consume.assert_called_once_with(ANY, queue_name)
+        broker.start_consuming.assert_called_once_with(ANY, queue_name)
 
 
 if __name__ == '__main__':

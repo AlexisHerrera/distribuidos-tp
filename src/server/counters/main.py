@@ -44,9 +44,9 @@ class GenericCounterNode(BaseNode):
         except Exception as e:
             logger.error(f'Error sending final counter results: {e}', exc_info=True)
 
-    def shutdown(self, force=False):
+    def shutdown(self):
         self._send_final_results()
-        super().shutdown(force=force)
+        super().shutdown()
 
     def _get_logic_registry(self) -> Dict[str, Type]:
         return AVAILABLE_COUNTER_LOGICS

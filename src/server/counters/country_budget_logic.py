@@ -18,7 +18,7 @@ class CountryBudgetLogic(BaseCounterLogic):
             country = production_countries[0]
             budget = int(movie.budget)
             self.country_budgets[country] += budget
-            self.log_final_results()
+            # self.log_final_results()
 
     def message_result(self) -> Message:
         result = dict(self.country_budgets)
