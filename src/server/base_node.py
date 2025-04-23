@@ -32,6 +32,7 @@ class BaseNode(ABC):
         self._eof_sent = False
         self.connection = ConnectionCreator.create(config)
         self.leader = LeaderElection(self.config)
+        self._consumer_thread = None
 
         try:
             self._load_logic()
@@ -118,8 +119,11 @@ class BaseNode(ABC):
             logic_name = type(self.logic).__name__ if self.logic else 'N/A'
             logger.info(f"Node '{logic_name}' running. Consuming. Waiting...")
 
-            self.connection.recv(self.process_message)
-
+            self._consumer_thread = threading.Thread(
+                target=lambda: self.connection.recv(self.process_message), daemon=False
+            )
+            self._consumer_thread.start()
+            self._consumer_thread.join()
             logger.info('Consumer loop finished.')
         except KeyboardInterrupt:
             logger.warning('KeyboardInterrupt (CTRL-C)...')
@@ -139,15 +143,17 @@ class BaseNode(ABC):
             self._is_running = False
             logger.debug('Coordinating EOF propagation and connection close...')
 
+            try:
+                logger.info('Shutting down consumer first')
+                self.connection.stop_consuming()
+                self._consumer_thread.join(timeout=5)
+                logger.info('Thread joined!')
+            except Exception as e:
+                logger.warning(f'Stop consumming error: {e}')
             # Leader sends EOF message to the next stage
             if not self.leader.enabled or (
                 self.leader.enabled and self.leader.is_leader and not self._eof_sent
             ):
-                try:
-                    logger.info('Shutting down consumer first')
-                    self.connection.stop_consuming()
-                except Exception as e:
-                    logger.warning(f'Stop consumming error: {e}')
                 try:
                     logger.info('Propagating EOF to next stage...')
                     eof_broker = RabbitMQBroker(self.config.rabbit_host)
