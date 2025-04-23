@@ -30,18 +30,6 @@ class Connection:
         except Exception as e:
             logger.error(f'Error closing broker: {e}')
 
-    def stop_consuming(self):
-        if self.consumer_tag:
-            try:
-                logger.info(f'Cancelling consumer {self.consumer_tag}')
-                self.__broker.basic_cancel(self.consumer_tag)
-            except Exception:
-                logger.error('Error sending basic_cancel')
-        try:
-            self.__broker.process_data_events(time_limit=1)
-        except Exception as e:
-            logger.error(f'Stop consuming: {e}')
-
 
 class MultiPublisherConnection:
     def __init__(
