@@ -14,14 +14,13 @@ services:
     environment:
       - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
     healthcheck:
-      test: [ "CMD", "rabbitmqctl", "status" ]
+      test: ["CMD", "rabbitmqctl", "status"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - testing_net
 
-  
   client:
     container_name: client
     build:
@@ -204,7 +203,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/decade_00_config.yaml:/app/config.yaml
-  
+
   q2_sink:
     container_name: q2_sink
     build:
@@ -219,10 +218,23 @@ services:
     volumes:
       - ./src/server/sinks/config.yaml:/app/config.yaml
 
+  reporter:
+    container_name: reporter
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/reporter/main.py"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/reporter/config.yaml:/app/config.yaml
+
 networks:
   testing_net:
     ipam:
       driver: default
       config:
         - subnet: 172.25.125.0/24
-    
