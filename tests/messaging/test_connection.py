@@ -36,7 +36,7 @@ class TestConnection:
 
         connection.recv(callback=callback)
 
-        consumer.consume.assert_called_once()
+        consumer.basic_consume.assert_called_once()
 
     def test_close(self):
         broker = Mock(Broker)

@@ -7,7 +7,9 @@ from abc import ABC, abstractmethod
 
 from typing import Any, Dict, Type
 
+from src.messaging.broker import RabbitMQBroker
 from src.messaging.connection_creator import ConnectionCreator
+from src.messaging.publisher import DirectPublisher
 from src.server.leader_election import LeaderElection
 from src.utils.config import Config
 from src.messaging.protocol.message import Message, MessageType
@@ -98,8 +100,7 @@ class BaseNode(ABC):
         if message.message_type == MessageType.EOF:
             if self.leader.enabled:
                 self.leader.on_local_eof()
-            else:
-                self.shutdown()
+            self.shutdown()
             return
         try:
             self.handle_message(message)
@@ -125,16 +126,16 @@ class BaseNode(ABC):
         except Exception as e:
             logger.critical(f'Fatal error during run: {e}', exc_info=True)
         finally:
-            self.shutdown(force=True)
+            self.shutdown()
 
-    def shutdown(self, force=False):
+    def shutdown(self):
         with self._shutdown_lock:
-            if self._shutdown_initiated and not force:
+            if self._shutdown_initiated:
                 return
             self._shutdown_initiated = True
 
             logic_name = type(self.logic).__name__ if self.logic else self.node_type
-            logger.info(f"Shutdown requested for node '{logic_name}'. Force={force}")
+            logger.info(f"Shutdown requested for node '{logic_name}'")
             self._is_running = False
             logger.debug('Coordinating EOF propagation and connection close...')
 
@@ -143,13 +144,23 @@ class BaseNode(ABC):
                 self.leader.enabled and self.leader.is_leader and not self._eof_sent
             ):
                 try:
+                    logger.info('Shutting down consumer first')
+                    self.connection.stop_consuming()
+                except Exception as e:
+                    logger.warning(f'Stop consumming error: {e}')
+                try:
                     logger.info('Propagating EOF to next stage...')
-                    self.connection.send(Message(MessageType.EOF, None))
+                    eof_broker = RabbitMQBroker(self.config.rabbit_host)
+                    eof_publisher = DirectPublisher(
+                        eof_broker, self.config.publishers[0]['queue']
+                    )
+                    eof_publisher.put(eof_broker, Message(MessageType.EOF, None))
                     self._eof_sent = True
                 except Exception as e:
-                    logger.debug(f'Ignoring EOF publish error: {e}')
+                    logger.error(f'Could not publish EOF: {e}')
 
             try:
+                logging.info('Now closing broker connection')
                 self.connection.close()
             except Exception as e:
                 logger.debug(f'Ignoring connection.close error: {e}')
@@ -196,5 +207,5 @@ class BaseNode(ABC):
                 f'Unhandled exception in {cls.__name__}.main: {e}', exc_info=True
             )
         if node_instance and isinstance(node_instance, BaseNode):
-            node_instance.shutdown(force=True)
+            node_instance.shutdown()
         sys.exit(1)

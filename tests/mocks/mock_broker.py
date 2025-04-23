@@ -90,7 +90,7 @@ class MockBroker(Broker):
                 f"MockBroker: Message published to exchange '{exchange}' (routing not simulated here)"
             )
 
-    def consume(self, callback: Callable, queue_name: str):
+    def start_consuming(self, callback: Callable, queue_name: str):
         self.call_log['consume'].append(
             {'queue_name': queue_name, 'callback': callback}
         )

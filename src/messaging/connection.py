@@ -14,15 +14,21 @@ class Connection:
         self.__broker = broker
         self.__publisher = publisher
         self.__consumer = consumer
+        self.consumer_tag = None
 
     def send(self, message: Message):
         self.__publisher.put(self.__broker, message)
 
     def recv(self, callback: Callable[[Message], None]):
-        self.__consumer.consume(self.__broker, callback)
+        self.consumer_tag = self.__consumer.basic_consume(self.__broker, callback)
+        self.__consumer.start_consuming(self.__broker, callback)
 
     def close(self):
         self.__broker.close()
+
+    def stop_consuming(self):
+        logger.info(f'Consumer tag to stop: {self.consumer_tag}')
+        self.__broker.stop_consuming(self.consumer_tag)
 
 
 class MultiPublisherConnection:
@@ -51,7 +57,7 @@ class MultiPublisherConnection:
             logger.error(f'Message type not in publishers {message.message_type}')
 
     def recv(self, callback: Callable[[Message], None]):
-        self.__consumer.consume(self.__broker, callback)
+        self.__consumer.start_consuming(self.__broker, callback)
 
     def close(self):
         self.__broker.close()
