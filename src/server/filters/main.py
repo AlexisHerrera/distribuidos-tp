@@ -35,6 +35,10 @@ class FilterNode(BaseNode):
         if not self.is_running():
             return
 
+        if message.message_type == MessageType.EOF:
+            self.leader.on_local_eof()
+            return
+
         if message.message_type == MessageType.Movie:
             movies_list = message.data
             if not isinstance(movies_list, list):
@@ -66,11 +70,6 @@ class FilterNode(BaseNode):
                         f'Error Publishing movies: {e}',
                         exc_info=True,
                     )
-
-        elif message.message_type == MessageType.EOF:
-            logger.info('EOF Received on data queue. Propagating and shutting down...')
-            self.shutdown()
-
         else:
             logger.warning(f'Unknown message type received: {message.message_type}')
 

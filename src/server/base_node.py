@@ -2,11 +2,13 @@ import logging
 import signal
 import sys
 import argparse
+import threading
 from abc import ABC, abstractmethod
 
 from typing import Any, Dict, Type
 
 from src.messaging.connection_creator import ConnectionCreator
+from src.server.leader_election import LeaderElection
 from src.utils.config import Config
 from src.messaging.protocol.message import Message
 from src.utils.log import initialize_log
@@ -23,8 +25,11 @@ class BaseNode(ABC):
 
         self._is_running = True
         self._shutdown_initiated = False
+        # Lock to ensure thread-safe shutdown
+        self._shutdown_lock = threading.Lock()
         self._eof_required = int(config.get_env_var('EOF_REQUIRED', '1'))
         self.connection = ConnectionCreator.create(config)
+        self.leader = LeaderElection(self.config)
 
         try:
             self._load_logic()
@@ -76,6 +81,15 @@ class BaseNode(ABC):
         signal.signal(signal.SIGINT, signal_handler)
         logger.info('Signal handlers configured.')
 
+    def _start_eof_monitor(self):
+        if not self.leader.enabled:
+            return
+        # Espera EOF de líder o de peers
+        self.leader.wait_for_eof()
+        logger.info('EOF detected by monitor, closing connection…')
+        # Cerrar conexión de forma segura
+        self.shutdown()
+
     @abstractmethod
     def process_message(self, message: Message):
         pass
@@ -85,7 +99,7 @@ class BaseNode(ABC):
             logger.critical('Node init failed.')
             return
         logger.info(f'Starting Node (Type: {self.node_type})...')
-
+        threading.Thread(target=self._start_eof_monitor, daemon=True).start()
         try:
             logic_name = type(self.logic).__name__ if self.logic else 'N/A'
             logger.info(f"Node '{logic_name}' running. Consuming. Waiting...")
@@ -101,15 +115,22 @@ class BaseNode(ABC):
             self.shutdown(force=True)
 
     def shutdown(self, force=False):
-        if not self._is_running and not force:
-            return
-        logic_name = type(self.logic).__name__ if self.logic else self.node_type
-        logger.info(f"Shutdown requested for node '{logic_name}'. Force={force}")
-        self._is_running = False
-        logger.debug('Closing broker connection...')
+        with self._shutdown_lock:
+            if self._shutdown_initiated and not force:
+                return
+            self._shutdown_initiated = True
 
-        self.connection.close()
-        logger.info(f'Node {self.node_type} shutdown complete.')
+            logic_name = type(self.logic).__name__ if self.logic else self.node_type
+            logger.info(f"Shutdown requested for node '{logic_name}'. Force={force}")
+            self._is_running = False
+            logger.debug('Closing broker connection...')
+
+            try:
+                self.connection.close()
+            except Exception as e:
+                logger.debug(f'Ignoring connection.close error: {e}')
+
+            logger.info(f'Node {self.node_type} shutdown complete.')
 
     def is_running(self) -> bool:
         return self._is_running
@@ -136,9 +157,7 @@ class BaseNode(ABC):
         logger = logging.getLogger(cls.__name__)
 
         try:
-            # Type of node
             args = cls._parse_args(logic_registry)
-
             node_instance = cls(config, args.node_type)
             node_instance.run()
             logger.info(f'{cls.__name__} run method finished.')
