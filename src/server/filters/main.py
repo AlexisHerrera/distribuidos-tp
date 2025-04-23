@@ -36,9 +36,13 @@ class FilterNode(BaseNode):
             return
 
         if message.message_type == MessageType.EOF:
-            # Starts election!
-            self.leader.on_local_eof()
-            return
+            if self.leader.enabled:
+                # Starts election!
+                self.leader.on_local_eof()
+                return
+            else:
+                self.shutdown()
+                return
 
         if message.message_type == MessageType.Movie:
             movies_list = message.data

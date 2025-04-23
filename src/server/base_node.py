@@ -99,7 +99,8 @@ class BaseNode(ABC):
             logger.critical('Node init failed.')
             return
         logger.info(f'Starting Node (Type: {self.node_type})...')
-        threading.Thread(target=self._start_eof_monitor, daemon=True).start()
+        if self.leader.enabled:
+            threading.Thread(target=self._start_eof_monitor, daemon=True).start()
         try:
             logic_name = type(self.logic).__name__ if self.logic else 'N/A'
             logger.info(f"Node '{logic_name}' running. Consuming. Waiting...")
@@ -126,9 +127,11 @@ class BaseNode(ABC):
             logger.debug('Coordinating EOF propagation and connection close...')
 
             # Leader sends EOF message to the next stage
-            if self.leader.enabled and self.leader.is_leader and not self._eof_sent:
+            if not self.leader.enabled or (
+                self.leader.enabled and self.leader.is_leader and not self._eof_sent
+            ):
                 try:
-                    logger.info('Leader propagating EOF to downstream...')
+                    logger.info('Propagating EOF to next stage...')
                     self.connection.send(Message(MessageType.EOF, None))
                     self._eof_sent = True
                 except Exception as e:

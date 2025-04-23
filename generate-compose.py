@@ -137,7 +137,6 @@ def create_node(service: ScalableService, index: int):
     command: {service.command}
     environment:
       - NODE_ID={container}
-      - REPLICAS={service.nodes}
       - PORT={service.port}
       - PEERS={peers_env}
     networks:

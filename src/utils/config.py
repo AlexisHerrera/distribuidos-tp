@@ -16,7 +16,6 @@ class Config:
         rabbit_config = config['rabbit']
         connection = config['connection']
         log_config = config['log']
-        replication_config = config.get('replication', {})
 
         self.rabbit_host = os.getenv('RABBIT_HOST', rabbit_config['host'])
 
@@ -26,10 +25,10 @@ class Config:
         self.log_level = os.getenv('LOG_LEVEL', log_config['level'])
 
         # Replication config
-        self.replication_enabled = replication_config.get('enabled', False)
         self.node_id = os.getenv('NODE_ID', '')
-        self.port = replication_config.get('port', 6000)
-        self.peers = replication_config.get('peers', [])
+        self.port = os.getenv('PORT', '')
+        self.peers = os.getenv('PEERS', '').split(',')
+        self.replicas_enabled = os.getenv('PEERS', '') != ''
 
     def get_env_var(self, var_name: str, default: str = None) -> str | None:
         return os.getenv(var_name, default)
@@ -39,7 +38,7 @@ def print_config(config: Config):
     logger.debug(
         f'Config - Rabbit Host: {config.rabbit_host}, '
         f'Log Level: {config.log_level}, '
-        f'Replication Enabled: {config.replication_enabled}, '
+        f'Replication Enabled: {config.peers != ""}, '
         f'Node ID: {config.node_id}, '
         f'Peers: {config.peers}, '
         f'Listen Port: {config.port}'
