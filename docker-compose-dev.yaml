@@ -102,6 +102,40 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/argentina_config.yaml:/app/config.yaml
+  cast_splitter-1:
+    container_name: cast_splitter-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/splitters/main.py", "cast_splitter"]
+    environment:
+      - NODE_ID=cast_splitter-1
+      - PORT=6007
+      - PEERS=cast_splitter-2:6007
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/splitters/config.yaml:/app/config.yaml
+  cast_splitter-2:
+    container_name: cast_splitter-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/splitters/main.py", "cast_splitter"]
+    environment:
+      - NODE_ID=cast_splitter-2
+      - PORT=6007
+      - PEERS=cast_splitter-1:6007
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/splitters/config.yaml:/app/config.yaml
   
   q2_sink:
     container_name: q2_sink
