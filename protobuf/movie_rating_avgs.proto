@@ -12,5 +12,5 @@ message MovieRatingAvg {
 
 message MovieRatingAvgs {
     MovieRatingAvg min = 1;
-    MovieRatingAvg max = 1;
+    MovieRatingAvg max = 2;
 }

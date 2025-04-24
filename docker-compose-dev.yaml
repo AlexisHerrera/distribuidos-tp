@@ -42,7 +42,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data-small:/app/.data
+      - ./.data:/app/.data
     depends_on:
       cleaner:
         condition: service_started
@@ -237,7 +237,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/actor_counter_config.yaml:/app/config.yaml
-  
+
   q2_sink:
     container_name: q2_sink
     build:

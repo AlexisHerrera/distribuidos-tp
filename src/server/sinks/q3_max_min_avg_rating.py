@@ -1,6 +1,6 @@
 import logging
 
-from src.messaging.protocol.message import Message
+from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_rating_avg import MovieRatingAvg
 from src.model.movie_rating_count import MovieRatingCount
 
@@ -28,30 +28,35 @@ class Q3MaxMinAvgRatingSinkLogic(BaseSinkLogic):
 
             self.rating_counts[rating.movie_id] = counter
 
-        self.finalize_and_log()
+    def message_result(self) -> Message:
+        result = self._get_max_min_average_rating()
+        return Message(MessageType.MovieRatingAvg, result)
 
-    def finalize_and_log(self):
+    def _get_max_min_average_rating(self) -> dict:
         logger.info('--- Sink: Final Global Q3 Max Min Avg Rating ---')
         if not self.rating_counts:
             logger.info('No rating counts aggregated.')
             return
         try:
-            min_movie = MovieRatingAvg(-1, '', 5)
-            max_movie = MovieRatingAvg(-1, '', 0)
+            result = {
+                'min': MovieRatingAvg(-1, '', 6),
+                'max': MovieRatingAvg(-1, '', 0),
+            }
+
             for rating in self.rating_counts.values():
                 avg = rating.partial_sum / rating.count
-                if avg > max_movie.average_rating:
-                    max_movie = MovieRatingAvg(rating.movie_id, rating.title, avg)
-                if avg < min_movie.average_rating:
-                    min_movie = MovieRatingAvg(rating.movie_id, rating.title, avg)
+                if avg >= result['max'].average_rating:
+                    result['max'] = MovieRatingAvg(rating.movie_id, rating.title, avg)
+                if avg <= result['min'].average_rating:
+                    result['min'] = MovieRatingAvg(rating.movie_id, rating.title, avg)
 
-            logger.info(
-                f'Max movie average: {max_movie.id} - {max_movie.title} - {max_movie.average_rating}'
-            )
-            logger.info(
-                f'Min movie average: {min_movie.id} - {min_movie.title} - {min_movie.average_rating}'
-            )
+            for k, v in result.items():
+                logger.info(
+                    f'{k} movie average: {v.id} - {v.title} - {v.average_rating}'
+                )
 
             logger.info('---------------------------------------------')
+
+            return result
         except Exception as e:
             logger.error(f'Error logging final results: {e}', exc_info=True)
