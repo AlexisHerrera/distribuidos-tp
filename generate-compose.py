@@ -104,20 +104,21 @@ def create_cleaner():
 """
 
 
-def create_sink_q2():
-    return f"""q2_sink:
-    container_name: q2_sink
+def create_sink(n: int):
+    return f"""
+  q{n}_sink:
+    container_name: q{n}_sink
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/sinks/main.py", "q2"]
+    command: ["python", "src/server/sinks/main.py", "q{n}"]
     networks:
       - {NETWORK_NAME}
     depends_on:
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/sinks/config.yaml:/app/config.yaml
+      - ./src/server/sinks/q{n}_config.yaml:/app/config.yaml
 """
 
 
@@ -179,7 +180,9 @@ def create_services(scalable_services: list[ScalableService]):
     rabbitmq = create_rabbitmq()
     client = create_client()
     cleaner = create_cleaner()
-    sink_q2 = create_sink_q2()
+    sinks = ''
+    for i in [2, 4]:
+        sinks += create_sink(i)
     joiners = ''
     for joiner in ['ratings', 'cast']:
         joiners += create_joiner(f'{joiner}_joiner')
@@ -193,7 +196,7 @@ services:
   {client}
   {cleaner}
   {services}
-  {sink_q2}
+  {sinks}
   {joiners}
 """
 

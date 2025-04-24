@@ -31,7 +31,9 @@ class BaseNode(ABC):
         self._shutdown_lock = threading.Lock()
         self.connection = ConnectionCreator.create(config)
         self.leader = LeaderElection(self.config)
-
+        # sent results before eof
+        self.should_send_results_before_eof = False
+        self._final_results_sent = False
         try:
             self._load_logic()
             self._setup_signal_handlers()
@@ -104,7 +106,18 @@ class BaseNode(ABC):
         pass
 
     def _send_final_results(self):
-        logger.info('Does not send any more data after eof!')
+        if not self.should_send_results_before_eof or self._final_results_sent:
+            return
+        try:
+            out_msg = self.logic.message_result()
+            broker = RabbitMQBroker(self.config.rabbit_host)
+            publisher = DirectPublisher(broker, self.config.publishers[0]['queue'])
+            publisher.put(broker, out_msg)
+            broker.close()
+            logger.info('Final counter results sent (result connection).')
+            self._final_results_sent = True
+        except Exception as e:
+            logger.error(f'Error sending final counter results: {e}', exc_info=True)
 
     def process_message(self, message: Message):
         if message.message_type == MessageType.EOF:

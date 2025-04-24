@@ -12,12 +12,13 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
         self.final_budgets = defaultdict(int)
         logger.info('Q2Top5BudgetSinkLogic initialized.')
 
-    def merge_results(self, message: Message) -> Message:
+    def merge_results(self, message: Message):
         result_dict = message.data
         for country, budget in result_dict.items():
             self.final_budgets[country] += int(budget)
-        sorted_countries = self._obtain_sorted_countries()
 
+    def message_result(self) -> Message:
+        sorted_countries = self._obtain_sorted_countries()
         return Message(MessageType.MovieBudgetCounter, sorted_countries)
 
     def _obtain_sorted_countries(self) -> Dict[str, int]:

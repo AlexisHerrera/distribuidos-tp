@@ -241,7 +241,7 @@ class Cleaner:
             logger.error(f'Failed to publish EOF: {e}', exc_info=True)
 
     def process_message(self, message: Message):
-        logger.info("Received message with results")
+        logger.info('Received message with results')
         logger.info(message.data)
 
     def shutdown(self):
@@ -271,7 +271,7 @@ class Cleaner:
 
     def process_results(self):
         try:
-            logger.info("Begin to process results...")
+            logger.info('Begin to process results...')
             self.connection.recv(self.process_message)
         except Exception as e:
             logger.critical(f'Fatal error while obtaining results: {e}', exc_info=True)
