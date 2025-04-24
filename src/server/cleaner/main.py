@@ -240,6 +240,10 @@ class Cleaner:
         except Exception as e:
             logger.error(f'Failed to publish EOF: {e}', exc_info=True)
 
+    def process_message(self, message: Message):
+        logger.info("Received message with results")
+        logger.info(message.data)
+
     def shutdown(self):
         logger.info('Shutting down Cleaner...')
         self.is_running = False
@@ -264,6 +268,13 @@ class Cleaner:
             logger.error(f'Error closing Connection: {e}', exc_info=True)
 
         logger.info('Cleaner shutdown complete.')
+
+    def process_results(self):
+        try:
+            logger.info("Begin to process results...")
+            self.connection.recv(self.process_message)
+        except Exception as e:
+            logger.critical(f'Fatal error while obtaining results: {e}', exc_info=True)
 
     def run(self):
         if not self.is_running:
@@ -300,6 +311,7 @@ if __name__ == '__main__':
         config = Config()
         cleaner_instance = Cleaner(config)
         cleaner_instance.run()
+        cleaner_instance.process_results()
         logger.info('Cleaner run method finished.')
         sys.exit(0)
     except ValueError as e:

@@ -27,7 +27,14 @@ class SinkNode(BaseNode):
         try:
             if message.message_type == MessageType.MovieBudgetCounter:
                 if self.logic:
-                    self.logic.merge_results(message)
+                    results = self.logic.merge_results(message)
+                    try:
+                        self.connection.send(results)
+                    except Exception as e:
+                        logger.error(
+                            f'Error publishing results: {e}',
+                            exc_info=True,
+                        )
                 else:
                     logger.warning('Sink received result but no logic loaded.')
             else:
