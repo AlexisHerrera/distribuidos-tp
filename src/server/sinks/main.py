@@ -24,7 +24,18 @@ class SinkNode(BaseNode):
 
     def handle_message(self, message: Message):
         try:
-            self.logic.merge_results(message)
+            if self.logic:
+                results = self.logic.merge_results(message)
+                try:
+                    self.connection.send(results)
+                except Exception as e:
+                    logger.error(
+                        f'Error publishing results: {e}',
+                        exc_info=True,
+                    )
+            else:
+                logger.warning('Sink received result but no logic loaded.')
+
         except Exception as e:
             logger.error(f'Error processing message in SinkNode: {e}', exc_info=True)
 
