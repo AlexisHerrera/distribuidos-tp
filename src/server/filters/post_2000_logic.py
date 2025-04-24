@@ -23,6 +23,7 @@ class Post2000Logic(BaseFilterLogic):
         return Movie(
             movie_id=movie.id,
             title=movie.title,
+            genres=movie.genres,
             release_date=movie.release_date,
             production_countries=movie.production_countries,
         )

@@ -170,6 +170,40 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/argentina_config.yaml:/app/config.yaml
+  filter_argentina_and_spain-1:
+    container_name: filter_argentina_and_spain-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "argentina_and_spain"]
+    environment:
+      - NODE_ID=filter_argentina_and_spain-1
+      - PORT=6005
+      - PEERS=
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/argentina_and_spain_config.yaml:/app/config.yaml
+  filter_decade_00-1:
+    container_name: filter_decade_00-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "decade_00"]
+    environment:
+      - NODE_ID=filter_decade_00-1
+      - PORT=6006
+      - PEERS=
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/decade_00_config.yaml:/app/config.yaml
   rating_counter-1:
     container_name: rating_counter-1
     build:
@@ -257,6 +291,20 @@ services:
       - ./src/server/counters/actor_counter_config.yaml:/app/config.yaml
   
   
+  q1_sink:
+    container_name: q1_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py", "q1"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sinks/q1_config.yaml:/app/config.yaml
+
   q2_sink:
     container_name: q2_sink
     build:
