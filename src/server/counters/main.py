@@ -7,6 +7,7 @@ from src.messaging.publisher import DirectPublisher
 from src.server.base_node import BaseNode
 from src.server.counters.base_counter_logic import BaseCounterLogic
 from src.server.counters.country_budget_logic import CountryBudgetLogic
+from src.server.counters.rating_counter_logic import RatingCounterLogic
 from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 # Registry of available counter types
 AVAILABLE_COUNTER_LOGICS: Dict[str, Type[BaseCounterLogic]] = {
     'country_budget': CountryBudgetLogic,
+    'rating': RatingCounterLogic,
 }
 
 
@@ -41,7 +43,10 @@ class GenericCounterNode(BaseNode):
         if not self.is_running():
             return
         try:
-            if message.message_type == MessageType.Movie:
+            if (
+                message.message_type == MessageType.Movie
+                or message.message_type == MessageType.MovieRating
+            ):
                 self.logic.process_message(message)
             else:
                 logger.warning(f'Unknown message: {message}')
