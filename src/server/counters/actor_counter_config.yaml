@@ -1,0 +1,11 @@
+rabbit:
+  host: rabbitmq
+connection:
+  consumer:
+    - type: direct
+      queue: actor
+  publisher:
+    - type: direct
+      queue: actor_counted
+log:
+  level: INFO

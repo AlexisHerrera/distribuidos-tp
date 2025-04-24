@@ -136,6 +136,40 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/splitters/config.yaml:/app/config.yaml
+  actor_counter-1:
+    container_name: actor_counter-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/main.py", "actor_counter"]
+    environment:
+      - NODE_ID=actor_counter-1
+      - PORT=6008
+      - PEERS=actor_counter-2:6008
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/counters/actor_counter_config.yaml:/app/config.yaml
+  actor_counter-2:
+    container_name: actor_counter-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/main.py", "actor_counter"]
+    environment:
+      - NODE_ID=actor_counter-2
+      - PORT=6008
+      - PEERS=actor_counter-1:6008
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/counters/actor_counter_config.yaml:/app/config.yaml
   
   q2_sink:
     container_name: q2_sink
