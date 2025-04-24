@@ -27,5 +27,5 @@ class RatingsJoinerLogic(BaseJoinerLogic):
                     movie_id=rating.movie_id, title=movie.title, rating=rating.rating
                 )
             )
-        # logger.info(f'Appending {len(joined)}')
+        logger.info(f'Joining {len(joined)}')
         return Message(MessageType.MovieRating, joined)
