@@ -230,6 +230,7 @@ def parse_args():
     parser.add_argument('--arg', '--argentina', type=int)
     parser.add_argument('--argspa', '--argentina-and-spain', type=int)
     parser.add_argument('--d00', '--decade-00', type=int)
+    parser.add_argument('--rc', '--rating-counter', type=int)
     parser.add_argument('--spl', '--splitter', type=int)
     parser.add_argument('--ac', '--actor-counter', type=int)
     return parser.parse_args()
@@ -252,7 +253,7 @@ def main():
             args.cbc,
             'src/server/counters/main.py',
             'country_budget',
-            './src/server/counters/config.yaml',
+            './src/server/counters/country_budget_config.yaml',
         ),
         (
             'sentiment_analyzer',
@@ -288,6 +289,13 @@ def main():
             'src/server/filters/main.py',
             'decade_00',
             './src/server/filters/decade_00_config.yaml',
+        ),
+        (
+            'rating_counter',
+            args.rc,
+            'src/server/counters/main.py',
+            'rating',
+            './src/server/counters/rating_counter_config.yaml',
         ),
         (
             'cast_splitter',

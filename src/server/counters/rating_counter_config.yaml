@@ -1,0 +1,11 @@
+rabbit:
+  host: rabbitmq
+connection:
+  consumer:
+    - type: direct
+      queue: movies_rating_joined
+  publisher:
+    - type: direct
+      queue: movies_rating_counted
+log:
+  level: INFO

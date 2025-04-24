@@ -8,6 +8,7 @@ from src.server.base_node import BaseNode
 from src.server.counters.actor_counter_logic import ActorCounterLogic
 from src.server.counters.base_counter_logic import BaseCounterLogic
 from src.server.counters.country_budget_logic import CountryBudgetLogic
+from src.server.counters.rating_counter_logic import RatingCounterLogic
 from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 # Registry of available counter types
 AVAILABLE_COUNTER_LOGICS: Dict[str, Type[BaseCounterLogic]] = {
     'country_budget': CountryBudgetLogic,
+    'rating': RatingCounterLogic,
     'actor_counter': ActorCounterLogic,
 }
 
