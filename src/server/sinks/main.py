@@ -1,17 +1,16 @@
 import logging
 from typing import Dict, Type
 
-from src.messaging.protocol.message import Message, MessageType
+from src.messaging.protocol.message import Message
 from src.server.base_node import BaseNode
 from src.server.sinks.base_sink_logic import BaseSinkLogic
 from src.server.sinks.q2_top5_budget_sink_logic import Q2Top5BudgetSinkLogic
+from src.server.sinks.q3_max_min_avg_rating import Q3MaxMinAvgRatingSinkLogic
 from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
 
-AVAILABLE_SINK_LOGICS = {
-    'q2': Q2Top5BudgetSinkLogic,
-}
+AVAILABLE_SINK_LOGICS = {'q2': Q2Top5BudgetSinkLogic, 'q3': Q3MaxMinAvgRatingSinkLogic}
 
 
 class SinkNode(BaseNode):
@@ -25,16 +24,7 @@ class SinkNode(BaseNode):
 
     def handle_message(self, message: Message):
         try:
-            if message.message_type == MessageType.MovieBudgetCounter:
-                if self.logic:
-                    self.logic.merge_results(message)
-                else:
-                    logger.warning('Sink received result but no logic loaded.')
-            else:
-                logger.debug(
-                    f'SinkNode received unhandled type: {message.message_type}'
-                )
-
+            self.logic.merge_results(message)
         except Exception as e:
             logger.error(f'Error processing message in SinkNode: {e}', exc_info=True)
 

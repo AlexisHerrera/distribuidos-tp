@@ -176,7 +176,7 @@ cython_debug/
 # Datasets
 **/*.csv
 *.zip
-.data
+.data*
 
 # VSCode local config
 .vscode

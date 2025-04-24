@@ -14,14 +14,13 @@ services:
     environment:
       - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
     healthcheck:
-      test: [ "CMD", "rabbitmqctl", "status" ]
+      test: ["CMD", "rabbitmqctl", "status"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - testing_net
 
-  
   client:
     container_name: client
     build:
@@ -43,7 +42,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
     depends_on:
       cleaner:
         condition: service_started
@@ -221,7 +220,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/splitters/config.yaml:/app/config.yaml
-  
+
   q2_sink:
     container_name: q2_sink
     build:
@@ -236,7 +235,6 @@ services:
     volumes:
       - ./src/server/sinks/config.yaml:/app/config.yaml
 
-  
   ratings_joiner:
     container_name: ratings_joiner
     build:
@@ -250,7 +248,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/joiners/ratings_joiner_config.yaml:/app/config.yaml
-    
+
   cast_joiner:
     container_name: cast_joiner
     build:
@@ -264,11 +262,24 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/joiners/cast_joiner_config.yaml:/app/config.yaml
-    
+
+  q3_sink:
+    container_name: q3_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py", "q3"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sinks/q3_config.yaml:/app/config.yaml
+
 networks:
   testing_net:
     ipam:
       driver: default
       config:
         - subnet: 172.25.125.0/24
-    

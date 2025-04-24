@@ -1,9 +1,7 @@
 import logging
 from typing import Dict, Type
 
-from src.messaging.broker import RabbitMQBroker
 from src.messaging.protocol.message import Message
-from src.messaging.publisher import DirectPublisher
 from src.server.base_node import BaseNode
 from src.server.counters.base_counter_logic import BaseCounterLogic
 from src.server.counters.country_budget_logic import CountryBudgetLogic
@@ -30,10 +28,11 @@ class GenericCounterNode(BaseNode):
             return
         try:
             out_msg = self.logic.message_result()
-            broker = RabbitMQBroker(self.config.rabbit_host)
-            publisher = DirectPublisher(broker, self.config.publishers[0]['queue'])
-            publisher.put(broker, out_msg)
-            broker.close()
+            self.connection.send(out_msg)
+            # broker = RabbitMQBroker(self.config.rabbit_host)
+            # publisher = DirectPublisher(broker, self.config.publishers[0]['queue'])
+            # publisher.put(broker, out_msg)
+            # broker.close()
             logger.info('Final counter results sent (result connection).')
             self._final_results_sent = True
         except Exception as e:
@@ -44,6 +43,7 @@ class GenericCounterNode(BaseNode):
             return
         try:
             self.logic.process_message(message)
+
         except Exception as e:
             logger.error(f'Error processing message in CounterNode: {e}', exc_info=True)
 

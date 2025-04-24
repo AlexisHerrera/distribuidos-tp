@@ -1,0 +1,11 @@
+rabbit:
+  host: rabbitmq
+connection:
+  consumer:
+    - type: direct
+      queue: budget_sum
+  publisher:
+    - type: direct
+      queue: report
+log:
+  level: INFO

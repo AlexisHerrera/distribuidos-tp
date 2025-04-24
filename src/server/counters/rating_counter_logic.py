@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class RatingCounterLogic(BaseCounterLogic):
     def __init__(self):
         self.ratings: dict[int, MovieRatingCount] = {}
-        logger.info('CountryBudgetLogic initialized.')
+        logger.info('RatingCounterLogic initialized.')
 
     def process_message(self, message: Message):
         movie_rating: list[MovieRating] = message.data

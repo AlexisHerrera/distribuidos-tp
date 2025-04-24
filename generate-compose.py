@@ -121,6 +121,23 @@ def create_sink_q2():
 """
 
 
+def create_sink_q3():
+    return f"""q3_sink:
+    container_name: q3_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py", "q3"]
+    networks:
+      - {NETWORK_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sinks/q3_config.yaml:/app/config.yaml
+"""
+
+
 def create_joiner(joiner_type: str) -> str:
     return f"""
   {joiner_type}:
@@ -180,6 +197,7 @@ def create_services(scalable_services: list[ScalableService]):
     client = create_client()
     cleaner = create_cleaner()
     sink_q2 = create_sink_q2()
+    sink_q3 = create_sink_q3()
     joiners = ''
     for joiner in ['ratings', 'cast']:
         joiners += create_joiner(f'{joiner}_joiner')
@@ -195,6 +213,7 @@ services:
   {services}
   {sink_q2}
   {joiners}
+  {sink_q3}
 """
 
 
