@@ -118,7 +118,7 @@ services:
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/counters/config.yaml:/app/config.yaml
+      - ./src/server/counters/country_budget_config.yaml:/app/config.yaml
   country_budget_counter-2:
     container_name: country_budget_counter-2
     build:
@@ -135,7 +135,7 @@ services:
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/counters/config.yaml:/app/config.yaml
+      - ./src/server/counters/country_budget_config.yaml:/app/config.yaml
   filter_post_2000-1:
     container_name: filter_post_2000-1
     build:
@@ -170,6 +170,23 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/argentina_config.yaml:/app/config.yaml
+  rating_counter-1:
+    container_name: rating_counter-1
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/main.py", "rating"]
+    environment:
+      - NODE_ID=rating_counter-1
+      - PORT=6007
+      - PEERS=
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/counters/rating_counter_config.yaml:/app/config.yaml
   cast_splitter-1:
     container_name: cast_splitter-1
     build:
@@ -178,8 +195,8 @@ services:
     command: ["python", "src/server/splitters/main.py", "cast_splitter"]
     environment:
       - NODE_ID=cast_splitter-1
-      - PORT=6007
-      - PEERS=cast_splitter-2:6007
+      - PORT=6008
+      - PEERS=cast_splitter-2:6008
     networks:
       - testing_net
     depends_on:
@@ -195,8 +212,8 @@ services:
     command: ["python", "src/server/splitters/main.py", "cast_splitter"]
     environment:
       - NODE_ID=cast_splitter-2
-      - PORT=6007
-      - PEERS=cast_splitter-1:6007
+      - PORT=6008
+      - PEERS=cast_splitter-1:6008
     networks:
       - testing_net
     depends_on:
@@ -212,8 +229,8 @@ services:
     command: ["python", "src/server/counters/main.py", "actor_counter"]
     environment:
       - NODE_ID=actor_counter-1
-      - PORT=6008
-      - PEERS=actor_counter-2:6008
+      - PORT=6009
+      - PEERS=actor_counter-2:6009
     networks:
       - testing_net
     depends_on:
@@ -229,8 +246,8 @@ services:
     command: ["python", "src/server/counters/main.py", "actor_counter"]
     environment:
       - NODE_ID=actor_counter-2
-      - PORT=6008
-      - PEERS=actor_counter-1:6008
+      - PORT=6009
+      - PEERS=actor_counter-1:6009
     networks:
       - testing_net
     depends_on:
@@ -238,6 +255,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/actor_counter_config.yaml:/app/config.yaml
+  
   
   q2_sink:
     container_name: q2_sink
@@ -251,7 +269,21 @@ services:
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/sinks/config.yaml:/app/config.yaml
+      - ./src/server/sinks/q2_config.yaml:/app/config.yaml
+
+  q4_sink:
+    container_name: q4_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py", "q4"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sinks/q4_config.yaml:/app/config.yaml
 
   
   ratings_joiner:
