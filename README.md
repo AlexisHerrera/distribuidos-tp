@@ -155,23 +155,7 @@ CastSplitter -> ActorCounter -> Top10Actors:
     2 count
       uint32
 
-ReporterService -> Gateway:
-  // n = 1, 2, 3, 4, 5
-  9n:
-    91: Q1
-    92: Q2
-    93: Q3
-    94: Q4
-    95: Q5
-
-  91 ReportResult:
-    // Then inside it has a list of any of the other types written above
-    5 MovieAvgBudget
-      id, title, avg_budget_revenue, sentiment
-    …
-
 Other messages:
 100 EOF
-200 ACK
 
 ```
