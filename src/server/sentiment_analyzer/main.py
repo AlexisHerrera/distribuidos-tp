@@ -20,6 +20,16 @@ class SentimentAnalyzerNode(BaseNode):
     def _get_logic_registry(self):
         return AVAILABLE_ANALYZER_LOGICS
 
+    def _start_eof_monitor(self):
+        if not self.leader.enabled:
+            return
+        self.leader.wait_for_eof()
+
+        logger.info('EOF detected by monitor — waiting for in-flight tasks…')
+        self._executor.shutdown(wait=True)
+        logger.info('All in-flight tasks completed.')
+        super()._start_eof_monitor()
+
     def handle_message(self, message):
         if not self.is_running():
             return
