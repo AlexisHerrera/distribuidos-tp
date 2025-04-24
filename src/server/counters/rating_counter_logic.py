@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class RatingCounterLogic(BaseCounterLogic):
     def __init__(self):
         self.ratings: dict[int, MovieRatingCount] = {}
-        logger.info('CountryBudgetLogic initialized.')
+        logger.info('RatingCounterLogic initialized.')
 
     def process_message(self, message: Message):
         movie_rating: list[MovieRating] = message.data
@@ -30,7 +30,24 @@ class RatingCounterLogic(BaseCounterLogic):
 
     def message_result(self) -> Message:
         result = []
+        self.log_final_results()
         for v in self.ratings.values():
             result.append(v)
 
         return Message(MessageType.MovieRatingCounter, result)
+
+    def log_final_results(self):
+        logger.info('--- Final Rating Counts ---')
+        if not self.ratings:
+            logger.info('No country budgets were counted.')
+            return
+
+        for rating in self.ratings.values():
+            logger.info(f'{rating.title} {rating.partial_sum} {rating.count}')
+
+        # logger.info('Top 5 Countries by Total Budget Invested (Single Production):')
+        # for i, (country, total_budget) in enumerate(sorted_countries[:5]):
+        #     logger.info(f'  {i + 1}. {country}: {total_budget}')
+
+        # logger.info(f'Total countries counted: {len(sorted_countries)}')
+        logger.info('-----------------------------')
