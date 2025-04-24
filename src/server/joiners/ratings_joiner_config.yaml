@@ -1,0 +1,16 @@
+rabbit:
+  host: rabbitmq
+connection:
+  consumer:
+    - type: direct
+      queue: ratings_clean
+  publisher:
+    - type: direct
+      queue: movies_rating_joined
+  base_db:
+    - type: broadcast
+      queue: argentina_post_2000_ratings
+      exchange: argentina_post_2000
+
+log:
+  level: INFO

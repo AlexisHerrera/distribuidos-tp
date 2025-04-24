@@ -21,6 +21,7 @@ class Config:
 
         self.consumers = connection['consumer']
         self.publishers = connection['publisher']
+        self.base_db = connection.get('base_db', {})
 
         self.log_level = os.getenv('LOG_LEVEL', log_config['level'])
 

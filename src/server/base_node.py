@@ -9,7 +9,7 @@ from typing import Any, Dict, Type
 
 from src.messaging.broker import RabbitMQBroker
 from src.messaging.connection_creator import ConnectionCreator
-from src.messaging.publisher import DirectPublisher
+from src.messaging.publisher import DirectPublisher, BroadcastPublisher
 from src.server.leader_election import LeaderElection
 from src.utils.config import Config
 from src.messaging.protocol.message import Message, MessageType
@@ -165,9 +165,16 @@ class BaseNode(ABC):
         try:
             logger.info('Propagating EOF to next stage...')
             eof_broker = RabbitMQBroker(self.config.rabbit_host)
-            eof_publisher = DirectPublisher(
-                eof_broker, self.config.publishers[0]['queue']
-            )
+            type = self.config.publishers[0]['type']
+            logger.info(f'Queue type to send: {type}')
+            if type == 'direct':
+                eof_publisher = DirectPublisher(
+                    eof_broker, self.config.publishers[0]['queue']
+                )
+            else:
+                eof_publisher = BroadcastPublisher(
+                    eof_broker, self.config.publishers[0]['queue']
+                )
             eof_publisher.put(eof_broker, Message(MessageType.EOF, None))
             logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')
         except Exception as e:
