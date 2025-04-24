@@ -1,0 +1,11 @@
+rabbit:
+  host: rabbitmq
+connection:
+  consumer:
+    - type: direct
+      queue: decade_00
+  publisher:
+    - type: direct
+      queue: reporter
+log:
+  level: INFO
