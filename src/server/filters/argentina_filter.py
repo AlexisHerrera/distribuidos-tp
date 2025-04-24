@@ -13,6 +13,7 @@ class ArgentinaLogic(BaseFilterLogic):
             if 'Argentina' in movie.production_countries:
                 return True
             else:
+                # logger.info(f'prod countries: {movie.production_countries}')
                 return False
         except Exception as e:
             movie_id = getattr(movie, 'id', 'UNKNOWN')

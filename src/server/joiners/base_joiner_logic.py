@@ -9,5 +9,5 @@ logger = logging.getLogger(__name__)
 
 class BaseJoinerLogic(ABC):
     @abstractmethod
-    def process_message(self, message: Message) -> Any:
+    def merge(self, message: Message) -> Any:
         pass

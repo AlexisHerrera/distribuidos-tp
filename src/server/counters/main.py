@@ -42,7 +42,7 @@ class GenericCounterNode(BaseNode):
             return
         try:
             if message.message_type == MessageType.Movie:
-                self.logic.process_message(message)
+                self.logic.merge(message)
             else:
                 logger.warning(f'Unknown message: {message}')
         except Exception as e:
