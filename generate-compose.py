@@ -279,7 +279,7 @@ def main():
             'sentiment_analyzer',
             args.sa,
             'src/server/sentiment_analyzer/main.py',
-            None,
+            'sentiment',
             './src/server/sentiment_analyzer/config.yaml',
         ),
         (
@@ -339,15 +339,27 @@ def main():
                 cmd = f'["python", "{script}", "{logic}"]'
             else:
                 cmd = f'["python", "{script}"]'
-            scalable_services.append(
-                ScalableService(
-                    name=name,
-                    nodes=count,
-                    command=cmd,
-                    config_file=cfg,
-                    port=port,
+            if name == 'sentiment_analyzer':
+                scalable_services.append(
+                    ScalableService(
+                        name=name,
+                        nodes=count,
+                        command=cmd,
+                        config_file=cfg,
+                        port=port,
+                        dockerfile='src/server/sentiment_analyzer/Dockerfile',
+                    )
                 )
-            )
+            else:
+                scalable_services.append(
+                    ScalableService(
+                        name=name,
+                        nodes=count,
+                        command=cmd,
+                        config_file=cfg,
+                        port=port,
+                    )
+                )
     content = create_docker_compose_data(scalable_services)
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.write(content)
