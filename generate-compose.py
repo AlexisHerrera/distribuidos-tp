@@ -121,6 +121,24 @@ def create_sink_q2():
 """
 
 
+def create_joiner(joiner_type: str) -> str:
+    return f"""
+  {joiner_type}:
+    container_name: {joiner_type}
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/joiners/main.py", {joiner_type}]
+    networks:
+      - {NETWORK_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/joiners/{joiner_type}_config.yaml:/app/config.yaml
+    """
+
+
 def create_node(service: ScalableService, index: int):
     container = f'{service.name}-{index}'
     peers = [
@@ -162,6 +180,9 @@ def create_services(scalable_services: list[ScalableService]):
     client = create_client()
     cleaner = create_cleaner()
     sink_q2 = create_sink_q2()
+    joiners = ''
+    for joiner in ['ratings', 'cast']:
+        joiners += create_joiner(f'{joiner}_joiner')
     services = ''
     for service in scalable_services:
         services += create_scalable(service)
@@ -173,6 +194,7 @@ services:
   {cleaner}
   {services}
   {sink_q2}
+  {joiners}
 """
 
 
@@ -209,6 +231,7 @@ def parse_args():
     parser.add_argument('--argspa', '--argentina-and-spain', type=int)
     parser.add_argument('--d00', '--decade-00', type=int)
     parser.add_argument('--rc', '--rating-counter', type=int)
+    parser.add_argument('--spl', '--splitter', type=int)
 
     return parser.parse_args()
 
@@ -273,6 +296,13 @@ def main():
             'src/server/counters/main.py',
             'rating',
             './src/server/counters/rating_counter_config.yaml',
+        ),
+        (
+            'cast_splitter',
+            args.spl,
+            'src/server/splitters/main.py',
+            'cast_splitter',
+            './src/server/splitters/config.yaml',
         ),
     ]
     for idx, (name, count, script, logic, cfg) in enumerate(mapping):

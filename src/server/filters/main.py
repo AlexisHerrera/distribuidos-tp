@@ -60,7 +60,7 @@ class FilterNode(BaseNode):
             if len(movies) > 0:
                 try:
                     self.connection.send(Message(MessageType.Movie, movies))
-                    # logger.info(f"Se envió al counter {len(movies)}")
+                    # logger.info(f'Se enviaron {len(movies)}')
                 except Exception as e:
                     logger.error(
                         f'Error Publishing movies: {e}',

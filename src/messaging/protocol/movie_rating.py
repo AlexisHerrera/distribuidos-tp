@@ -22,7 +22,7 @@ class MovieRatingProtocol(MessageProtocol):
         return movie_rating_encoded
 
     def __encode_all(self, a_list):
-        return movie_ratings_pb2.MovieRatings(list=a_list).SerialiazeToString()
+        return movie_ratings_pb2.MovieRatings(list=a_list).SerializeToString()
 
     def __to_movie_rating(self, movie_rating_pb2) -> MovieRating:
         movie_id = movie_rating_pb2.id
