@@ -20,7 +20,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n protobuf/movie_avg_budgets.proto\x12\x08protobuf"Z\n\x0eMovieAvgBudget\x12\n\n\x02id\x18\x01 \x01(\x05\x12\r\n\x05title\x18\x02 \x01(\t\x12\x1a\n\x12\x61vg_budget_revenue\x18\x03 \x01(\x02\x12\x11\n\tsentiment\x18\x04 \x01(\t"9\n\x0fMovieAvgBudgets\x12&\n\x04list\x18\x01 \x03(\x0b\x32\x18.protobuf.MovieAvgBudgetB\x05\x92\x03\x02\x08\x01\x62\x08\x65\x64itionsp\xe8\x07'
+    b'\n protobuf/movie_avg_budgets.proto\x12\x08protobuf"4\n\x0eMovieAvgBudget\x12\x10\n\x08positive\x18\x01 \x01(\x02\x12\x10\n\x08negative\x18\x02 \x01(\x02\x42\x05\x92\x03\x02\x08\x01\x62\x08\x65\x64itionsp\xe8\x07'
 )
 
 _globals = globals()
@@ -32,7 +32,5 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _globals['DESCRIPTOR']._loaded_options = None
     _globals['DESCRIPTOR']._serialized_options = b'\222\003\002\010\001'
     _globals['_MOVIEAVGBUDGET']._serialized_start = 46
-    _globals['_MOVIEAVGBUDGET']._serialized_end = 136
-    _globals['_MOVIEAVGBUDGETS']._serialized_start = 138
-    _globals['_MOVIEAVGBUDGETS']._serialized_end = 195
+    _globals['_MOVIEAVGBUDGET']._serialized_end = 98
 # @@protoc_insertion_point(module_scope)
