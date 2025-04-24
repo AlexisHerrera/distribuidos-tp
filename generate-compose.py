@@ -198,7 +198,7 @@ def create_services(scalable_services: list[ScalableService]):
     client = create_client()
     cleaner = create_cleaner()
     sinks = ''
-    for i in [1, 2, 4]:
+    for i in list(range(1, 6)):
         sinks += create_sink(i)
     joiners = ''
     for joiner in ['ratings', 'cast']:

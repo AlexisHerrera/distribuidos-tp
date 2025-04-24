@@ -1,0 +1,11 @@
+rabbit:
+  host: rabbitmq
+connection:
+  consumer:
+    - type: direct
+      queue: sentiment_analyzed
+  publisher:
+    - type: direct
+      queue: reporter
+log:
+  level: INFO

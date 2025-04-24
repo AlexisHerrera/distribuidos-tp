@@ -77,24 +77,7 @@ services:
     environment:
       - NODE_ID=filter_single_country-1
       - PORT=6000
-      - PEERS=filter_single_country-2:6000
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/filters/single_country_config.yaml:/app/config.yaml
-  filter_single_country-2:
-    container_name: filter_single_country-2
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/filters/main.py", "solo_country"]
-    environment:
-      - NODE_ID=filter_single_country-2
-      - PORT=6000
-      - PEERS=filter_single_country-1:6000
+      - PEERS=
     networks:
       - testing_net
     depends_on:
@@ -111,7 +94,7 @@ services:
     environment:
       - NODE_ID=country_budget_counter-1
       - PORT=6001
-      - PEERS=country_budget_counter-2:6001
+      - PEERS=
     networks:
       - testing_net
     depends_on:
@@ -119,23 +102,23 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/country_budget_config.yaml:/app/config.yaml
-  country_budget_counter-2:
-    container_name: country_budget_counter-2
+  sentiment_analyzer-1:
+    container_name: sentiment_analyzer-1
     build:
       context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/counters/main.py", "country_budget"]
+      dockerfile: src/server/sentiment_analyzer/Dockerfile
+    command: ["python", "src/server/sentiment_analyzer/main.py", "sentiment"]
     environment:
-      - NODE_ID=country_budget_counter-2
-      - PORT=6001
-      - PEERS=country_budget_counter-1:6001
+      - NODE_ID=sentiment_analyzer-1
+      - PORT=6002
+      - PEERS=
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/counters/country_budget_config.yaml:/app/config.yaml
+      - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
   filter_post_2000-1:
     container_name: filter_post_2000-1
     build:
@@ -230,24 +213,7 @@ services:
     environment:
       - NODE_ID=cast_splitter-1
       - PORT=6008
-      - PEERS=cast_splitter-2:6008
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/splitters/config.yaml:/app/config.yaml
-  cast_splitter-2:
-    container_name: cast_splitter-2
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/splitters/main.py", "cast_splitter"]
-    environment:
-      - NODE_ID=cast_splitter-2
-      - PORT=6008
-      - PEERS=cast_splitter-1:6008
+      - PEERS=
     networks:
       - testing_net
     depends_on:
@@ -264,24 +230,7 @@ services:
     environment:
       - NODE_ID=actor_counter-1
       - PORT=6009
-      - PEERS=actor_counter-2:6009
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/counters/actor_counter_config.yaml:/app/config.yaml
-  actor_counter-2:
-    container_name: actor_counter-2
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/counters/main.py", "actor_counter"]
-    environment:
-      - NODE_ID=actor_counter-2
-      - PORT=6009
-      - PEERS=actor_counter-1:6009
+      - PEERS=
     networks:
       - testing_net
     depends_on:
@@ -319,6 +268,20 @@ services:
     volumes:
       - ./src/server/sinks/q2_config.yaml:/app/config.yaml
 
+  q3_sink:
+    container_name: q3_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py", "q3"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sinks/q3_config.yaml:/app/config.yaml
+
   q4_sink:
     container_name: q4_sink
     build:
@@ -332,6 +295,20 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q4_config.yaml:/app/config.yaml
+
+  q5_sink:
+    container_name: q5_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py", "q5"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sinks/q5_config.yaml:/app/config.yaml
 
   
   ratings_joiner:
