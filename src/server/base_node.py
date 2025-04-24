@@ -34,6 +34,8 @@ class BaseNode(ABC):
         # sent results before eof
         self.should_send_results_before_eof = False
         self._final_results_sent = False
+        # executor
+        self._executor= None
         try:
             self._load_logic()
             self._setup_signal_handlers()
@@ -84,13 +86,19 @@ class BaseNode(ABC):
         signal.signal(signal.SIGINT, signal_handler)
         logger.info('Signal handlers configured.')
 
+    def _wait_for_executor(self):
+        if getattr(self, "_executor", None):
+            logger.info("Waiting for executor tasks to finish…")
+            self._executor.shutdown(wait=True)
+            logger.info("All executor tasks completed.")
+
     def _start_eof_monitor(self):
         if not self.leader.enabled:
             return
         self.leader.wait_for_eof()
         logger.info('EOF detected by monitor')
         self._send_final_results()
-
+        self._wait_for_executor()
         if self.leader.is_leader:
             logger.info('Leader waiting for DONE from followers…')
             self.leader.wait_for_done()
@@ -124,6 +132,7 @@ class BaseNode(ABC):
             logger.info('RECEIVED EOF FROM QUEUE')
             if not self.leader.enabled:
                 # single node shutdown, there is no monitor
+                self._wait_for_executor()
                 self._send_final_results()
                 self._propagate_eof()
                 self.shutdown()

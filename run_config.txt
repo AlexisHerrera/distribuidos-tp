@@ -1,6 +1,6 @@
 solo-country-filter=2
 country-budget-counter=2
-sentiment-analyzer=0
+sentiment-analyzer=1
 post-2000=2
 argentina=2
 argentina-and-spain=2
