@@ -4,13 +4,18 @@ from typing import Dict, Type
 from src.messaging.protocol.message import Message
 from src.server.base_node import BaseNode
 from src.server.sinks.base_sink_logic import BaseSinkLogic
+from src.server.sinks.q1_arg_spa_2000_sink_logic import Q1ArgSpa2000
 from src.server.sinks.q2_top5_budget_sink_logic import Q2Top5BudgetSinkLogic
 from src.server.sinks.q4_top10_actors_sink_logic import Q4Top10ActorsSinkLogic
 from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
 
-AVAILABLE_SINK_LOGICS = {'q2': Q2Top5BudgetSinkLogic, 'q4': Q4Top10ActorsSinkLogic}
+AVAILABLE_SINK_LOGICS = {
+    'q1': Q1ArgSpa2000,
+    'q2': Q2Top5BudgetSinkLogic,
+    'q4': Q4Top10ActorsSinkLogic,
+}
 
 
 class SinkNode(BaseNode):
