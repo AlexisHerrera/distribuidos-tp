@@ -230,7 +230,7 @@ def parse_args():
     parser.add_argument('--arg', '--argentina', type=int)
     parser.add_argument('--argspa', '--argentina-and-spain', type=int)
     parser.add_argument('--d00', '--decade-00', type=int)
-
+    parser.add_argument('--spl', '--splitter', type=int)
     return parser.parse_args()
 
 
@@ -287,6 +287,13 @@ def main():
             'src/server/filters/main.py',
             'decade_00',
             './src/server/filters/decade_00_config.yaml',
+        ),
+        (
+            'cast_splitter',
+            args.spl,
+            'src/server/splitters/main.py',
+            'cast_splitter',
+            './src/server/splitters/config.yaml',
         ),
     ]
     for idx, (name, count, script, logic, cfg) in enumerate(mapping):

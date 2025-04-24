@@ -27,7 +27,7 @@ class MovieCastProtocol(MessageProtocol):
     def __to_movie_cast(self, movie_cast_pb2) -> MovieCast:
         movie_id = movie_cast_pb2.id
         title = movie_cast_pb2.title
-        actors_name = movie_casts_pb2.actors_name
+        actors_name = movie_cast_pb2.actors_name
 
         return MovieCast(movie_id, title, actors_name)
 

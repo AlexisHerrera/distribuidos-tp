@@ -1,0 +1,11 @@
+rabbit:
+  host: rabbitmq
+connection:
+  consumer:
+    - type: direct
+      queue: movies_cast_joined
+  publisher:
+    - type: direct
+      queue: actor
+log:
+  level: INFO
