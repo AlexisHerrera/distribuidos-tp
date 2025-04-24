@@ -22,6 +22,7 @@ class CountryBudgetLogic(BaseCounterLogic):
 
     def message_result(self) -> Message:
         result = dict(self.country_budgets)
+        logger.info(f'Se mando: {result}')
         return Message(MessageType.MovieBudgetCounter, result)
 
     def log_final_results(self):

@@ -13,7 +13,7 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
 
     def merge_results(self, message: Message):
         result_dict = message.data
-        # logger.info("Received message:", message.message_type, message.data)
+        logger.info(f'Received message: {message.message_type}, {message.data}')
         for country, budget in result_dict.items():
             self.final_budgets[country] += int(budget)
         self.finalize_and_log()
