@@ -121,6 +121,23 @@ def create_sink_q2():
 """
 
 
+def create_joiner(joiner_type: str) -> str:
+    return f"""{joiner_type}:
+    container_name: {joiner_type}
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/joiners/main.py", {joiner_type}]
+    networks:
+      - {NETWORK_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/joiners/{joiner_type}_config.yaml:/app/config.yaml
+    """
+
+
 def create_node(service: ScalableService, index: int):
     container = f'{service.name}-{index}'
     peers = [
@@ -162,6 +179,7 @@ def create_services(scalable_services: list[ScalableService]):
     client = create_client()
     cleaner = create_cleaner()
     sink_q2 = create_sink_q2()
+    ratings_joiner = create_joiner('ratings_joiner')
     services = ''
     for service in scalable_services:
         services += create_scalable(service)
@@ -173,6 +191,7 @@ services:
   {cleaner}
   {services}
   {sink_q2}
+  {ratings_joiner}
 """
 
 
