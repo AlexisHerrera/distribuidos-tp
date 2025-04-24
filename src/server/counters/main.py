@@ -2,7 +2,7 @@ import logging
 from typing import Dict, Type
 
 from src.messaging.broker import RabbitMQBroker
-from src.messaging.protocol.message import Message, MessageType
+from src.messaging.protocol.message import Message
 from src.messaging.publisher import DirectPublisher
 from src.server.base_node import BaseNode
 from src.server.counters.base_counter_logic import BaseCounterLogic
@@ -43,13 +43,7 @@ class GenericCounterNode(BaseNode):
         if not self.is_running():
             return
         try:
-            if (
-                message.message_type == MessageType.Movie
-                or message.message_type == MessageType.MovieRating
-            ):
-                self.logic.process_message(message)
-            else:
-                logger.warning(f'Unknown message: {message}')
+            self.logic.process_message(message)
         except Exception as e:
             logger.error(f'Error processing message in CounterNode: {e}', exc_info=True)
 

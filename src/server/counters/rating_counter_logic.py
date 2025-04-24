@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_rating import MovieRating
@@ -11,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class RatingCounterLogic(BaseCounterLogic):
     def __init__(self):
-        self.ratings = defaultdict(MovieRatingCount)
+        self.ratings: dict[int, MovieRatingCount] = {}
         logger.info('CountryBudgetLogic initialized.')
 
     def process_message(self, message: Message):
