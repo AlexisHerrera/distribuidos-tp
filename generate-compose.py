@@ -122,7 +122,8 @@ def create_sink_q2():
 
 
 def create_joiner(joiner_type: str) -> str:
-    return f"""{joiner_type}:
+    return f"""
+  {joiner_type}:
     container_name: {joiner_type}
     build:
       context: .
@@ -179,7 +180,9 @@ def create_services(scalable_services: list[ScalableService]):
     client = create_client()
     cleaner = create_cleaner()
     sink_q2 = create_sink_q2()
-    ratings_joiner = create_joiner('ratings_joiner')
+    joiners = ''
+    for joiner in ['ratings', 'cast']:
+        joiners += create_joiner(f'{joiner}_joiner')
     services = ''
     for service in scalable_services:
         services += create_scalable(service)
@@ -191,7 +194,7 @@ services:
   {cleaner}
   {services}
   {sink_q2}
-  {ratings_joiner}
+  {joiners}
 """
 
 

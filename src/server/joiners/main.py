@@ -8,6 +8,7 @@ from src.messaging.protocol.message import Message, MessageType
 from src.model.movie import Movie
 from src.server.base_node import BaseNode
 from src.server.joiners.base_joiner_logic import BaseJoinerLogic
+from src.server.joiners.cast_joiner_logic import CastJoinerLogic
 from src.server.joiners.ratings_joiner_logic import RatingsJoinerLogic
 from src.utils.config import Config
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Registry of available counter types
 AVAILABLE_JOINER_LOGICS: Dict[str, Type[BaseJoinerLogic]] = {
     'ratings_joiner': RatingsJoinerLogic,
+    'cast_joiner': CastJoinerLogic,
 }
 
 
