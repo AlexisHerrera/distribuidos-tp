@@ -19,6 +19,15 @@ class Connection:
     def send(self, message: Message):
         self.__publisher.put(self.__broker, message)
 
+    def thread_safe_send(self, message: Message):
+        def _publish():
+            self.__publisher.put(self.__broker, message)
+
+        if hasattr(self.__broker, 'add_callback_threadsafe'):
+            self.__broker.add_callback_threadsafe(_publish)
+        else:
+            _publish()
+
     def recv(self, callback: Callable[[Message], None]):
         self.consumer_tag = self.__consumer.basic_consume(self.__broker, callback)
         self.__consumer.start_consuming(self.__broker, callback)

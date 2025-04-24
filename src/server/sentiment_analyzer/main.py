@@ -1,6 +1,8 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from src.messaging.protocol.message import Message, MessageType
+from src.model.movie import Movie
 from src.server.base_node import BaseNode
 from src.server.sentiment_analyzer.sentiment_analyzer import SentimentAnalyzer
 from src.utils.config import Config
@@ -12,7 +14,7 @@ AVAILABLE_ANALYZER_LOGICS = {'sentiment': SentimentAnalyzer}
 class SentimentAnalyzerNode(BaseNode):
     def __init__(self, config: Config, analyzer_type: str):
         super().__init__(config, analyzer_type)
-
+        self._executor = ThreadPoolExecutor(max_workers=4)
         logger.info(f"SentimentAnalyzerNode '{analyzer_type}' initialized.")
 
     def _get_logic_registry(self):
@@ -23,11 +25,14 @@ class SentimentAnalyzerNode(BaseNode):
             return
 
         if message.message_type == MessageType.Movie:
-            result = self.logic.handle_message(message.data)
-            out_message = Message(MessageType.MovieSentiment, result)
-            self.connection.send(out_message)
+            self._executor.submit(self._process_and_publish, message.data)
         else:
             logger.warning(f'Unknown message type received: {message.message_type}')
+
+    def _process_and_publish(self, movies: list[Movie]):
+        result = self.logic.handle_message(movies)
+        out = Message(MessageType.MovieSentiment, result)
+        self.connection.thread_safe_send(out)
 
 
 if __name__ == '__main__':
