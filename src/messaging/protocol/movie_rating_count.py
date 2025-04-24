@@ -13,7 +13,7 @@ class MovieRatingCounterProtocol(MessageProtocol):
         )
 
     def __to_movie_rating_count_pb(self, movie_rating_count: MovieRatingCount):
-        movie_rating_count_encoded = movie_ratings_count_pb2.MovieRatingAvg()
+        movie_rating_count_encoded = movie_ratings_count_pb2.MovieRatingCount()
 
         movie_rating_count_encoded.id = movie_rating_count.movie_id
         movie_rating_count_encoded.title = movie_rating_count.title
@@ -23,7 +23,9 @@ class MovieRatingCounterProtocol(MessageProtocol):
         return movie_rating_count_encoded
 
     def __encode_all(self, a_list):
-        return movie_ratings_count_pb2.MovieRatingAvgs(list=a_list).SerializeToString()
+        return movie_ratings_count_pb2.MovieRatingCounts(
+            list=a_list
+        ).SerializeToString()
 
     def __to_movie_rating_avg(self, movie_rating_count_pb2) -> MovieRatingCount:
         movie_id = movie_rating_count_pb2.id
@@ -34,7 +36,7 @@ class MovieRatingCounterProtocol(MessageProtocol):
         return MovieRatingCount(movie_id, title, partial_sum, count)
 
     def __decode_all(self, buf: bytes, bytes_amount: int):
-        pb2_list = movie_ratings_count_pb2.MovieRatingAvgs()
+        pb2_list = movie_ratings_count_pb2.MovieRatingCounts()
 
         pb2_list.ParseFromString(buf[0:bytes_amount])
 
