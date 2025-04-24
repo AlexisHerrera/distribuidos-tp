@@ -1,18 +1,17 @@
+import argparse
 import logging
 import signal
 import sys
-import argparse
 import threading
 from abc import ABC, abstractmethod
-
 from typing import Any, Dict, Type
 
 from src.messaging.broker import RabbitMQBroker
 from src.messaging.connection_creator import ConnectionCreator
-from src.messaging.publisher import DirectPublisher, BroadcastPublisher
+from src.messaging.protocol.message import Message, MessageType
+from src.messaging.publisher import BroadcastPublisher, DirectPublisher
 from src.server.leader_election import LeaderElection
 from src.utils.config import Config
-from src.messaging.protocol.message import Message, MessageType
 from src.utils.log import initialize_log
 
 logger = logging.getLogger(__name__)
@@ -172,6 +171,9 @@ class BaseNode(ABC):
                 logging.info('Connection closed')
                 self.leader.stop()
                 logger.info('LeaderElection detenido')
+                # Only used by sentiment analyzer as it runs in another thread
+                if hasattr(self.logic, 'stop') and callable(self.logic.stop):
+                    self.logic.stop()
             except Exception as e:
                 logger.error(f'Stopping or closing error: {e}')
 
