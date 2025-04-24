@@ -14,13 +14,14 @@ services:
     environment:
       - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
     healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
+      test: [ "CMD", "rabbitmqctl", "status" ]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - testing_net
 
+  
   client:
     container_name: client
     build:
@@ -318,48 +319,6 @@ services:
     volumes:
       - ./src/server/sinks/q2_config.yaml:/app/config.yaml
 
-  q4_sink:
-    container_name: q4_sink
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/sinks/main.py", "q4"]
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/sinks/q4_config.yaml:/app/config.yaml
-
-  ratings_joiner:
-    container_name: ratings_joiner
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/joiners/main.py", ratings_joiner]
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/joiners/ratings_joiner_config.yaml:/app/config.yaml
-
-  cast_joiner:
-    container_name: cast_joiner
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/joiners/main.py", cast_joiner]
-    networks:
-      - testing_net
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/joiners/cast_joiner_config.yaml:/app/config.yaml
-
   q3_sink:
     container_name: q3_sink
     build:
@@ -374,9 +333,53 @@ services:
     volumes:
       - ./src/server/sinks/q3_config.yaml:/app/config.yaml
 
+  q4_sink:
+    container_name: q4_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py", "q4"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sinks/q4_config.yaml:/app/config.yaml
+
+  
+  ratings_joiner:
+    container_name: ratings_joiner
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/joiners/main.py", ratings_joiner]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/joiners/ratings_joiner_config.yaml:/app/config.yaml
+    
+  cast_joiner:
+    container_name: cast_joiner
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/joiners/main.py", cast_joiner]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/joiners/cast_joiner_config.yaml:/app/config.yaml
+    
 networks:
   testing_net:
     ipam:
       driver: default
       config:
         - subnet: 172.25.125.0/24
+    
