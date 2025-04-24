@@ -8,7 +8,7 @@ class MovieRatingCounterProtocol(MessageProtocol):
         super().__init__(
             item_to_bytes=self.__to_movie_rating_count_pb,
             encode_all=self.__encode_all,
-            bytes_to_item=self.__to_movie_rating_avg,
+            bytes_to_item=self.__to_movie_rating_count,
             decode_all=self.__decode_all,
         )
 
@@ -27,7 +27,7 @@ class MovieRatingCounterProtocol(MessageProtocol):
             list=a_list
         ).SerializeToString()
 
-    def __to_movie_rating_avg(self, movie_rating_count_pb2) -> MovieRatingCount:
+    def __to_movie_rating_count(self, movie_rating_count_pb2) -> MovieRatingCount:
         movie_id = movie_rating_count_pb2.id
         title = movie_rating_count_pb2.title
         partial_sum = movie_rating_count_pb2.partial_sum

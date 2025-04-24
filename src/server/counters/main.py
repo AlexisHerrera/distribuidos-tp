@@ -31,6 +31,7 @@ class GenericCounterNode(BaseNode):
             return
         try:
             self.logic.process_message(message)
+
         except Exception as e:
             logger.error(f'Error processing message in CounterNode: {e}', exc_info=True)
 

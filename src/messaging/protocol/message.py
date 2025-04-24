@@ -9,6 +9,7 @@ from src.messaging.protocol.movie_avg_budget import MovieAvgBudgetProtocol
 from src.messaging.protocol.movie_budget_counter import MovieBudgetCounterProtocol
 from src.messaging.protocol.movie_cast import MovieCastProtocol
 from src.messaging.protocol.movie_rating import MovieRatingProtocol
+from src.messaging.protocol.movie_rating_avg import MovieRatingAvgProtocol
 from src.messaging.protocol.movie_rating_count import MovieRatingCounterProtocol
 from src.messaging.protocol.movie_sentiment import MovieSentimentProtocol
 from src.messaging.protocol.null import NullProtocol
@@ -27,6 +28,7 @@ class MessageType(Enum):
     MovieRatingCounter = 8
     MovieCast = 9
     ActorCount = 10
+    MovieRatingAvg = 11
     EOF = 100
 
     @classmethod
@@ -106,6 +108,8 @@ class Message:
                 return MovieCastProtocol()
             case MessageType.ActorCount:
                 return ActorCountProtocol()
+            case MessageType.MovieRatingAvg:
+                return MovieRatingAvgProtocol()
             case MessageType.EOF:
                 return EOFProtocol()
             case _:

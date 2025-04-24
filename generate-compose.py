@@ -122,6 +122,23 @@ def create_sink(n: int):
 """
 
 
+def create_sink_q3():
+    return f"""q3_sink:
+    container_name: q3_sink
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/sinks/main.py", "q3"]
+    networks:
+      - {NETWORK_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sinks/q3_config.yaml:/app/config.yaml
+"""
+
+
 def create_joiner(joiner_type: str) -> str:
     return f"""
   {joiner_type}:

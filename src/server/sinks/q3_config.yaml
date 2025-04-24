@@ -3,7 +3,7 @@ rabbit:
 connection:
   consumer:
     - type: direct
-      queue: budget_sum
+      queue: movies_rating_counted
   publisher:
     - type: direct
       queue: report

@@ -1,6 +1,7 @@
 import logging
 from collections import defaultdict
 from typing import Dict
+
 from src.messaging.protocol.message import Message, MessageType
 from src.model.actor_count import ActorCount
 from src.server.sinks.base_sink_logic import BaseSinkLogic
@@ -13,7 +14,7 @@ class Q4Top10ActorsSinkLogic(BaseSinkLogic):
         self.final_actor_count = defaultdict(int)
         logger.info('Q4Top10ActorsSinkLogic initialized.')
 
-    def merge_results(self, message: Message) -> Message:
+    def merge_results(self, message: Message):
         result_list: list[ActorCount] = message.data
         for actor_count in result_list:
             self.final_actor_count[actor_count.actor_name] += int(actor_count.count)
