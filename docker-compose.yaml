@@ -117,6 +117,7 @@ services:
     volumes:
       - ./src/server/sinks/config.yaml:/app/config.yaml
 
+  
   ratings_joiner:
     container_name: ratings_joiner
     build:
@@ -130,6 +131,20 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/joiners/ratings_joiner_config.yaml:/app/config.yaml
+    
+  cast_joiner:
+    container_name: cast_joiner
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/joiners/main.py", cast_joiner]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/joiners/cast_joiner_config.yaml:/app/config.yaml
     
 networks:
   testing_net:
