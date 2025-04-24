@@ -1,0 +1,10 @@
+solo-country-filter=2
+country-budget-counter=2
+sentiment-analyzer=2
+post-2000=2
+argentina=2
+argentina-and-spain=2
+decade-00=2
+rating-counter=2
+splitter=2
+actor-counter=2
