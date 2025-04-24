@@ -12,32 +12,36 @@ class MovieAvgBudgetProtocol(MessageProtocol):
             decode_all=self.__decode_all,
         )
 
+    def to_bytes(self, item):
+        encoded = self.__to_movie_avg_budget_pb2(item).SerializeToString()
+
+        return encoded, len(encoded)
+
+    def __encode_all(self, obj):
+        pass
+
     def __to_movie_avg_budget_pb2(self, movie_avg_budget: MovieAvgBudget):
         movie_avg_budget_encoded = movie_avg_budgets_pb2.MovieAvgBudget()
 
-        movie_avg_budget_encoded.id = movie_avg_budget.movie_id
-        movie_avg_budget_encoded.title = movie_avg_budget.title
-        movie_avg_budget_encoded.avg_budget_revenue = (
-            movie_avg_budget.avg_budget_revenue
-        )
-        movie_avg_budget_encoded.sentiment = movie_avg_budget.sentiment
+        movie_avg_budget_encoded.positive = movie_avg_budget.positive
+        movie_avg_budget_encoded.negative = movie_avg_budget.negative
 
         return movie_avg_budget_encoded
 
-    def __encode_all(self, a_list):
-        return movie_avg_budgets_pb2.MovieAvgBudgets(list=a_list).SerializeToString()
+    def from_bytes(self, buf: bytes, bytes_amount: int):
+        obj = self.__decode_all(buf, bytes_amount)
+
+        return self.__to_movie_avg_budget(obj)
 
     def __to_movie_avg_budget(self, movie_avg_budget_pb2) -> MovieAvgBudget:
-        movie_id = movie_avg_budget_pb2.id
-        title = movie_avg_budget_pb2.title
-        avg_budget_revenue = movie_avg_budget_pb2.avg_budget_revenue
-        sentiment = movie_avg_budget_pb2.sentiment
+        positive = movie_avg_budget_pb2.positive
+        negative = movie_avg_budget_pb2.negative
 
-        return MovieAvgBudget(movie_id, title, avg_budget_revenue, sentiment)
+        return MovieAvgBudget(positive, negative)
 
     def __decode_all(self, buf: bytes, bytes_amount: int):
-        pb2_list = movie_avg_budgets_pb2.MovieAvgBudgets()
+        pb2_obj = movie_avg_budgets_pb2.MovieAvgBudget()
 
-        pb2_list.ParseFromString(buf[0:bytes_amount])
+        pb2_obj.ParseFromString(buf[0:bytes_amount])
 
-        return pb2_list.list
+        return pb2_obj
