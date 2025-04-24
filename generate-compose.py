@@ -1,7 +1,7 @@
 import argparse
 
 DEFAULT_NODES = 1
-DOCKER_COMPOSE_FILENAME = 'docker-compose-dev.yaml'
+DOCKER_COMPOSE_FILENAME = 'docker-compose.yaml'
 NETWORK_NAME = 'testing_net'
 BASE_PORT = 6000
 
