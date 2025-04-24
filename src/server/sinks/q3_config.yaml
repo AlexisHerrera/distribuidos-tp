@@ -6,6 +6,6 @@ connection:
       queue: movies_rating_counted
   publisher:
     - type: direct
-      queue: report
+      queue: reporter
 log:
   level: INFO

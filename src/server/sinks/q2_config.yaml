@@ -6,6 +6,6 @@ connection:
       queue: budget_sum
   publisher:
     - type: direct
-      queue: report
+      queue: reporter
 log:
   level: INFO

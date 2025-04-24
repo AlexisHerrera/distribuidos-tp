@@ -9,6 +9,7 @@ from src.common.socket_communication import (
     accept_new_connection,
     create_server_socket,
     receive_message,
+    send_message,
 )
 from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
@@ -19,6 +20,7 @@ from src.server.cleaner.clean_credits import parse_line_to_credits
 from src.server.cleaner.clean_movies import parse_line_to_movie
 from src.server.cleaner.clean_ratings import parse_line_to_rating
 from src.utils.config import Config
+
 
 logging.basicConfig(
     level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -34,7 +36,7 @@ class Cleaner:
         self.connection = ConnectionCreator.create_multipublisher(config)
         self.server_socket = None
         self.client_socket = None
-
+        self.querys_needed = 5
         try:
             self.port = int(os.getenv('SERVER_PORT', '12345'))
             self.backlog = int(os.getenv('LISTENING_BACKLOG', '3'))
@@ -241,8 +243,29 @@ class Cleaner:
             logger.error(f'Failed to publish EOF: {e}', exc_info=True)
 
     def process_message(self, message: Message):
+        if message.message_type == MessageType.EOF:
+            logger.warning('Llego un EOF, ignorar')
+            return
         logger.info('Received message with results')
-        logger.info(message.data)
+        payload = message.to_bytes()
+        send_message(self.client_socket, payload)
+        self.querys_needed -= 1
+        if message.message_type == MessageType.Movie:
+            logger.info('Llego Q1')
+        elif message.message_type == MessageType.MovieBudgetCounter:
+            logger.info('Llego Q2')
+        elif message.message_type == MessageType.MovieRatingAvg:
+            logger.info('Llego Q3')
+        elif message.message_type == MessageType.ActorCount:
+            logger.info('Llego Q4')
+        elif message.message_type == MessageType.MovieAvgBudget:
+            logger.info('Llego Q5')
+        elif message.message_type == MessageType.EOF:
+            logger.warning('Llego un EOF, ignorar')
+        else:
+            logger.warning('Mensaje indefinido')
+        if self.querys_needed <= 0:
+            self.shutdown()
 
     def shutdown(self):
         logger.info('Shutting down Cleaner...')
@@ -301,8 +324,6 @@ class Cleaner:
 
         except Exception as e:
             logger.critical(f'Fatal error during Cleaner execution: {e}', exc_info=True)
-        finally:
-            self.shutdown()
 
 
 if __name__ == '__main__':

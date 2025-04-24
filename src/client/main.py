@@ -5,8 +5,18 @@ import os
 import logging
 import time
 
-from src.common.socket_communication import send_message, connect_to_server
+from src.common.socket_communication import (
+    send_message,
+    connect_to_server,
+    receive_message,
+)
 from src.common.protocol.batch import BatchType, Batch
+from src.messaging.protocol.message import Message, MessageType
+from src.model.actor_count import ActorCount
+from src.model.movie import Movie
+from src.model.movie_avg_budget import MovieAvgBudget
+from src.model.movie_budget_counter import MovieBudgetCounter
+from src.model.movie_rating_avg import MovieRatingAvg
 
 BATCH_SIZE_MOVIES = int(os.getenv('BATCH_SIZE_MOVIES', '20'))
 BATCH_SIZE_RATINGS = int(os.getenv('BATCH_SIZE_RATINGS', '100'))
@@ -137,9 +147,9 @@ def send_data(
 
             send_message(client_socket, batch_bytes)
             total_lines_sent += len(batch_lines)
-            logging.info(
-                f'Sent Batch #{batch_number} ({file_description}) with {len(batch_lines)} records.'
-            )
+            # logging.info(
+            #    f'Sent Batch #{batch_number} ({file_description}) with {len(batch_lines)} records.'
+            # )
 
         logging.info(
             f'--- Finished sending {file_description}. Total lines sent: {total_lines_sent} ---'
@@ -185,6 +195,68 @@ def create_client_socket():
     return None
 
 
+def receive_responses(client_socket):
+    logging.info('Esperando respuestas del servidor...')
+    while True:
+        try:
+            raw = receive_message(client_socket)
+        except ConnectionError:
+            logging.info('Conexión cerrada por servidor.')
+            break
+
+        msg = Message.from_bytes(raw)
+        if msg.message_type == MessageType.EOF:
+            logging.info('EOF recibido. Terminando recepción.')
+            break
+
+        # Q1: Movie
+        if msg.message_type == MessageType.Movie:
+            movies: list[Movie] = msg.data
+            for m in movies:
+                print(f'[Q1] Movie → ID={m.id}, Title="{m.title}", Genres="{m.genres}"')
+        # Q2: MovieBudgetCounter
+        elif msg.message_type == MessageType.MovieBudgetCounter:
+            data: dict[str, int] = msg.data
+            counters = [
+                MovieBudgetCounter(country, total) for country, total in data.items()
+            ]
+            for position, c in enumerate(counters):
+                print(
+                    f'[Q2] {position + 1}. Country="{c.country}", TotalBudget={c.total_budget}'
+                )
+
+        # Q3: MovieRatingAvg
+        elif msg.message_type == MessageType.MovieRatingAvg:
+            ratings_dict: dict[str, MovieRatingAvg] = msg.data
+            min_movie = ratings_dict.get('min')
+            max_movie = ratings_dict.get('max')
+
+            if min_movie:
+                print(
+                    f'[Q3 - MÍN] Película: "{min_movie.title}", '
+                    f'Rating={min_movie.average_rating:.2f}'
+                )
+            if max_movie:
+                print(
+                    f'[Q3 - MÁX] Película: "{max_movie.title}", '
+                    f'Rating={max_movie.average_rating:.2f}'
+                )
+        # Q4
+        elif msg.message_type == MessageType.ActorCount:
+            counts: list[ActorCount] = msg.data
+            for ac in counts:
+                print(f'[Q4] Actor="{ac.actor_name}", Count={ac.count}')
+        # Q5
+        elif msg.message_type == MessageType.MovieAvgBudget:
+            mab: MovieAvgBudget = msg.data
+            print(
+                f'[Q5] MovieAvgBudget → Positive={mab.positive:.2f}, '
+                f'Negative={mab.negative:.2f}'
+            )
+        else:
+            logging.warning(f'Mensaje desconocido: {msg.message_type}')
+
+
 def main():
     try:
         args = parse_arguments()
@@ -207,7 +279,7 @@ def main():
         send_cast(client_socket, args)
         send_ratings(client_socket, args)
         logging.info('Waiting for response.')
-        time.sleep(60 * 10)
+        receive_responses(client_socket)
         client_socket.close()
         logging.info('Client socket closed.')
     except ValueError as e:

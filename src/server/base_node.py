@@ -114,7 +114,7 @@ class BaseNode(ABC):
             publisher = DirectPublisher(broker, self.config.publishers[0]['queue'])
             publisher.put(broker, out_msg)
             broker.close()
-            logger.info('Final counter results sent (result connection).')
+            logger.info('Final results sent (result connection).')
             self._final_results_sent = True
         except Exception as e:
             logger.error(f'Error sending final counter results: {e}', exc_info=True)
