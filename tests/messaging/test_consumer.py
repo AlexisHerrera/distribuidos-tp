@@ -1,8 +1,9 @@
 import unittest
 from unittest.mock import ANY, Mock
+
 from src.messaging.broker import Broker
-from src.messaging.protocol.message import Message
 from src.messaging.consumer import BroadcastConsumer
+from src.messaging.protocol.message import Message
 
 
 class TestConsumer:
@@ -13,7 +14,7 @@ class TestConsumer:
 
         broker.queue_declare.return_value = queue_name
 
-        _consumer = BroadcastConsumer(broker, exchange_name)
+        _consumer = BroadcastConsumer(broker, exchange_name, queue_name)
 
         broker.exchange_declare.assert_called_once_with(exchange_name, 'fanout')
         broker.queue_declare.assert_called_once()
@@ -27,7 +28,7 @@ class TestConsumer:
 
         broker.queue_declare.return_value = queue_name
 
-        consumer = BroadcastConsumer(broker, exchange_name)
+        consumer = BroadcastConsumer(broker, exchange_name, queue_name)
 
         consumer.start_consuming(broker, message)
 

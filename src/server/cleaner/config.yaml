@@ -5,7 +5,7 @@ connection:
     - type: direct
       queue: report
   publisher:
-    - type: direct
+    - type: broadcast
       queue: movies_metadata_clean
       msg_type: Movie
     - type: direct

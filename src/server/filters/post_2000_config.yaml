@@ -3,7 +3,8 @@ rabbit:
 connection:
   consumer:
     - type: broadcast
-      queue: movies_metadata_clean
+      queue: movies_metadata_clean_post_2000
+      exchange: movies_metadata_clean
   publisher:
     - type: broadcast
       queue: post_2000

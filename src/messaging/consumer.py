@@ -73,9 +73,9 @@ class Consumer(ABC):
 
 
 class BroadcastConsumer(Consumer):
-    def __init__(self, broker: Broker, exchange_name: str):
+    def __init__(self, broker: Broker, exchange_name: str, queue: str):
         broker.exchange_declare(exchange_name, 'fanout')
-        self.__queue_name = broker.queue_declare()
+        self.__queue_name = broker.queue_declare(queue)
         self.tag = None
         broker.queue_bind(exchange_name, self.__queue_name)
 
