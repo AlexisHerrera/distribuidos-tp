@@ -57,6 +57,7 @@ class MultiPublisherConnection:
             logger.error(f'Message type not in publishers {message.message_type}')
 
     def recv(self, callback: Callable[[Message], None]):
+        self.__consumer.basic_consume(self.__broker, callback)
         self.__consumer.start_consuming(self.__broker, callback)
 
     def close(self):

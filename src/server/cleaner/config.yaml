@@ -3,7 +3,7 @@ rabbit:
 connection:
   consumer:
     - type: direct
-      queue: report
+      queue: reporter
   publisher:
     - type: broadcast
       queue: movies_metadata_clean

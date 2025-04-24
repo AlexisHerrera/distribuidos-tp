@@ -1,7 +1,8 @@
 import logging
 from collections import defaultdict
+from typing import Dict
 from .base_sink_logic import BaseSinkLogic
-from src.messaging.protocol.message import Message
+from src.messaging.protocol.message import Message, MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -11,18 +12,20 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
         self.final_budgets = defaultdict(int)
         logger.info('Q2Top5BudgetSinkLogic initialized.')
 
-    def merge_results(self, message: Message):
+    def merge_results(self, message: Message) -> Message:
         result_dict = message.data
-        # logger.info("Received message:", message.message_type, message.data)
         for country, budget in result_dict.items():
             self.final_budgets[country] += int(budget)
-        self.finalize_and_log()
+        sorted_countries = self._obtain_sorted_countries()
+        
+        return Message(MessageType.MovieBudgetCounter, sorted_countries)
 
-    def finalize_and_log(self):
+    def _obtain_sorted_countries(self) -> Dict[str, int]:
         logger.info('--- Sink: Final Global Country Budget Counts ---')
         if not self.final_budgets:
             logger.info('No country budgets aggregated.')
-            return
+            return {}
+
         try:
             sorted_countries = sorted(
                 self.final_budgets.items(), key=lambda item: item[1], reverse=True
@@ -32,5 +35,8 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
                 logger.info(f'  {i + 1}. {country}: {total_budget}')
             logger.info(f'Total countries aggregated: {len(sorted_countries)}')
             logger.info('---------------------------------------------')
+
+            return dict(sorted_countries[:5])
         except Exception as e:
             logger.error(f'Error logging final results: {e}', exc_info=True)
+            return None
