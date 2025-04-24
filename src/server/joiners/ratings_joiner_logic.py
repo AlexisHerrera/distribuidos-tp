@@ -15,13 +15,17 @@ class RatingsJoinerLogic(BaseJoinerLogic):
         logger.info('RatingsJoinerLogic initialized.')
 
     def merge(self, message: Message) -> Message:
-        rating: Rating = message.data
-        movie = self.base_data.get(rating.movie_id)
-        if movie is None:
-            logger.warning(f'No movie in base_data for id={rating.movie_id}')
-            return
-
-        joined = MovieRating(
-            movie_id=rating.movie_id, title=movie.title, rating=rating.rating
-        )
+        ratings: list[Rating] = message.data
+        joined = []
+        for rating in ratings:
+            movie = self.base_data.get(rating.movie_id)
+            if movie is None:
+                # logger.warning(f'No movie in base_data for id={rating.movie_id}')
+                continue
+            joined.append(
+                MovieRating(
+                    movie_id=rating.movie_id, title=movie.title, rating=rating.rating
+                )
+            )
+        # logger.info(f'Appending {len(joined)}')
         return Message(MessageType.MovieRating, joined)

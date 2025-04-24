@@ -52,9 +52,7 @@ class GenericJoinerNode(BaseNode):
         logger.info('Start consuming db')
 
     def process_message(self, message: Message):
-        logger.info('Waiting on base loaded')
         self._base_loaded.wait()
-        logger.info('Base loaded, getting into day!')
         super().process_message(message)
 
     def handle_message(self, message: Message):
