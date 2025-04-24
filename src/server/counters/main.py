@@ -5,6 +5,7 @@ from src.messaging.broker import RabbitMQBroker
 from src.messaging.protocol.message import Message
 from src.messaging.publisher import DirectPublisher
 from src.server.base_node import BaseNode
+from src.server.counters.actor_counter_logic import ActorCounterLogic
 from src.server.counters.base_counter_logic import BaseCounterLogic
 from src.server.counters.country_budget_logic import CountryBudgetLogic
 from src.server.counters.rating_counter_logic import RatingCounterLogic
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 AVAILABLE_COUNTER_LOGICS: Dict[str, Type[BaseCounterLogic]] = {
     'country_budget': CountryBudgetLogic,
     'rating': RatingCounterLogic,
+    'actor_counter': ActorCounterLogic,
 }
 
 

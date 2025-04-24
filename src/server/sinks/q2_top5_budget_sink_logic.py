@@ -17,7 +17,7 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
         for country, budget in result_dict.items():
             self.final_budgets[country] += int(budget)
         sorted_countries = self._obtain_sorted_countries()
-        
+
         return Message(MessageType.MovieBudgetCounter, sorted_countries)
 
     def _obtain_sorted_countries(self) -> Dict[str, int]:

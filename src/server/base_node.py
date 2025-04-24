@@ -111,6 +111,7 @@ class BaseNode(ABC):
             logger.info('RECEIVED EOF FROM QUEUE')
             if not self.leader.enabled:
                 # single node shutdown, there is no monitor
+                self._send_final_results()
                 self._propagate_eof()
                 self.shutdown()
             else:

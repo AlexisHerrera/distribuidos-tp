@@ -232,7 +232,7 @@ def parse_args():
     parser.add_argument('--d00', '--decade-00', type=int)
     parser.add_argument('--rc', '--rating-counter', type=int)
     parser.add_argument('--spl', '--splitter', type=int)
-
+    parser.add_argument('--ac', '--actor-counter', type=int)
     return parser.parse_args()
 
 
@@ -303,6 +303,13 @@ def main():
             'src/server/splitters/main.py',
             'cast_splitter',
             './src/server/splitters/config.yaml',
+        ),
+        (
+            'actor_counter',
+            args.ac,
+            'src/server/counters/main.py',
+            'actor_counter',
+            './src/server/counters/actor_counter_config.yaml',
         ),
     ]
     for idx, (name, count, script, logic, cfg) in enumerate(mapping):
