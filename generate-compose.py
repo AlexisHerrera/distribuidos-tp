@@ -253,6 +253,8 @@ def parse_args():
     parser.add_argument('--rc', '--rating-counter', type=int)
     parser.add_argument('--spl', '--splitter', type=int)
     parser.add_argument('--ac', '--actor-counter', type=int)
+    parser.add_argument('--br', '--budget-revenue', type=int)
+
     return parser.parse_args()
 
 
@@ -274,6 +276,13 @@ def main():
             'src/server/counters/main.py',
             'country_budget',
             './src/server/counters/country_budget_config.yaml',
+        ),
+        (
+            'filter_budget_revenue',
+            args.br,
+            'src/server/filters/main.py',
+            'budget_revenue',
+            './src/server/filters/budget_revenue_config.yaml',
         ),
         (
             'sentiment_analyzer',
