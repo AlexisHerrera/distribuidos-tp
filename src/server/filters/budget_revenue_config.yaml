@@ -1,0 +1,12 @@
+rabbit:
+  host: rabbitmq
+connection:
+  consumer:
+    - type: broadcast
+      exchange: movies_metadata_clean
+      queue: movies_metadata_clean_sentiment_analyzed
+  publisher:
+    - type: direct
+      queue: movie_budget_revenue_clean
+log:
+  level: INFO
