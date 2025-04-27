@@ -18,6 +18,10 @@ class Broker(ABC):
         pass
 
     @abstractmethod
+    def basic_qos(self):
+        pass
+
+    @abstractmethod
     def put(self, exchange: str, routing_key: str, body: bytes):
         pass
 
@@ -74,6 +78,9 @@ class RabbitMQBroker(Broker):
 
     def queue_bind(self, exchange_name: str, queue_name: str):
         self.__channel.queue_bind(exchange=exchange_name, queue=queue_name)
+
+    def basic_qos(self):
+        self.__channel.basic_qos(prefetch_count=1)
 
     def put(self, exchange: str = '', routing_key: str = '', body: bytes = b''):
         self.__channel.basic_publish(

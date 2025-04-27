@@ -14,6 +14,8 @@ class SentimentAnalyzer:
         self.__analyzer = pipeline(
             'sentiment-analysis',
             model='distilbert-base-uncased-finetuned-sst-2-english',
+            framework='pt',
+            device='cpu',
         )
 
     def handle_message(self, movies: list[Movie]):

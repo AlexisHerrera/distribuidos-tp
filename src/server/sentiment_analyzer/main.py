@@ -14,7 +14,7 @@ AVAILABLE_ANALYZER_LOGICS = {'sentiment': SentimentAnalyzer}
 class SentimentAnalyzerNode(BaseNode):
     def __init__(self, config: Config, analyzer_type: str):
         super().__init__(config, analyzer_type)
-        self._executor = ThreadPoolExecutor(max_workers=4)
+        self.__executor = ThreadPoolExecutor(max_workers=4)
         logger.info(f"SentimentAnalyzerNode '{analyzer_type}' initialized.")
 
     def _get_logic_registry(self):
@@ -25,8 +25,8 @@ class SentimentAnalyzerNode(BaseNode):
             return
         self.leader.wait_for_eof()
 
-        logger.info('EOF detected by monitor — waiting for in-flight tasks…')
-        self._executor.shutdown(wait=True)
+        logger.info('EOF detected by monitor — waiting for in-flight tasks...')
+        self.__executor.shutdown(wait=True)
         logger.info('All in-flight tasks completed.')
         super()._start_eof_monitor()
 
@@ -35,14 +35,19 @@ class SentimentAnalyzerNode(BaseNode):
             return
 
         if message.message_type == MessageType.Movie:
-            self._executor.submit(self._process_and_publish, message.data)
+            logic_result = []
+
+            movies: list[Movie] = message.data
+            logic_result = self.__executor.map(self.logic.handle_message, [movies])
+
+            result = []
+            for r in logic_result:
+                result.extend(r)
+
+            out_message = Message(MessageType.MovieSentiment, result)
+            self.connection.send(out_message)
         else:
             logger.warning(f'Unknown message type received: {message.message_type}')
-
-    def _process_and_publish(self, movies: list[Movie]):
-        result = self.logic.handle_message(movies)
-        out = Message(MessageType.MovieSentiment, result)
-        self.connection.thread_safe_send(out)
 
 
 if __name__ == '__main__':
