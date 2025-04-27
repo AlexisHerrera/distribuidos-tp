@@ -15,4 +15,4 @@ echo ">>> Generando docker-compose-dev.yaml con ${SMALL_DATASET_FLAG}"
 python generate-compose.py ${SMALL_DATASET_FLAG}
 
 echo ">>> Lanzando contenedores"
-# make docker-compose-up
+make docker-compose-up
