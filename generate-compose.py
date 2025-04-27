@@ -1,9 +1,12 @@
 import argparse
 
-DEFAULT_NODES = 1
+import yaml
+
 DOCKER_COMPOSE_FILENAME = 'docker-compose.yaml'
 NETWORK_NAME = 'testing_net'
 BASE_PORT = 6000
+SMALL_DATASET_PATH = './.data-small'
+DATASET_PATH = './.data'
 
 
 class ScalableService:
@@ -42,7 +45,7 @@ def create_rabbitmq():
     environment:
       - RABBITMQ_CONFIG_FILE=/etc/rabbitmq/rabbitmq.conf
     healthcheck:
-      test: [ "CMD", "rabbitmqctl", "status" ]
+      test: ["CMD", "rabbitmqctl", "status"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,7 +54,7 @@ def create_rabbitmq():
 """
 
 
-def create_client():
+def create_client(dataset_path: str):
     return f"""
   client:
     container_name: client
@@ -74,7 +77,7 @@ def create_client():
     networks:
       - {NETWORK_NAME}
     volumes:
-      - ./.data:/app/.data
+      - {dataset_path}:/app/.data
     depends_on:
       cleaner:
         condition: service_started
@@ -193,9 +196,9 @@ def create_scalable(service: ScalableService):
     return nodes
 
 
-def create_services(scalable_services: list[ScalableService]):
+def create_services(scalable_services: list[ScalableService], dataset_path: str):
     rabbitmq = create_rabbitmq()
-    client = create_client()
+    client = create_client(dataset_path)
     cleaner = create_cleaner()
     sinks = ''
     for i in list(range(1, 6)):
@@ -228,9 +231,11 @@ def create_networks():
     """
 
 
-def create_docker_compose_data(scalable_services: list[ScalableService]):
+def create_docker_compose_data(
+    scalable_services: list[ScalableService], dataset_path: str
+):
     base = create_docker_compose_base()
-    services = create_services(scalable_services)
+    services = create_services(scalable_services, dataset_path)
     networks = create_networks()
 
     return base + services + networks
@@ -238,104 +243,116 @@ def create_docker_compose_data(scalable_services: list[ScalableService]):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        prog='generate-compose',
-        description='Docker compose generator',
-        argument_default=DEFAULT_NODES,
+        prog='generate-compose', description='Docker compose generator'
     )
 
-    parser.add_argument('--scf', '--solo-country-filter', type=int)
-    parser.add_argument('--cbc', '--country-budget-counter', type=int)
-    parser.add_argument('--sa', '--sentiment-analyzer', type=int)
-    parser.add_argument('--p2000', '--post-2000', type=int)
-    parser.add_argument('--arg', '--argentina', type=int)
-    parser.add_argument('--argspa', '--argentina-and-spain', type=int)
-    parser.add_argument('--d00', '--decade-00', type=int)
-    parser.add_argument('--rc', '--rating-counter', type=int)
-    parser.add_argument('--spl', '--splitter', type=int)
-    parser.add_argument('--ac', '--actor-counter', type=int)
-    parser.add_argument('--br', '--budget-revenue', type=int)
+    parser.add_argument(
+        '-s',
+        '--small-dataset',
+        default=False,
+        action='store_true',
+        help='Set if you want to use the small dataset path, else false.',
+    )
 
     return parser.parse_args()
 
 
+class Config:
+    def __init__(self, data: dict):
+        self.__dict__.update(data)
+
+        if 'all' in self.__dict__ and self.all is not None and self.all > 0:
+            for k in self.__dict__.keys():
+                self.__dict__[k] = self.all
+
+
+def read_config() -> Config:
+    data = ''
+    with open('nodes-config.yaml', 'r') as f:
+        data = yaml.safe_load(f)
+
+    return Config(data)
+
+
 def main():
     args = parse_args()
+    config = read_config()
     scalable_services = []
     base = BASE_PORT
     mapping = [
         (
             'filter_single_country',
-            args.scf,
+            config.filter_single_country,
             'src/server/filters/main.py',
             'solo_country',
             './src/server/filters/single_country_config.yaml',
         ),
         (
             'country_budget_counter',
-            args.cbc,
+            config.country_budget_counter,
             'src/server/counters/main.py',
             'country_budget',
             './src/server/counters/country_budget_config.yaml',
         ),
         (
             'filter_budget_revenue',
-            args.br,
+            config.filter_budget_revenue,
             'src/server/filters/main.py',
             'budget_revenue',
             './src/server/filters/budget_revenue_config.yaml',
         ),
         (
             'sentiment_analyzer',
-            args.sa,
+            config.sentiment_analyzer,
             'src/server/sentiment_analyzer/main.py',
             'sentiment',
             './src/server/sentiment_analyzer/config.yaml',
         ),
         (
             'filter_post_2000',
-            args.p2000,
+            config.filter_post_2000,
             'src/server/filters/main.py',
             'post_2000',
             './src/server/filters/post_2000_config.yaml',
         ),
         (
             'filter_argentina',
-            args.arg,
+            config.filter_argentina,
             'src/server/filters/main.py',
             'argentina',
             './src/server/filters/argentina_config.yaml',
         ),
         (
             'filter_argentina_and_spain',
-            args.argspa,
+            config.filter_argentina_and_spain,
             'src/server/filters/main.py',
             'argentina_and_spain',
             './src/server/filters/argentina_and_spain_config.yaml',
         ),
         (
             'filter_decade_00',
-            args.d00,
+            config.filter_decade_00,
             'src/server/filters/main.py',
             'decade_00',
             './src/server/filters/decade_00_config.yaml',
         ),
         (
             'rating_counter',
-            args.rc,
+            config.rating_counter,
             'src/server/counters/main.py',
             'rating',
             './src/server/counters/rating_counter_config.yaml',
         ),
         (
             'cast_splitter',
-            args.spl,
+            config.cast_splitter,
             'src/server/splitters/main.py',
             'cast_splitter',
             './src/server/splitters/config.yaml',
         ),
         (
             'actor_counter',
-            args.ac,
+            config.actor_counter,
             'src/server/counters/main.py',
             'actor_counter',
             './src/server/counters/actor_counter_config.yaml',
@@ -369,7 +386,11 @@ def main():
                         port=port,
                     )
                 )
-    content = create_docker_compose_data(scalable_services)
+
+    dataset_path = SMALL_DATASET_PATH if args.small_dataset else DATASET_PATH
+
+    content = create_docker_compose_data(scalable_services, dataset_path)
+
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.write(content)
 

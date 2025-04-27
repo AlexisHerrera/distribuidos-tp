@@ -1,0 +1,19 @@
+# Scale all scalable nodes equally
+all: ~
+
+# Filters
+filter_single_country: 1
+filter_budget_revenue: 1
+filter_post_2000: 1
+filter_argentina: 1
+filter_argentina_and_spain: 1
+filter_decade_00: 1
+
+# Counters
+rating_counter: 1
+country_budget_counter: 1
+actor_counter: 1
+
+# Others
+cast_splitter: 1
+sentiment_analyzer: 1
