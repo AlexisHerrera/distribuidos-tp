@@ -8,14 +8,13 @@ from src.model.movie_sentiment import MovieSentiment
 
 logger = logging.getLogger(__name__)
 
-
 class SentimentAnalyzer:
     def __init__(self):
         self.__analyzer = pipeline(
             'sentiment-analysis',
             model='distilbert-base-uncased-finetuned-sst-2-english',
             framework='pt',
-            device='cpu',
+            device=0
         )
 
     def handle_message(self, movies: list[Movie]):
