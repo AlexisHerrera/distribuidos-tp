@@ -78,6 +78,7 @@ class BroadcastConsumer(Consumer):
         self.__queue_name = broker.queue_declare(queue)
         self.tag = None
         broker.queue_bind(exchange_name, self.__queue_name)
+        broker.basic_qos()
 
     def basic_consume(self, broker: Broker, callback: Callable[[Message], None]) -> str:
         tag = broker.basic_consume(
@@ -99,6 +100,7 @@ class NamedQueueConsumer(Consumer):
         broker.queue_declare(queue_name=queue_name, exclusive=False, durable=True)
         self.__queue_name = queue_name
         self.tag = None
+        broker.basic_qos()
 
     def basic_consume(self, broker: Broker, callback: Callable[[Message], None]) -> str:
         tag = broker.basic_consume(
