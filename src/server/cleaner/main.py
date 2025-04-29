@@ -20,11 +20,8 @@ from src.server.cleaner.clean_credits import parse_line_to_credits
 from src.server.cleaner.clean_movies import parse_line_to_movie
 from src.server.cleaner.clean_ratings import parse_line_to_rating
 from src.utils.config import Config
+from src.utils.log import initialize_log
 
-
-logging.basicConfig(
-    level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 logger = logging.getLogger(__name__)
 
 
@@ -37,6 +34,7 @@ class Cleaner:
         self.server_socket = None
         self.client_socket = None
         self.querys_needed = 5
+
         try:
             self.port = int(os.getenv('SERVER_PORT', '12345'))
             self.backlog = int(os.getenv('LISTENING_BACKLOG', '3'))
@@ -309,8 +307,6 @@ class Cleaner:
         self._setup_signal_handlers()
 
         try:
-            # if not self._connect_rabbitmq():
-            #     return
             if not self._setup_server_socket():
                 return
 
@@ -330,6 +326,7 @@ if __name__ == '__main__':
     cleaner_instance = None
     try:
         config = Config()
+        initialize_log(config.log_level)
         cleaner_instance = Cleaner(config)
         cleaner_instance.run()
         cleaner_instance.process_results()
