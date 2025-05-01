@@ -259,6 +259,7 @@ def parse_args():
 
 class Config:
     def __init__(self, data: dict):
+        # Dynamically generate attributes based on the `key`s from `data`
         self.__dict__.update(data)
 
         if 'all' in self.__dict__ and self.all is not None and self.all > 0:

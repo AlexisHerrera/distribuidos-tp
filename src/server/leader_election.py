@@ -1,6 +1,7 @@
-import threading
-import socket
 import logging
+import socket
+import threading
+
 from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
@@ -12,10 +13,13 @@ class LeaderElection:
         if not self.enabled:
             logger.info('LeaderElection disabled.')
             return
+
         self.node_id = config.node_id
         self.port = int(config.port)
         self.peers = [tuple(p.split(':')) for p in config.peers]
+
         logger.info(f'Peers: {self.peers}')
+
         self.is_leader = False
         self.eof_event = threading.Event()
         self.done_event = threading.Event()
@@ -27,7 +31,9 @@ class LeaderElection:
         self._sock.bind(('', self.port))
         self._sock.listen()
         self._stop = threading.Event()
-        threading.Thread(target=self._listen, daemon=True).start()
+        self._listen_thread = threading.Thread(target=self._listen, daemon=True)
+        self._listen_thread.start()
+
         logger.info(f'LeaderElection listening on port {self.port}')
 
     def _listen(self):
@@ -95,4 +101,8 @@ class LeaderElection:
             logger.error(f'Error notifying DONE to leader: {e}')
 
     def stop(self):
-        self._stop.set()
+        if self._stop:
+            self._stop.set()
+
+        if self._listen_thread:
+            self._listen_thread.join()

@@ -53,6 +53,10 @@ class Broker(ABC):
     def process_data_events(self, time_limit: int):
         pass
 
+    @abstractmethod
+    def add_callback_threadsafe(self, callback: Callable):
+        pass
+
 
 class RabbitMQBroker(Broker):
     def __init__(self, host: str):
@@ -121,3 +125,6 @@ class RabbitMQBroker(Broker):
 
     def process_data_events(self, time_limit: int):
         self.__connection.process_data_events(time_limit=time_limit)
+
+    def add_callback_threadsafe(self, callback: Callable):
+        self.__connection.add_callback_threadsafe(callback)

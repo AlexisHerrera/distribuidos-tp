@@ -1,16 +1,17 @@
-import sys
 import argparse
 import io
-import os
 import logging
+import os
+import signal
+import sys
 import time
 
+from src.common.protocol.batch import Batch, BatchType
 from src.common.socket_communication import (
-    send_message,
     connect_to_server,
     receive_message,
+    send_message,
 )
-from src.common.protocol.batch import BatchType, Batch
 from src.messaging.protocol.message import Message, MessageType
 from src.model.actor_count import ActorCount
 from src.model.movie import Movie
@@ -275,6 +276,13 @@ def main():
                 'Could not connect to server after multiple retries. Exiting.'
             )
             return
+
+        def handle_signal(sig, frame):
+            client_socket.close()
+
+        signal.signal(signal.SIGTERM, handle_signal)
+        signal.signal(signal.SIGINT, handle_signal)
+
         send_movies(client_socket, args)
         send_cast(client_socket, args)
         send_ratings(client_socket, args)

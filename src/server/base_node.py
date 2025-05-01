@@ -1,18 +1,15 @@
+import argparse
 import logging
 import signal
 import sys
-import argparse
 import threading
 from abc import ABC, abstractmethod
-
 from typing import Any, Dict, Type
 
-from src.messaging.broker import RabbitMQBroker
 from src.messaging.connection_creator import ConnectionCreator
-from src.messaging.publisher import DirectPublisher, BroadcastPublisher
+from src.messaging.protocol.message import Message, MessageType
 from src.server.leader_election import LeaderElection
 from src.utils.config import Config
-from src.messaging.protocol.message import Message, MessageType
 from src.utils.log import initialize_log
 
 logger = logging.getLogger(__name__)
@@ -35,10 +32,16 @@ class BaseNode(ABC):
         self.should_send_results_before_eof = False
         self._final_results_sent = False
         # executor
-        self._executor= None
+        self._executor = None
         try:
             self._load_logic()
             self._setup_signal_handlers()
+            if self.leader.enabled:
+                logger.info('Launching monitor thread')
+                self._monitor_thread = threading.Thread(
+                    target=self._start_eof_monitor, daemon=True
+                )
+                self._monitor_thread.start()
             logger.info(f"BaseNode for '{self.node_type}' initialized.")
         except Exception as e:
             logger.critical(
@@ -87,10 +90,10 @@ class BaseNode(ABC):
         logger.info('Signal handlers configured.')
 
     def _wait_for_executor(self):
-        if getattr(self, "_executor", None):
-            logger.info("Waiting for executor tasks to finish…")
+        if getattr(self, '_executor', None):
+            logger.info('Waiting for executor tasks to finish…')
             self._executor.shutdown(wait=True)
-            logger.info("All executor tasks completed.")
+            logger.info('All executor tasks completed.')
 
     def _start_eof_monitor(self):
         if not self.leader.enabled:
@@ -107,7 +110,6 @@ class BaseNode(ABC):
         else:
             logger.info('Follower sending DONE to leader')
             self.leader.send_done()
-        self.shutdown()
 
     @abstractmethod
     def handle_message(self, message: Message):
@@ -118,10 +120,7 @@ class BaseNode(ABC):
             return
         try:
             out_msg = self.logic.message_result()
-            broker = RabbitMQBroker(self.config.rabbit_host)
-            publisher = DirectPublisher(broker, self.config.publishers[0]['queue'])
-            publisher.put(broker, out_msg)
-            broker.close()
+            self.connection.thread_safe_send(out_msg)
             logger.info('Final results sent (result connection).')
             self._final_results_sent = True
         except Exception as e:
@@ -135,7 +134,6 @@ class BaseNode(ABC):
                 self._wait_for_executor()
                 self._send_final_results()
                 self._propagate_eof()
-                self.shutdown()
             else:
                 # Unlock monitor
                 self.leader.on_local_eof()
@@ -150,9 +148,7 @@ class BaseNode(ABC):
             logger.critical('Node init failed.')
             return
         logger.info(f'Starting Node (Type: {self.node_type})...')
-        if self.leader.enabled:
-            logger.info('Launching monitor thread')
-            threading.Thread(target=self._start_eof_monitor, daemon=True).start()
+
         try:
             logic_name = type(self.logic).__name__ if self.logic else 'N/A'
             logger.info(f"Node '{logic_name}' running. Consuming. Waiting...")
@@ -179,26 +175,19 @@ class BaseNode(ABC):
                 logging.info('Now closing broker connection...')
                 self.connection.close()
                 logging.info('Connection closed')
-                self.leader.stop()
-                logger.info('LeaderElection detenido')
+                if self.leader.enabled:
+                    self.leader.stop()
+                    logger.info('LeaderElection detenido')
+                    self._monitor_thread.join()
             except Exception as e:
                 logger.error(f'Stopping or closing error: {e}')
 
     def _propagate_eof(self):
         try:
             logger.info('Propagating EOF to next stage...')
-            eof_broker = RabbitMQBroker(self.config.rabbit_host)
-            type = self.config.publishers[0]['type']
-            logger.info(f'Queue type to send: {type}')
-            if type == 'direct':
-                eof_publisher = DirectPublisher(
-                    eof_broker, self.config.publishers[0]['queue']
-                )
-            else:
-                eof_publisher = BroadcastPublisher(
-                    eof_broker, self.config.publishers[0]['queue']
-                )
-            eof_publisher.put(eof_broker, Message(MessageType.EOF, None))
+            eof_message = Message(MessageType.EOF, None)
+            self.connection.thread_safe_send(eof_message)
+
             logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')
         except Exception as e:
             logger.error(f'Could not publish EOF: {e}')
