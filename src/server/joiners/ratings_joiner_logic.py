@@ -1,9 +1,10 @@
 import logging
+
+from src.messaging.protocol.message import Message, MessageType
 from src.model.movie import Movie
 from src.model.movie_rating import MovieRating
 from src.model.rating import Rating
 from src.server.joiners.base_joiner_logic import BaseJoinerLogic
-from src.messaging.protocol.message import Message, MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -28,4 +29,4 @@ class RatingsJoinerLogic(BaseJoinerLogic):
                 )
             )
         logger.info(f'Joining {len(joined)}')
-        return Message(MessageType.MovieRating, joined)
+        return Message(message.user_id, MessageType.MovieRating, joined)
