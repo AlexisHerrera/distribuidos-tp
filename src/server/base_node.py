@@ -6,10 +6,8 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Type
 
-from src.messaging.broker import RabbitMQBroker
 from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
-from src.messaging.publisher import DirectPublisher
 from src.server.leader_election import LeaderElection
 from src.utils.config import Config
 from src.utils.log import initialize_log
@@ -122,10 +120,7 @@ class BaseNode(ABC):
             return
         try:
             out_msg = self.logic.message_result()
-            broker = RabbitMQBroker(self.config.rabbit_host)
-            publisher = DirectPublisher(broker, self.config.publishers[0]['queue'])
-            publisher.put(broker, out_msg)
-            broker.close()
+            self.connection.thread_safe_send(out_msg)
             logger.info('Final results sent (result connection).')
             self._final_results_sent = True
         except Exception as e:
@@ -153,9 +148,7 @@ class BaseNode(ABC):
             logger.critical('Node init failed.')
             return
         logger.info(f'Starting Node (Type: {self.node_type})...')
-        # if self.leader.enabled:
-        #     logger.info('Launching monitor thread')
-        #     threading.Thread(target=self._start_eof_monitor, daemon=True).start()
+
         try:
             logic_name = type(self.logic).__name__ if self.logic else 'N/A'
             logger.info(f"Node '{logic_name}' running. Consuming. Waiting...")
@@ -192,20 +185,9 @@ class BaseNode(ABC):
     def _propagate_eof(self):
         try:
             logger.info('Propagating EOF to next stage...')
-            # eof_broker = RabbitMQBroker(self.config.rabbit_host)
-            # type = self.config.publishers[0]['type']
-            # logger.info(f'Queue type to send: {type}')
-            # if type == 'direct':
-            #     eof_publisher = DirectPublisher(
-            #         eof_broker, self.config.publishers[0]['queue']
-            #     )
-            # else:
-            #     eof_publisher = BroadcastPublisher(
-            #         eof_broker, self.config.publishers[0]['queue']
-            #     )
             eof_message = Message(MessageType.EOF, None)
             self.connection.thread_safe_send(eof_message)
-            # eof_publisher.put(eof_broker, Message(MessageType.EOF, None))
+
             logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')
         except Exception as e:
             logger.error(f'Could not publish EOF: {e}')

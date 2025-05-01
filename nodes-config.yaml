@@ -1,11 +1,11 @@
 # Scale all scalable nodes equally
-all: 1
+# all: ~
 
 # Filters
 filter_single_country: 1
 filter_budget_revenue: 1
 filter_post_2000: 1
-filter_argentina: 1
+filter_argentina: 2
 filter_argentina_and_spain: 1
 filter_decade_00: 1
 
