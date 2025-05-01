@@ -182,9 +182,10 @@ class BaseNode(ABC):
                 logging.info('Now closing broker connection...')
                 self.connection.close()
                 logging.info('Connection closed')
-                self.leader.stop()
-                logger.info('LeaderElection detenido')
-                self._monitor_thread.join()
+                if self.leader.enabled:
+                    self.leader.stop()
+                    logger.info('LeaderElection detenido')
+                    self._monitor_thread.join()
             except Exception as e:
                 logger.error(f'Stopping or closing error: {e}')
 
