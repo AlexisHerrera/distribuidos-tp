@@ -204,7 +204,7 @@ class BaseNode(ABC):
             #         eof_broker, self.config.publishers[0]['queue']
             #     )
             eof_message = Message(MessageType.EOF, None)
-            self.connection.send(eof_message)
+            self.connection.thread_safe_send(eof_message)
             # eof_publisher.put(eof_broker, Message(MessageType.EOF, None))
             logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')
         except Exception as e:
