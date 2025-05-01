@@ -8,26 +8,31 @@
 
 ## Usage
 
-```bash
-python src/client/main.py .data/movies_metadata.csv .data/ratings.csv .data/credits.csv
+Use the `run-compose.sh` script to start all nodes, including the client.
+
+```sh
+./run-compose.sh [yes/no] [number]
 ```
 
+`number` represents the percentage that the dataset will be shrinked
+in case the `yes` is passed to use the small dataset
+
+Example 1: run without flags is the same as running `python3 generate-compose.py` to generate `docker-compose.yaml`
+
+```sh
+./run-compose.sh
 ```
-Successfully opened files:
-  Movies:  .data/movies_metadata.csv
-  Ratings: .data/ratings.csv
-  Cast:    .data/credits.csv
 
---- Counting lines in: Movies (.data/movies_metadata.csv) ---
---- Counting ended for Movies. Total lines: 45573 ---
+Example 2: run with `yes` uses small dataset, by default is 10% its equivalent to run `python3 generate-compose.py -s` to generate `docker-compose.yaml`
 
---- Counting lines in: Ratings (.data/ratings.csv) ---
---- Counting ended for Ratings. Total lines: 26024290 ---
+```sh
+./run-compose.sh yes
+```
 
---- Counting lines in: Cast (.data/credits.csv) ---
---- Counting ended for Cast. Total lines: 45477 ---
+Example 3: run with `yes` and specify percentage
 
-Successfully completed processing all files.
+```sh
+./run-compose.sh yes 40
 ```
 
 # Protocol
