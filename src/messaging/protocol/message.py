@@ -88,8 +88,7 @@ class Message:
         decoder = Message.__get_protocol(msg_type)
 
         data: list | None = decoder.from_bytes(
-            buf[Message.MSG_DATA_POS :],
-            bytes_amount,
+            buf[Message.MSG_DATA_POS :], bytes_amount
         )
 
         return Message(user_id, msg_type, data)
