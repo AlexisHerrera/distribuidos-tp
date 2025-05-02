@@ -3,6 +3,7 @@ import os
 import signal
 import sys
 from collections import defaultdict
+from random import randrange
 
 from src.common.protocol.batch import Batch, BatchType
 from src.common.socket_communication import (
@@ -141,7 +142,7 @@ class Cleaner:
 
         return parsed_ratings
 
-    def _process_client_data(self, type_of_data):
+    def _process_client_data(self, user_id: int, type_of_data):
         if not self.is_running or not self.client_socket:
             logger.error(
                 'Cannot process client data: component missing or not running.'
@@ -174,7 +175,7 @@ class Cleaner:
                     logger.info(
                         'EOF Batch received from client. Signaling end of all streams.'
                     )
-                    self._publish_eof()
+                    self._publish_eof(user_id)
                     break
 
                 object_list = self.batch_to_list_objects(batch)
@@ -208,7 +209,7 @@ class Cleaner:
                             exc_info=True,
                         )
 
-                output_message = Message(message_type_enum, model_object_list)
+                output_message = Message(user_id, message_type_enum, model_object_list)
                 self.connection.send(output_message)
 
                 if count_in_batch > 0:
@@ -233,9 +234,9 @@ class Cleaner:
         logger.info('Client data processing finished.')
         logger.info(f'Processing Summary: {dict(processed_counts)}')
 
-    def _publish_eof(self):
+    def _publish_eof(self, user_id: int):
         try:
-            eof_message = Message(MessageType.EOF, None)
+            eof_message = Message(user_id, MessageType.EOF, None)
             self.connection.send(eof_message)
         except Exception as e:
             logger.error(f'Failed to publish EOF: {e}', exc_info=True)
@@ -311,15 +312,20 @@ class Cleaner:
                 return
 
             if self._accept_client():
+                user_id = self.generate_user_id()
                 logger.info('Beginning to receive movies...')
-                self._process_client_data(BatchType.MOVIES)
+                self._process_client_data(user_id, BatchType.MOVIES)
                 logger.info('Beginning to receive credits...')
-                self._process_client_data(BatchType.CREDITS)
+                self._process_client_data(user_id, BatchType.CREDITS)
                 logger.info('Beginning to receive ratings...')
-                self._process_client_data(BatchType.RATINGS)
+                self._process_client_data(user_id, BatchType.RATINGS)
 
         except Exception as e:
             logger.critical(f'Fatal error during Cleaner execution: {e}', exc_info=True)
+
+    def generate_user_id(self):
+        # TODO: properly generate the number
+        return randrange(100)
 
 
 if __name__ == '__main__':

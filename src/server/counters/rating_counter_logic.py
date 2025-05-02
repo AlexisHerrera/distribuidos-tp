@@ -29,12 +29,13 @@ class RatingCounterLogic(BaseCounterLogic):
             self.ratings[movie.movie_id] = counter
 
     def message_result(self) -> Message:
+        user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         result = []
         self.log_final_results()
         for v in self.ratings.values():
             result.append(v)
 
-        return Message(MessageType.MovieRatingCounter, result)
+        return Message(user_id, MessageType.MovieRatingCounter, result)
 
     def log_final_results(self):
         logger.info('--- Final Rating Counts ---')

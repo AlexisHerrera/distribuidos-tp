@@ -1,8 +1,10 @@
 import logging
 from collections import defaultdict
-from .base_counter_logic import BaseCounterLogic
+
 from src.messaging.protocol.message import Message, MessageType
+
 from ...model.actor_count import ActorCount
+from .base_counter_logic import BaseCounterLogic
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +22,12 @@ class ActorCounterLogic(BaseCounterLogic):
             )
 
     def message_result(self) -> Message:
+        user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         final_result = []
         self.log_final_results()
         for name, count in self.actor_counts.items():
             final_result.append(ActorCount(name, count))
-        return Message(MessageType.ActorCount, final_result)
+        return Message(user_id, MessageType.ActorCount, final_result)
 
     def log_final_results(self):
         logger.info('--- Final Actor Counts ---')

@@ -106,7 +106,7 @@ class BaseNode(ABC):
             logger.info('Leader waiting for DONE from followers…')
             self.leader.wait_for_done()
             logger.info('All followers DONE; propagating EOF downstream')
-            self._propagate_eof()
+            self._propagate_eof()  # TODO: Must pass user_id somehow
         else:
             logger.info('Follower sending DONE to leader')
             self.leader.send_done()
@@ -133,10 +133,10 @@ class BaseNode(ABC):
                 # single node shutdown, there is no monitor
                 self._wait_for_executor()
                 self._send_final_results()
-                self._propagate_eof()
+                self._propagate_eof(message.user_id)
             else:
                 # Unlock monitor
-                self.leader.on_local_eof()
+                self.leader.on_local_eof(message.user_id)
             return
         try:
             self.handle_message(message)
@@ -182,10 +182,10 @@ class BaseNode(ABC):
             except Exception as e:
                 logger.error(f'Stopping or closing error: {e}')
 
-    def _propagate_eof(self):
+    def _propagate_eof(self, user_id: int):
         try:
             logger.info('Propagating EOF to next stage...')
-            eof_message = Message(MessageType.EOF, None)
+            eof_message = Message(user_id, MessageType.EOF, None)
             self.connection.thread_safe_send(eof_message)
 
             logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')

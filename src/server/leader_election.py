@@ -67,11 +67,12 @@ class LeaderElection:
             logger.info('Peer notification: EOF received, notifying monitor')
         self.eof_event.set()
 
-    def on_local_eof(self):
+    def on_local_eof(self, user_id: int):
         if not self.eof_event.is_set():
             self.is_leader = True
             logger.info('I am the LEADER')
         self.eof_event.set()
+        # TODO: Probably need to add `user_id` here
         payload = f'EOF|{self.node_id}|{self.port}'.encode()
         self.notify_peers(payload)
 

@@ -44,7 +44,7 @@ class SentimentAnalyzerNode(BaseNode):
             for r in logic_result:
                 result.extend(r)
 
-            out_message = Message(MessageType.MovieSentiment, result)
+            out_message = Message(message.user_id, MessageType.MovieSentiment, result)
             self.connection.send(out_message)
         else:
             logger.warning(f'Unknown message type received: {message.message_type}')

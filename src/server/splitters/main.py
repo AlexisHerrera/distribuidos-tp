@@ -1,5 +1,6 @@
 import logging
 from typing import Dict, Type
+
 from src.messaging.protocol.message import Message, MessageType
 from src.model.actor_count import ActorCount
 from src.model.movie_cast import MovieCast
@@ -44,7 +45,9 @@ class SplitterNode(BaseNode):
                 list_to_send.append(ActorCount(name, count))
             if len(list_to_send) > 0:
                 try:
-                    self.connection.send(Message(MessageType.ActorCount, list_to_send))
+                    self.connection.send(
+                        Message(message.user_id, MessageType.ActorCount, list_to_send)
+                    )
                     logger.info(f'Se enviaron {len(list_to_send)}')
                 except Exception as e:
                     logger.error(
