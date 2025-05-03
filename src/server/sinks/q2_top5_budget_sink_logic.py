@@ -43,8 +43,11 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
                 key=lambda item: item[1].total_budget,
                 reverse=True,
             )
+
             top5 = [v for (_, v) in sorted_countries[:5]]
+
             logger.info('FINAL Top 5 Countries by Total Budget Invested:')
+
             for i, movie_budget_counter in enumerate(top5):
                 country = movie_budget_counter.country
                 total_budget = movie_budget_counter.total_budget
