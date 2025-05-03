@@ -29,23 +29,28 @@ class Q3MaxMinAvgRatingSinkLogic(BaseSinkLogic):
             self.rating_counts[rating.movie_id] = counter
 
     def message_result(self, user_id: int) -> Message:
-        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         result = self._get_max_min_average_rating()
         return Message(user_id, MessageType.MovieRatingAvg, result)
 
     def _get_max_min_average_rating(self) -> dict:
         logger.info('--- Sink: Final Global Q3 Max Min Avg Rating ---')
+        result = {
+            'min': None,
+            'max': None,
+        }
+
         if not self.rating_counts:
             logger.info('No rating counts aggregated.')
-            return
+            return result
         try:
-            result = {
-                'min': MovieRatingAvg(-1, '', 6),
-                'max': MovieRatingAvg(-1, '', 0),
-            }
-
             for rating in self.rating_counts.values():
                 avg = rating.partial_sum / rating.count
+
+                if not result['min']:
+                    result['min'] = MovieRatingAvg(rating.movie_id, rating.title, avg)
+                if not result['max']:
+                    result['max'] = MovieRatingAvg(rating.movie_id, rating.title, avg)
+
                 if avg >= result['max'].average_rating:
                     result['max'] = MovieRatingAvg(rating.movie_id, rating.title, avg)
                 if avg <= result['min'].average_rating:

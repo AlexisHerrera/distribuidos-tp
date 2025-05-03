@@ -214,22 +214,33 @@ def receive_responses(client_socket):
         if msg.message_type == MessageType.Movie:
             movies: list[Movie] = msg.data
 
-            for m in movies:
-                print(f'[Q1] Movie → ID={m.id}, Title="{m.title}", Genres="{m.genres}"')
+            if len(movies) == 0:
+                print('[Q1] No movies to show.')
+            else:
+                for m in movies:
+                    print(
+                        f'[Q1] Movie → ID={m.id}, Title="{m.title}", Genres="{m.genres}"'
+                    )
         # Q2: MovieBudgetCounter
         elif msg.message_type == MessageType.MovieBudgetCounter:
             data: list[MovieBudgetCounter] = msg.data
 
-            for position, c in enumerate(data):
-                print(
-                    f'[Q2] {position + 1}. Country="{c.country}", TotalBudget={c.total_budget}'
-                )
+            if len(data) == 0:
+                print('[Q2] No movies to show.')
+            else:
+                for position, c in enumerate(data):
+                    print(
+                        f'[Q2] {position + 1}. Country="{c.country}", TotalBudget={c.total_budget}'
+                    )
 
         # Q3: MovieRatingAvg
         elif msg.message_type == MessageType.MovieRatingAvg:
             ratings_dict: dict[str, MovieRatingAvg] = msg.data
             min_movie = ratings_dict.get('min')
             max_movie = ratings_dict.get('max')
+
+            if not min_movie and not max_movie:
+                print('[Q3] No movies to show.')
 
             if min_movie:
                 print(
@@ -245,8 +256,11 @@ def receive_responses(client_socket):
         elif msg.message_type == MessageType.ActorCount:
             counts: list[ActorCount] = msg.data
 
-            for ac in counts:
-                print(f'[Q4] Actor="{ac.actor_name}", Count={ac.count}')
+            if len(counts) == 0:
+                print('[Q4] No actors to show.')
+            else:
+                for ac in counts:
+                    print(f'[Q4] Actor="{ac.actor_name}", Count={ac.count}')
         # Q5
         elif msg.message_type == MessageType.MovieAvgBudget:
             mab: MovieAvgBudget = msg.data
