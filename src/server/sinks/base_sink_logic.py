@@ -11,5 +11,5 @@ class BaseSinkLogic(ABC):
         pass
 
     @abstractmethod
-    def message_result(self) -> Message:
+    def message_result(self, user_id: int) -> Message:
         pass

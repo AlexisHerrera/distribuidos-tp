@@ -7,27 +7,56 @@ from src.model.rating import Rating
 
 
 class TestMessage:
+    @staticmethod
+    def int_to_bytes(value: int, length: int = 1) -> bytes:
+        return value.to_bytes(length=length, byteorder='big', signed=False)
+
+    @staticmethod
+    def int_from_bytes(buf: bytes, bytes_amount: int) -> int:
+        return int.from_bytes(buf[0:bytes_amount], 'big', signed=False)
+
+    def test_message_user_id(self):
+        user_id = 1
+        message = Message(user_id, MessageType.EOF)
+        message_bytes = message.to_bytes()
+
+        assert message_bytes[
+            Message.USER_ID_POS : Message.USER_ID_SIZE
+        ] == self.int_to_bytes(user_id, Message.USER_ID_SIZE)
+
     class TestMovie:
         def test_encode_movie(self):
             movie = Movie(1, 'Toy Story')
-            message = Message(MessageType.Movie, [movie])
+            user_id = 1
+            message = Message(user_id, MessageType.Movie, [movie])
 
             message_bytes = message.to_bytes()
 
-            assert message_bytes[0:1] == b'\x01'
+            assert message_bytes[
+                Message.USER_ID_POS : Message.USER_ID_SIZE
+            ] == TestMessage.int_to_bytes(user_id, message.USER_ID_SIZE)
 
-            bytes_amount = int.from_bytes(message_bytes[1:3], 'big')
+            assert message_bytes[
+                Message.MSG_TYPE_POS : Message.MSG_TYPE_POS + Message.MSG_TYPE_SIZE
+            ] == TestMessage.int_to_bytes(MessageType.Movie.value)
 
-            assert len(message_bytes[3:]) == bytes_amount
+            bytes_amount = TestMessage.int_from_bytes(
+                message_bytes[Message.MSG_LEN_POS :],
+                Message.MSG_LEN_SIZE,
+            )
+
+            assert len(message_bytes[Message.MSG_DATA_POS :]) == bytes_amount
 
         def test_encode_and_decode_movie_should_return_same_movie(self):
             movie = Movie(1, 'Toy Story')
-            message = Message(MessageType.Movie, [movie])
+            user_id = 1
+            message = Message(user_id, MessageType.Movie, [movie])
 
             message_bytes = message.to_bytes()
 
             result = Message.from_bytes(message_bytes)
 
+            assert result.user_id == user_id
             assert result.message_type == MessageType.Movie
             assert result.data is not None
             assert len(result.data) == 1
@@ -40,24 +69,35 @@ class TestMessage:
     class TestRating:
         def test_encode_rating(self):
             rating = Rating(1, 4.5)
-            message = Message(MessageType.Rating, [rating])
+            user_id = 1
+            message = Message(user_id, MessageType.Rating, [rating])
 
             message_bytes = message.to_bytes()
 
-            assert message_bytes[0:1] == b'\x02'
+            assert message_bytes[
+                Message.USER_ID_POS : Message.USER_ID_SIZE
+            ] == TestMessage.int_to_bytes(user_id, Message.USER_ID_SIZE)
 
-            bytes_amount = int.from_bytes(message_bytes[1:3], 'big')
+            assert message_bytes[
+                Message.MSG_TYPE_POS : Message.MSG_TYPE_POS + Message.MSG_TYPE_SIZE
+            ] == TestMessage.int_to_bytes(MessageType.Rating.value)
 
-            assert len(message_bytes[3:]) == bytes_amount
+            bytes_amount = TestMessage.int_from_bytes(
+                message_bytes[Message.MSG_LEN_POS :], Message.MSG_LEN_SIZE
+            )
+
+            assert len(message_bytes[Message.MSG_DATA_POS :]) == bytes_amount
 
         def test_encode_and_decode_rating_should_return_same_rating(self):
             rating = Rating(1, 4.5)
-            message = Message(MessageType.Rating, [rating])
+            user_id = 1
+            message = Message(user_id, MessageType.Rating, [rating])
 
             message_bytes = message.to_bytes()
 
             result = Message.from_bytes(message_bytes)
 
+            assert result.user_id == user_id
             assert result.message_type == MessageType.Rating
             assert result.data is not None
             assert len(result.data) == 1
@@ -70,24 +110,31 @@ class TestMessage:
     class TestCast:
         def test_encode_cast(self):
             cast = Cast(1, ['Ricardo Darín', 'Guillermo Francella'])
-            message = Message(MessageType.Cast, [cast])
+            user_id = 1
+            message = Message(user_id, MessageType.Cast, [cast])
 
             message_bytes = message.to_bytes()
 
-            assert message_bytes[0:1] == b'\x03'
+            assert message_bytes[
+                Message.MSG_TYPE_POS : Message.MSG_TYPE_POS + Message.MSG_TYPE_SIZE
+            ] == TestMessage.int_to_bytes(MessageType.Cast.value)
 
-            bytes_amount = int.from_bytes(message_bytes[1:3], 'big')
+            bytes_amount = TestMessage.int_from_bytes(
+                message_bytes[Message.MSG_LEN_POS :], Message.MSG_LEN_SIZE
+            )
 
-            assert len(message_bytes[3:]) == bytes_amount
+            assert len(message_bytes[Message.MSG_DATA_POS :]) == bytes_amount
 
         def test_encode_and_decode_cast_should_return_same_cast(self):
             cast = Cast(1, ['Ricardo Darín', 'Guillermo Francella'])
-            message = Message(MessageType.Cast, [cast])
+            user_id = 1
+            message = Message(user_id, MessageType.Cast, [cast])
 
             message_bytes = message.to_bytes()
 
             result = Message.from_bytes(message_bytes)
 
+            assert result.user_id == user_id
             assert result.message_type == MessageType.Cast
             assert result.data is not None
             assert len(result.data) == 1
@@ -100,25 +147,27 @@ class TestMessage:
 
     class TestEOF:
         def test_encode_eof_should_return_empty_data(self):
-            message = Message(MessageType.EOF, None)
+            user_id = 1
+            message = Message(user_id, MessageType.EOF)
 
             result = message.to_bytes()
 
-            assert result[: Message.MSG_TYPE_LEN] == MessageType.EOF.value.to_bytes()
-            assert (
-                result[
-                    Message.MSG_TYPE_LEN : Message.MSG_TYPE_LEN + Message.MSG_LEN_SIZE
-                ]
-                == b'\x00\x00'
-            )
+            assert result[
+                Message.MSG_TYPE_POS : Message.MSG_TYPE_POS + Message.MSG_TYPE_SIZE
+            ] == TestMessage.int_to_bytes(MessageType.EOF.value, Message.MSG_TYPE_SIZE)
+            assert result[
+                Message.MSG_LEN_POS : Message.MSG_LEN_POS + Message.MSG_LEN_SIZE
+            ] == TestMessage.int_to_bytes(0, Message.MSG_LEN_SIZE)
 
         def test_decode_eof_should_return_eof_type(self):
-            message = Message(MessageType.EOF, None)
+            user_id = 1
+            message = Message(user_id, MessageType.EOF, None)
 
             message_bytes = message.to_bytes()
 
             result = Message.from_bytes(message_bytes)
 
+            assert result.user_id == user_id
             assert result.message_type == message.message_type
             assert result.data == message.data
 

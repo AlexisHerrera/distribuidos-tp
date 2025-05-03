@@ -98,15 +98,15 @@ class BaseNode(ABC):
     def _start_eof_monitor(self):
         if not self.leader.enabled:
             return
-        self.leader.wait_for_eof()
+        user_id = self.leader.wait_for_eof()
         logger.info('EOF detected by monitor')
-        self._send_final_results()
+        self._send_final_results(user_id)
         self._wait_for_executor()
         if self.leader.is_leader:
             logger.info('Leader waiting for DONE from followers…')
             self.leader.wait_for_done()
             logger.info('All followers DONE; propagating EOF downstream')
-            self._propagate_eof()
+            self._propagate_eof(user_id)
         else:
             logger.info('Follower sending DONE to leader')
             self.leader.send_done()
@@ -115,11 +115,11 @@ class BaseNode(ABC):
     def handle_message(self, message: Message):
         pass
 
-    def _send_final_results(self):
+    def _send_final_results(self, user_id: int):
         if not self.should_send_results_before_eof or self._final_results_sent:
             return
         try:
-            out_msg = self.logic.message_result()
+            out_msg = self.logic.message_result(user_id)
             self.connection.thread_safe_send(out_msg)
             logger.info('Final results sent (result connection).')
             self._final_results_sent = True
@@ -132,11 +132,11 @@ class BaseNode(ABC):
             if not self.leader.enabled:
                 # single node shutdown, there is no monitor
                 self._wait_for_executor()
-                self._send_final_results()
-                self._propagate_eof()
+                self._send_final_results(message.user_id)
+                self._propagate_eof(message.user_id)
             else:
                 # Unlock monitor
-                self.leader.on_local_eof()
+                self.leader.on_local_eof(message.user_id)
             return
         try:
             self.handle_message(message)
@@ -182,10 +182,10 @@ class BaseNode(ABC):
             except Exception as e:
                 logger.error(f'Stopping or closing error: {e}')
 
-    def _propagate_eof(self):
+    def _propagate_eof(self, user_id: int):
         try:
             logger.info('Propagating EOF to next stage...')
-            eof_message = Message(MessageType.EOF, None)
+            eof_message = Message(user_id, MessageType.EOF, None)
             self.connection.thread_safe_send(eof_message)
 
             logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')

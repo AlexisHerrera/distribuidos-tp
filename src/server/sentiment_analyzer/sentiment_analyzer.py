@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 
 from transformers import pipeline
 
@@ -19,19 +18,22 @@ class SentimentAnalyzer:
         )
 
     def handle_message(self, movies: list[Movie]):
-        sentiments = defaultdict(lambda: 1)
+        sentiments = {}
         analyzed_movies = []
 
         for movie in movies:
-            sentiment = self.__analyzer(movie.overview)[0]['label']
+            try:
+                sentiment = self.__analyzer(movie.overview)[0]['label']
 
-            sentiments[sentiment] += 1
+                sentiments[sentiment] = sentiments.get(sentiment, 0) + 1
 
-            movie_sentiment = MovieSentiment(
-                movie.id, movie.title, movie.budget, movie.revenue, sentiment
-            )
+                movie_sentiment = MovieSentiment(
+                    movie.id, movie.title, movie.budget, movie.revenue, sentiment
+                )
 
-            analyzed_movies.append(movie_sentiment)
+                analyzed_movies.append(movie_sentiment)
+            except Exception as e:
+                logger.warning(f'Failed to analyze movie {movie.id}: {e}')
 
         logger.info('Analyzed sentiments in this batch:')
         for k, v in sentiments.items():

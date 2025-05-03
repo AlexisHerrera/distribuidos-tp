@@ -28,13 +28,14 @@ class RatingCounterLogic(BaseCounterLogic):
 
             self.ratings[movie.movie_id] = counter
 
-    def message_result(self) -> Message:
+    def message_result(self, user_id: int) -> Message:
+        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         result = []
         self.log_final_results()
         for v in self.ratings.values():
             result.append(v)
 
-        return Message(MessageType.MovieRatingCounter, result)
+        return Message(user_id, MessageType.MovieRatingCounter, result)
 
     def log_final_results(self):
         logger.info('--- Final Rating Counts ---')
@@ -45,9 +46,4 @@ class RatingCounterLogic(BaseCounterLogic):
         for rating in self.ratings.values():
             logger.info(f'{rating.title} {rating.partial_sum} {rating.count}')
 
-        # logger.info('Top 5 Countries by Total Budget Invested (Single Production):')
-        # for i, (country, total_budget) in enumerate(sorted_countries[:5]):
-        #     logger.info(f'  {i + 1}. {country}: {total_budget}')
-
-        # logger.info(f'Total countries counted: {len(sorted_countries)}')
         logger.info('-----------------------------')

@@ -1,6 +1,7 @@
 import logging
 import socket
 import threading
+from queue import Queue
 
 from src.utils.config import Config
 
@@ -22,6 +23,7 @@ class LeaderElection:
 
         self.is_leader = False
         self.eof_event = threading.Event()
+        self.user_id_queue = Queue()
         self.done_event = threading.Event()
         self._done_count = 0
         self._total_followers = len(self.peers)
@@ -44,9 +46,9 @@ class LeaderElection:
                 conn.close()
                 if data.startswith(b'EOF|'):
                     logger.info(f'Decoded:${data.decode()}')
-                    _, host, port = data.decode().split('|')
+                    _, host, port, user_id = data.decode().split('|')
                     self.leader_addr = (host, int(port))
-                    self._on_peer_eof()
+                    self._on_peer_eof(user_id)
                 elif data == b'DONE':
                     self._on_done()
             except socket.timeout:
@@ -62,21 +64,29 @@ class LeaderElection:
         if self._done_count >= self._total_followers:
             self.done_event.set()
 
-    def _on_peer_eof(self):
+    def _on_peer_eof(self, user_id: int):
         if not self.eof_event.is_set():
             logger.info('Peer notification: EOF received, notifying monitor')
         self.eof_event.set()
+        self.user_id_queue.put(user_id, block=False)
 
-    def on_local_eof(self):
+    def on_local_eof(self, user_id: int):
         if not self.eof_event.is_set():
             self.is_leader = True
             logger.info('I am the LEADER')
         self.eof_event.set()
-        payload = f'EOF|{self.node_id}|{self.port}'.encode()
+        self.user_id_queue.put(user_id, block=False)
+        # TODO: Probably need to add `user_id` here
+        payload = f'EOF|{self.node_id}|{self.port}|{user_id}'.encode()
         self.notify_peers(payload)
 
     def wait_for_eof(self, timeout=None):
-        return self.eof_event.wait(timeout)
+        # return self.eof_event.wait(timeout)
+        self.eof_event.wait(timeout)
+        user_id = self.user_id_queue.get()
+        logger.info(f'Received EOF for user {user_id}')
+        self.user_id_queue.task_done()
+        return user_id
 
     def wait_for_done(self, timeout=None):
         return self.done_event.wait(timeout)

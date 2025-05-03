@@ -1,10 +1,10 @@
 import logging
 
+from src.messaging.protocol.message import Message, MessageType
 from src.model.cast import Cast
 from src.model.movie import Movie
 from src.model.movie_cast import MovieCast
 from src.server.joiners.base_joiner_logic import BaseJoinerLogic
-from src.messaging.protocol.message import Message, MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -27,4 +27,4 @@ class CastJoinerLogic(BaseJoinerLogic):
             )
         if len(joined) > 0:
             logger.info(f'Joining {len(joined)} MovieCast')
-        return Message(MessageType.MovieCast, joined)
+        return Message(message.user_id, MessageType.MovieCast, joined)

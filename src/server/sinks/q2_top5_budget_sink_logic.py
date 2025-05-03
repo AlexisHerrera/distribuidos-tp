@@ -1,8 +1,10 @@
 import logging
 from collections import defaultdict
 from typing import Dict
-from .base_sink_logic import BaseSinkLogic
+
 from src.messaging.protocol.message import Message, MessageType
+
+from .base_sink_logic import BaseSinkLogic
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +19,10 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
         for country, budget in result_dict.items():
             self.final_budgets[country] += int(budget)
 
-    def message_result(self) -> Message:
+    def message_result(self, user_id: int) -> Message:
+        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         sorted_countries = self._obtain_sorted_countries()
-        return Message(MessageType.MovieBudgetCounter, sorted_countries)
+        return Message(user_id, MessageType.MovieBudgetCounter, sorted_countries)
 
     def _obtain_sorted_countries(self) -> Dict[str, int]:
         logger.info('--- Sink: Final Global Country Budget Counts ---')

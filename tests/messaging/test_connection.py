@@ -16,7 +16,8 @@ class TestConnection:
 
         connection = Connection(broker, publisher, consumer)
 
-        message = Message(MessageType.Unknown, 'message')
+        user_id = 1
+        message = Message(user_id, MessageType.Unknown, 'message')
 
         connection.send(message)
 
@@ -55,7 +56,8 @@ class TestConnection:
             consumer = Mock(Consumer)
             publisher = Mock(Publisher)
             msg_type = MessageType('Movie')
-            message = Message(MessageType.Movie, [])
+            user_id = 1
+            message = Message(user_id, MessageType.Movie, [])
 
             publishers = {msg_type: publisher}
 
@@ -70,7 +72,8 @@ class TestConnection:
             consumer = Mock(Consumer)
             publisher = Mock(Publisher)
             msg_type = MessageType('Movie')
-            message = Message(MessageType.Movie, [])
+            user_id = 1
+            message = Message(user_id, MessageType.Movie, [])
 
             publishers = {msg_type: publisher}
 
@@ -80,7 +83,7 @@ class TestConnection:
 
             publisher.put.assert_called_with(broker, message)
 
-            message = Message(MessageType.EOF, None)
+            message = Message(user_id, MessageType.EOF, None)
 
             multi.send(message)
 
@@ -93,8 +96,9 @@ class TestConnection:
             publisher_rating = Mock(Publisher)
             msg_type_movie = MessageType('Movie')
             msg_type_rating = MessageType('Rating')
-            message_movie = Message(MessageType.Movie, [])
-            message_rating = Message(MessageType.Rating, [])
+            user_id = 1
+            message_movie = Message(user_id, MessageType.Movie, [])
+            message_rating = Message(user_id, MessageType.Rating, [])
 
             publishers = {
                 msg_type_movie: publisher_movie,
