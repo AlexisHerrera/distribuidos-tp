@@ -21,8 +21,6 @@ class Q1ArgSpa2000(BaseSinkLogic):
             self.final_movies_and_genres.append(movie_genre)
 
     def message_result(self, user_id: int) -> Message:
-        # final_movies_genre = self.final_movies_and_genres
-        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         logger.info(f'Final Movie Genre: count {len(self.final_movies_and_genres)}')
         for movies_genre in self.final_movies_and_genres:
             logger.info(f'Movie: {movies_genre.title}, Genres: {movies_genre.genres}')

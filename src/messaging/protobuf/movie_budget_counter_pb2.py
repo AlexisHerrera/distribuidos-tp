@@ -20,7 +20,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n#protobuf/movie_budget_counter.proto\x12\x08protobuf"\x96\x01\n\x12MovieBudgetCounter\x12I\n\x0f\x63ountry_budgets\x18\x01 \x03(\x0b\x32\x30.protobuf.MovieBudgetCounter.CountryBudgetsEntry\x1a\x35\n\x13\x43ountryBudgetsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x03:\x02\x38\x01\x42\x05\x92\x03\x02\x08\x01\x62\x08\x65\x64itionsp\xe8\x07'
+    b'\n#protobuf/movie_budget_counter.proto\x12\x08protobuf";\n\x12MovieBudgetCounter\x12\x0f\n\x07\x63ountry\x18\x01 \x01(\t\x12\x14\n\x0ctotal_budget\x18\x02 \x01(\x04"A\n\x13MovieBudgetCounters\x12*\n\x04list\x18\x01 \x03(\x0b\x32\x1c.protobuf.MovieBudgetCounterB\x05\x92\x03\x02\x08\x01\x62\x08\x65\x64itionsp\xe8\x07'
 )
 
 _globals = globals()
@@ -31,10 +31,8 @@ _builder.BuildTopDescriptorsAndMessages(
 if not _descriptor._USE_C_DESCRIPTORS:
     _globals['DESCRIPTOR']._loaded_options = None
     _globals['DESCRIPTOR']._serialized_options = b'\222\003\002\010\001'
-    _globals['_MOVIEBUDGETCOUNTER_COUNTRYBUDGETSENTRY']._loaded_options = None
-    _globals['_MOVIEBUDGETCOUNTER_COUNTRYBUDGETSENTRY']._serialized_options = b'8\001'
-    _globals['_MOVIEBUDGETCOUNTER']._serialized_start = 50
-    _globals['_MOVIEBUDGETCOUNTER']._serialized_end = 200
-    _globals['_MOVIEBUDGETCOUNTER_COUNTRYBUDGETSENTRY']._serialized_start = 147
-    _globals['_MOVIEBUDGETCOUNTER_COUNTRYBUDGETSENTRY']._serialized_end = 200
+    _globals['_MOVIEBUDGETCOUNTER']._serialized_start = 49
+    _globals['_MOVIEBUDGETCOUNTER']._serialized_end = 108
+    _globals['_MOVIEBUDGETCOUNTERS']._serialized_start = 110
+    _globals['_MOVIEBUDGETCOUNTERS']._serialized_end = 175
 # @@protoc_insertion_point(module_scope)

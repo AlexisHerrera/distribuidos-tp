@@ -2,6 +2,7 @@ import logging
 from collections import defaultdict
 
 from src.messaging.protocol.message import Message, MessageType
+from src.model.movie_budget_counter import MovieBudgetCounter
 
 from .base_counter_logic import BaseCounterLogic
 
@@ -20,11 +21,9 @@ class CountryBudgetLogic(BaseCounterLogic):
             country = production_countries[0]
             budget = int(movie.budget)
             self.country_budgets[country] += budget
-            # self.log_final_results()
 
     def message_result(self, user_id: int) -> Message:
-        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
-        result = dict(self.country_budgets)
+        result = [MovieBudgetCounter(k, v) for k, v in self.country_budgets.items()]
         logger.info(f'Se mando: {result}')
         return Message(user_id, MessageType.MovieBudgetCounter, result)
 

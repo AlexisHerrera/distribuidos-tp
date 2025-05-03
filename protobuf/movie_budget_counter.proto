@@ -5,5 +5,10 @@ package protobuf;
 option features.field_presence = EXPLICIT;
 
 message MovieBudgetCounter {
-  map<string, int64> country_budgets = 1;
+    string country = 1;
+    uint64 total_budget = 2;
+}
+
+message MovieBudgetCounters {
+    repeated MovieBudgetCounter list = 1;
 }

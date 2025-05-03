@@ -213,15 +213,14 @@ def receive_responses(client_socket):
         # Q1: Movie
         if msg.message_type == MessageType.Movie:
             movies: list[Movie] = msg.data
+
             for m in movies:
                 print(f'[Q1] Movie → ID={m.id}, Title="{m.title}", Genres="{m.genres}"')
         # Q2: MovieBudgetCounter
         elif msg.message_type == MessageType.MovieBudgetCounter:
-            data: dict[str, int] = msg.data
-            counters = [
-                MovieBudgetCounter(country, total) for country, total in data.items()
-            ]
-            for position, c in enumerate(counters):
+            data: list[MovieBudgetCounter] = msg.data
+
+            for position, c in enumerate(data):
                 print(
                     f'[Q2] {position + 1}. Country="{c.country}", TotalBudget={c.total_budget}'
                 )
@@ -245,11 +244,13 @@ def receive_responses(client_socket):
         # Q4
         elif msg.message_type == MessageType.ActorCount:
             counts: list[ActorCount] = msg.data
+
             for ac in counts:
                 print(f'[Q4] Actor="{ac.actor_name}", Count={ac.count}')
         # Q5
         elif msg.message_type == MessageType.MovieAvgBudget:
             mab: MovieAvgBudget = msg.data
+
             print(
                 f'[Q5] MovieAvgBudget → Positive={mab.positive:.2f}, '
                 f'Negative={mab.negative:.2f}'
