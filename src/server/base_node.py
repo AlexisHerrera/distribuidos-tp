@@ -106,7 +106,7 @@ class BaseNode(ABC):
             logger.info('Leader waiting for DONE from followers…')
             self.leader.wait_for_done()
             logger.info('All followers DONE; propagating EOF downstream')
-            self._propagate_eof(user_id)  # TODO: Must pass user_id somehow
+            self._propagate_eof(user_id)
         else:
             logger.info('Follower sending DONE to leader')
             self.leader.send_done()
