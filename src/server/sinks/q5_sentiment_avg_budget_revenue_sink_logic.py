@@ -35,8 +35,8 @@ class Q5SentimentAvgBudgetRevenueSinkLogic(BaseSinkLogic):
         avg_neg = neg['sum'] / neg['count'] if neg['count'] else 0.0
         return avg_pos, avg_neg
 
-    def message_result(self) -> Message:
-        user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
+    def message_result(self, user_id: int) -> Message:
+        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         avg_pos, avg_neg = self._obtain_avg_budget_revenue()
         logger.info(f'Averages by sentiment - POSITIVE: {avg_pos}, NEGATIVE: {avg_neg}')
         result = MovieAvgBudget(positive=avg_pos, negative=avg_neg)

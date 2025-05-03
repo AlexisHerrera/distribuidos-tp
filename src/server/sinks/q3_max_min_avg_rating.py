@@ -28,8 +28,8 @@ class Q3MaxMinAvgRatingSinkLogic(BaseSinkLogic):
 
             self.rating_counts[rating.movie_id] = counter
 
-    def message_result(self) -> Message:
-        user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
+    def message_result(self, user_id: int) -> Message:
+        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         result = self._get_max_min_average_rating()
         return Message(user_id, MessageType.MovieRatingAvg, result)
 

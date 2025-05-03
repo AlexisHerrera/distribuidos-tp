@@ -21,8 +21,8 @@ class ActorCounterLogic(BaseCounterLogic):
                 self.actor_counts.get(actor_count.actor_name, 0) + actor_count.count
             )
 
-    def message_result(self) -> Message:
-        user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
+    def message_result(self, user_id: int) -> Message:
+        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         final_result = []
         self.log_final_results()
         for name, count in self.actor_counts.items():

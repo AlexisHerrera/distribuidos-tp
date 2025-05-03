@@ -19,8 +19,8 @@ class Q4Top10ActorsSinkLogic(BaseSinkLogic):
         for actor_count in result_list:
             self.final_actor_count[actor_count.actor_name] += int(actor_count.count)
 
-    def message_result(self) -> Message:
-        user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
+    def message_result(self, user_id: int) -> Message:
+        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         sorted_top10_actors = self._obtain_sorted_top10_actors()
         logger.info(f'TOP 10: {sorted_top10_actors}')
         top_to_reporter = []

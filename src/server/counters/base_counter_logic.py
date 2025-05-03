@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class BaseCounterLogic(ABC):
     @abstractmethod
-    def message_result(self) -> Message:
+    def message_result(self, user_id: int) -> Message:
         pass
 
     def log_final_results(self):

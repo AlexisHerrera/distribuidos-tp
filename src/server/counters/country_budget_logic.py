@@ -1,7 +1,9 @@
 import logging
 from collections import defaultdict
-from .base_counter_logic import BaseCounterLogic
+
 from src.messaging.protocol.message import Message, MessageType
+
+from .base_counter_logic import BaseCounterLogic
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +22,11 @@ class CountryBudgetLogic(BaseCounterLogic):
             self.country_budgets[country] += budget
             # self.log_final_results()
 
-    def message_result(self) -> Message:
+    def message_result(self, user_id: int) -> Message:
+        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         result = dict(self.country_budgets)
         logger.info(f'Se mando: {result}')
-        return Message(MessageType.MovieBudgetCounter, result)
+        return Message(user_id, MessageType.MovieBudgetCounter, result)
 
     def log_final_results(self):
         logger.info('--- Final Country Budget Counts ---')
