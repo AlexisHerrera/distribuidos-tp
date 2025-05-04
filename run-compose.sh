@@ -23,7 +23,7 @@ if [[ ${SMALL_DATASET} != "no" ]]; then
   bash ./generate-small-dataset.sh ${DATASET_PERCENT_SIZE}
 fi
 
-echo ">>> Generando docker-compose-dev.yaml con ${SMALL_DATASET_FLAG}"
+echo ">>> Generando docker-compose.yaml con ${SMALL_DATASET_FLAG}"
 python generate-compose.py ${SMALL_DATASET_FLAG}
 
 echo ">>> Lanzando contenedores"

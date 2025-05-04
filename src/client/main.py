@@ -22,7 +22,6 @@ from src.model.movie_rating_avg import MovieRatingAvg
 BATCH_SIZE_MOVIES = int(os.getenv('BATCH_SIZE_MOVIES', '20'))
 BATCH_SIZE_RATINGS = int(os.getenv('BATCH_SIZE_RATINGS', '100'))
 BATCH_SIZE_CREDITS = int(os.getenv('BATCH_SIZE_CREDITS', '20'))
-CSV_MOVIES_PATH = '.data/movies_metadata.csv'
 
 logging.basicConfig(level=logging.INFO)
 
@@ -213,47 +212,49 @@ def receive_responses(client_socket):
         # Q1: Movie
         if msg.message_type == MessageType.Movie:
             movies: list[Movie] = msg.data
-            for m in movies:
-                print(f'[Q1] Movie → ID={m.id}, Title="{m.title}", Genres="{m.genres}"')
+            logging.info('Persisting results Q1...')
+            with open('.results/Q1_Results.txt', 'w', encoding='utf-8') as f:
+                for m in movies:
+                    f.write(f'[Q1] Movie → ID={m.id}, Title="{m.title}", Genres="{m.genres}"\n')
+
         # Q2: MovieBudgetCounter
         elif msg.message_type == MessageType.MovieBudgetCounter:
             data: dict[str, int] = msg.data
             counters = [
                 MovieBudgetCounter(country, total) for country, total in data.items()
             ]
-            for position, c in enumerate(counters):
-                print(
-                    f'[Q2] {position + 1}. Country="{c.country}", TotalBudget={c.total_budget}'
-                )
+            logging.info('Persisting results Q2...')
+            with open('.results/Q2_Results.txt', 'w', encoding='utf-8') as f:
+                for position, c in enumerate(counters):
+                    f.write(f'[Q2] {position + 1}. Country="{c.country}", TotalBudget={c.total_budget}\n')
 
         # Q3: MovieRatingAvg
         elif msg.message_type == MessageType.MovieRatingAvg:
             ratings_dict: dict[str, MovieRatingAvg] = msg.data
             min_movie = ratings_dict.get('min')
             max_movie = ratings_dict.get('max')
+            logging.info('Persisting results Q3...')
+            with open('.results/Q3_Results.txt', 'w', encoding='utf-8') as f:
+                if min_movie:
+                    f.write(f'[Q3 - MÍN] Película: "{min_movie.title}", Rating={min_movie.average_rating:.2f}\n')
+                if max_movie:
+                    f.write(f'[Q3 - MÁX] Película: "{max_movie.title}", Rating={max_movie.average_rating:.2f}\n')
 
-            if min_movie:
-                print(
-                    f'[Q3 - MÍN] Película: "{min_movie.title}", '
-                    f'Rating={min_movie.average_rating:.2f}'
-                )
-            if max_movie:
-                print(
-                    f'[Q3 - MÁX] Película: "{max_movie.title}", '
-                    f'Rating={max_movie.average_rating:.2f}'
-                )
-        # Q4
+        # Q4: ActorCount
         elif msg.message_type == MessageType.ActorCount:
             counts: list[ActorCount] = msg.data
-            for ac in counts:
-                print(f'[Q4] Actor="{ac.actor_name}", Count={ac.count}')
-        # Q5
+            logging.info('Persisting results Q4...')
+            with open('.results/Q4_Results.txt', 'w', encoding='utf-8') as f:
+                for ac in counts:
+                    f.write(f'[Q4] Actor="{ac.actor_name}", Count={ac.count}\n')
+
+        # Q5: MovieAvgBudget
         elif msg.message_type == MessageType.MovieAvgBudget:
             mab: MovieAvgBudget = msg.data
-            print(
-                f'[Q5] MovieAvgBudget → Positive={mab.positive:.2f}, '
-                f'Negative={mab.negative:.2f}'
-            )
+            logging.info('Persisting results Q5...')
+            with open('.results/Q5_Results.txt', 'w', encoding='utf-8') as f:
+                f.write(f'[Q5] MovieAvgBudget → Positive={mab.positive:.2f}, Negative={mab.negative:.2f}\n')
+
         else:
             logging.warning(f'Mensaje desconocido: {msg.message_type}')
 
