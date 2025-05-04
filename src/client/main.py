@@ -215,7 +215,7 @@ def receive_responses(client_socket):
             logging.info('Persisting results Q1...')
             with open('.results/Q1_Results.txt', 'w', encoding='utf-8') as f:
                 if len(movies) == 0:
-                    f.write(f'[Q1] No movies to show."\n')
+                    f.write('[Q1] No movies to show.\n')
                 else:
                     for m in movies:
                         f.write(f'[Q1] Movie → ID={m.id}, Title="{m.title}", Genres="{m.genres}"\n')
@@ -226,7 +226,7 @@ def receive_responses(client_socket):
             logging.info('Persisting results Q2...')
             with open('.results/Q2_Results.txt', 'w', encoding='utf-8') as f:
                 if len(data) == 0:
-                    f.write(f'[Q2] No movies to show."\n')
+                    f.write('[Q2] No movies to show.\n')
                 else:
                     for position, c in enumerate(data):
                         f.write(f'[Q2] {position + 1}. Country="{c.country}", TotalBudget={c.total_budget}\n')
@@ -239,7 +239,7 @@ def receive_responses(client_socket):
             logging.info('Persisting results Q3...')
             with open('.results/Q3_Results.txt', 'w', encoding='utf-8') as f:
                 if not min_movie and not max_movie:
-                    f.write(f'[Q3] No movies to show."\n')
+                    f.write('[Q3] No movies to show.\n')
                 if min_movie:
                     f.write(f'[Q3 - MÍN] Película: "{min_movie.title}", Rating={min_movie.average_rating:.2f}\n')
                 if max_movie:
@@ -251,7 +251,7 @@ def receive_responses(client_socket):
             logging.info('Persisting results Q4...')
             with open('.results/Q4_Results.txt', 'w', encoding='utf-8') as f:
                 if len(counts) == 0:
-                    f.write(f'[Q4] No actors to show."\n')
+                    f.write('[Q4] No actors to show.\n')
                 else:
                     for ac in counts:
                         f.write(f'[Q4] Actor="{ac.actor_name}", Count={ac.count}\n')
