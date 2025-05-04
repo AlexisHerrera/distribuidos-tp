@@ -3,6 +3,7 @@
 PERCENTAGE=${1:-10}
 
 DIR_SMALL=".data-small"
+DIR_WHOLE_DATA=".data"
 
 mkdir -p ./${DIR_SMALL}
 
@@ -14,9 +15,9 @@ RATINGS_FILE=ratings.csv
 
 create_small_file() {
     local filename=$1
-    local total_lines=$(wc -l < ${filename})
+    local total_lines=$(wc -l < ${DIR_WHOLE_DATA}/${filename})
     local small_file_lines=$((total_lines / PERCENTAGE))
-    head -n ${small_file_lines} ${filename} > ${DIR_SMALL}/${filename}
+    head -n ${small_file_lines} ${DIR_WHOLE_DATA}/${filename} > ${DIR_SMALL}/${filename}
 }
 
 create_small_file ${MOVIES_FILE}

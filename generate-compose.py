@@ -7,6 +7,7 @@ NETWORK_NAME = 'testing_net'
 BASE_PORT = 6000
 SMALL_DATASET_PATH = './.data-small'
 DATASET_PATH = './.data'
+RESULTS_PATH = './.results'
 
 
 class ScalableService:
@@ -78,6 +79,7 @@ def create_client(dataset_path: str):
       - {NETWORK_NAME}
     volumes:
       - {dataset_path}:/app/.data
+      - {RESULTS_PATH}:/app/.results
     depends_on:
       cleaner:
         condition: service_started
