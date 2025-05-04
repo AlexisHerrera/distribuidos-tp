@@ -13,6 +13,9 @@ class MovieRatingAvgProtocol(MessageProtocol):
         )
 
     def __to_movie_rating_avg_pb(self, movie_rating_avg: MovieRatingAvg):
+        if not movie_rating_avg:
+            return None
+
         movie_rating_avg_encoded = movie_rating_avgs_pb2.MovieRatingAvg()
 
         movie_rating_avg_encoded.id = movie_rating_avg.id
@@ -37,6 +40,9 @@ class MovieRatingAvgProtocol(MessageProtocol):
         return items_encoded, len(items_encoded)
 
     def __to_movie_rating_avg(self, movie_rating_avg_pb2) -> MovieRatingAvg:
+        if not movie_rating_avg_pb2 or movie_rating_avg_pb2.title == '':
+            return None
+
         movie_id = movie_rating_avg_pb2.id
         title = movie_rating_avg_pb2.title
         average_rating = movie_rating_avg_pb2.average_rating
