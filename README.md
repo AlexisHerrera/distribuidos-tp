@@ -39,9 +39,9 @@ Example 3: run with `yes` and specify percentage
 
 ## Message Structure
 
-| MsgId  | MsgLen  | ProtobufData    |
-| ------ | ------- | --------------- |
-| 1 Byte | 2 Bytes | Variable Length |
+| UserId  | MsgId  | MsgLen  | ProtobufData    |
+| ------- | ------ | ------- | --------------- |
+| 4 Bytes | 1 Byte | 2 Bytes | Variable Length |
 
 > [!Note]
 > The 2 Bytes for message len should be enough for a batch of size < 8kb
