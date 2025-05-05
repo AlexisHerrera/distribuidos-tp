@@ -21,8 +21,9 @@ services:
     networks:
       - testing_net
 
-  client:
-    container_name: client
+  
+  client-1:
+    container_name: client-1
     build:
       context: .
       dockerfile: src/client/Dockerfile
@@ -34,7 +35,6 @@ services:
         ".data/ratings.csv",
         ".data/credits.csv",
       ]
-    image: client:latest
     environment:
       - SERVER_HOST=cleaner
       - SERVER_PORT=12345
@@ -272,7 +272,8 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/actor_counter_config.yaml:/app/config.yaml
-
+  
+  
   q1_sink:
     container_name: q1_sink
     build:
@@ -343,6 +344,7 @@ services:
     volumes:
       - ./src/server/sinks/q5_config.yaml:/app/config.yaml
 
+  
   ratings_joiner:
     container_name: ratings_joiner
     build:
@@ -356,7 +358,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/joiners/ratings_joiner_config.yaml:/app/config.yaml
-
+    
   cast_joiner:
     container_name: cast_joiner
     build:
@@ -370,10 +372,11 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/joiners/cast_joiner_config.yaml:/app/config.yaml
-
+    
 networks:
   testing_net:
     ipam:
       driver: default
       config:
         - subnet: 172.25.125.0/24
+    
