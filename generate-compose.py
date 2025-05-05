@@ -55,10 +55,11 @@ def create_rabbitmq():
 """
 
 
-def create_client(dataset_path: str):
+def create_client(dataset_path: str, client_number: int):
+    container_name = f"client{client_number}"
     return f"""
-  client:
-    container_name: client
+  {container_name}:
+    container_name: {container_name}
     build:
       context: .
       dockerfile: src/client/Dockerfile
@@ -198,9 +199,11 @@ def create_scalable(service: ScalableService):
     return nodes
 
 
-def create_services(scalable_services: list[ScalableService], dataset_path: str):
+def create_services(scalable_services: list[ScalableService], dataset_path: str, num_clients: int):
     rabbitmq = create_rabbitmq()
-    client = create_client(dataset_path)
+    clients = ''
+    for i in range(1, num_clients + 1):
+        clients += create_client(dataset_path, i)
     cleaner = create_cleaner()
     sinks = ''
     for i in list(range(1, 6)):
@@ -215,7 +218,7 @@ def create_services(scalable_services: list[ScalableService], dataset_path: str)
     return f"""
 services:
   {rabbitmq}
-  {client}
+  {clients}
   {cleaner}
   {services}
   {sinks}
@@ -234,10 +237,10 @@ def create_networks():
 
 
 def create_docker_compose_data(
-    scalable_services: list[ScalableService], dataset_path: str
+    scalable_services: list[ScalableService], dataset_path: str, num_clients: int
 ):
     base = create_docker_compose_base()
-    services = create_services(scalable_services, dataset_path)
+    services = create_services(scalable_services, dataset_path, num_clients)
     networks = create_networks()
 
     return base + services + networks
@@ -254,6 +257,13 @@ def parse_args():
         default=False,
         action='store_true',
         help='Set if you want to use the small dataset path, else false.',
+    )
+    parser.add_argument(
+        '-c',
+        '--clients',
+        type=int,
+        default=1,
+        help='Number of client instances to create.',
     )
 
     return parser.parse_args()
@@ -392,7 +402,8 @@ def main():
 
     dataset_path = SMALL_DATASET_PATH if args.small_dataset else DATASET_PATH
 
-    content = create_docker_compose_data(scalable_services, dataset_path)
+    num_clients = args.clients
+    content = create_docker_compose_data(scalable_services, dataset_path, num_clients)
 
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.write(content)
