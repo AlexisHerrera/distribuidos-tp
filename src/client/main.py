@@ -23,6 +23,9 @@ BATCH_SIZE_MOVIES = int(os.getenv('BATCH_SIZE_MOVIES', '20'))
 BATCH_SIZE_RATINGS = int(os.getenv('BATCH_SIZE_RATINGS', '100'))
 BATCH_SIZE_CREDITS = int(os.getenv('BATCH_SIZE_CREDITS', '20'))
 
+RESULTS_FOLDER = '.results'
+Q_RESULT_FILE_NAME_TEMPLATE = RESULTS_FOLDER + '/user_{user_id}_Q{n}_.txt'
+
 logging.basicConfig(level=logging.INFO)
 
 
@@ -209,47 +212,65 @@ def receive_responses(client_socket):
             logging.info('EOF recibido. Terminando recepción.')
             break
 
+        filename_args = {'user_id': msg.user_id}
+
         # Q1: Movie
         if msg.message_type == MessageType.Movie:
             movies: list[Movie] = msg.data
-            logging.info('Persisting results Q1...')
-            with open('.results/Q1_Results.txt', 'w', encoding='utf-8') as f:
+            filename_args['n'] = 1
+            filename = Q_RESULT_FILE_NAME_TEMPLATE.format(**filename_args)
+            logging.info(f'Persisting results Q1 to {filename}...')
+            with open(filename, 'w', encoding='utf-8') as f:
                 if len(movies) == 0:
                     f.write('[Q1] No movies to show.\n')
                 else:
                     for m in movies:
-                        f.write(f'[Q1] Movie → ID={m.id}, Title="{m.title}", Genres="{m.genres}"\n')
+                        f.write(
+                            f'[Q1] Movie → ID={m.id}, Title="{m.title}", Genres="{m.genres}"\n'
+                        )
 
         # Q2: MovieBudgetCounter
         elif msg.message_type == MessageType.MovieBudgetCounter:
             data: list[MovieBudgetCounter] = msg.data
-            logging.info('Persisting results Q2...')
-            with open('.results/Q2_Results.txt', 'w', encoding='utf-8') as f:
+            filename_args['n'] = 2
+            filename = Q_RESULT_FILE_NAME_TEMPLATE.format(**filename_args)
+            logging.info(f'Persisting results Q2 to {filename}...')
+            with open(filename, 'w', encoding='utf-8') as f:
                 if len(data) == 0:
                     f.write('[Q2] No movies to show.\n')
                 else:
                     for position, c in enumerate(data):
-                        f.write(f'[Q2] {position + 1}. Country="{c.country}", TotalBudget={c.total_budget}\n')
+                        f.write(
+                            f'[Q2] {position + 1}. Country="{c.country}", TotalBudget={c.total_budget}\n'
+                        )
 
         # Q3: MovieRatingAvg
         elif msg.message_type == MessageType.MovieRatingAvg:
             ratings_dict: dict[str, MovieRatingAvg] = msg.data
+            filename_args['n'] = 3
+            filename = Q_RESULT_FILE_NAME_TEMPLATE.format(**filename_args)
             min_movie = ratings_dict.get('min')
             max_movie = ratings_dict.get('max')
-            logging.info('Persisting results Q3...')
-            with open('.results/Q3_Results.txt', 'w', encoding='utf-8') as f:
+            logging.info(f'Persisting results Q3 to {filename}...')
+            with open(filename, 'w', encoding='utf-8') as f:
                 if not min_movie and not max_movie:
                     f.write('[Q3] No movies to show.\n')
                 if min_movie:
-                    f.write(f'[Q3 - MÍN] Película: "{min_movie.title}", Rating={min_movie.average_rating:.2f}\n')
+                    f.write(
+                        f'[Q3 - MÍN] Película: "{min_movie.title}", Rating={min_movie.average_rating:.2f}\n'
+                    )
                 if max_movie:
-                    f.write(f'[Q3 - MÁX] Película: "{max_movie.title}", Rating={max_movie.average_rating:.2f}\n')
+                    f.write(
+                        f'[Q3 - MÁX] Película: "{max_movie.title}", Rating={max_movie.average_rating:.2f}\n'
+                    )
 
         # Q4: ActorCount
         elif msg.message_type == MessageType.ActorCount:
             counts: list[ActorCount] = msg.data
-            logging.info('Persisting results Q4...')
-            with open('.results/Q4_Results.txt', 'w', encoding='utf-8') as f:
+            filename_args['n'] = 4
+            filename = Q_RESULT_FILE_NAME_TEMPLATE.format(**filename_args)
+            logging.info(f'Persisting results Q4 to {filename}...')
+            with open(filename, 'w', encoding='utf-8') as f:
                 if len(counts) == 0:
                     f.write('[Q4] No actors to show.\n')
                 else:
@@ -259,9 +280,13 @@ def receive_responses(client_socket):
         # Q5: MovieAvgBudget
         elif msg.message_type == MessageType.MovieAvgBudget:
             mab: MovieAvgBudget = msg.data
-            logging.info('Persisting results Q5...')
-            with open('.results/Q5_Results.txt', 'w', encoding='utf-8') as f:
-                f.write(f'[Q5] MovieAvgBudget → Positive={mab.positive:.2f}, Negative={mab.negative:.2f}\n')
+            filename_args['n'] = 5
+            filename = Q_RESULT_FILE_NAME_TEMPLATE.format(**filename_args)
+            logging.info(f'Persisting results Q5 to {filename}...')
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(
+                    f'[Q5] MovieAvgBudget → Positive={mab.positive:.2f}, Negative={mab.negative:.2f}\n'
+                )
 
         else:
             logging.warning(f'Mensaje desconocido: {msg.message_type}')

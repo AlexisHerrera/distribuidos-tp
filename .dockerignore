@@ -1,6 +1,8 @@
 **/*.csv
 *.zip
 .data
+.results
+.data-small
 .vscode
 .idea
 .github
