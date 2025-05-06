@@ -11,7 +11,7 @@ message Movie {
     string release_date = 4;
     repeated string production_countries = 5;
     int32 budget = 6;
-    int32 revenue = 7;
+    int64 revenue = 7;
     string overview = 8;
 }
 
