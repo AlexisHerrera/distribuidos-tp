@@ -1,13 +1,13 @@
 import logging
 import os
 import signal
+import socket
 import sys
+import threading
 from collections import defaultdict
-from random import randrange
 
 from src.common.protocol.batch import Batch, BatchType
 from src.common.socket_communication import (
-    accept_new_connection,
     create_server_socket,
     receive_message,
     send_message,
@@ -28,13 +28,17 @@ logger = logging.getLogger(__name__)
 
 class Cleaner:
     def __init__(self, config: Config):
+        self.results_processing_thread = None
         logger.info('Initializing Cleaner...')
         self.config = config
         self.is_running = True
         self.connection = ConnectionCreator.create_multipublisher(config)
         self.server_socket = None
-        self.client_socket = None
-        self.querys_needed = 5
+        self.expected_query_count = 5
+        self.client_data = {}
+        self.client_data_lock = threading.Lock()
+        self.next_user_id = 0
+        self.user_id_lock = threading.Lock()
 
         try:
             self.port = int(os.getenv('SERVER_PORT', '12345'))
@@ -70,25 +74,6 @@ class Cleaner:
             return True
         except Exception as e:
             logger.critical(f'Failed to set up server socket: {e}', exc_info=True)
-            self.is_running = False
-            return False
-
-    def _accept_client(self):
-        if not self.is_running or not self.server_socket:
-            return False
-        try:
-            logger.info('Waiting for client connection...')
-            self.client_socket = accept_new_connection(self.server_socket)
-            if self.client_socket:
-                logger.info('Client connected.')
-                return True
-            else:
-                logger.warning('Failed to accept client connection.')
-                self.is_running = False
-                return False
-        except Exception as e:
-            if self.is_running:
-                logger.error(f'Error accepting client connection: {e}', exc_info=True)
             self.is_running = False
             return False
 
@@ -142,161 +127,337 @@ class Cleaner:
 
         return parsed_ratings
 
-    def _process_client_data(self, user_id: int, type_of_data):
-        if not self.is_running or not self.client_socket:
+    def _process_client_data(
+        self,
+        user_id: int,
+        client_socket,
+        data_type_label: str,
+        associated_message_type: MessageType,
+    ):
+        if not self.is_running or not client_socket:
             logger.error(
-                'Cannot process client data: component missing or not running.'
+                f'[{user_id}] Cannot process client data for {data_type_label}: component missing or not running.'
             )
-            return
+            return False
 
-        logger.info('Starting to process data from client using Batch protocol...')
+        logger.info(f'[{user_id}] Starting to process {data_type_label} from client...')
         processed_counts = defaultdict(int)
         total_batches = 0
 
         while self.is_running:
             try:
-                raw_batch_bytes = receive_message(self.client_socket)
+                raw_batch_bytes = receive_message(client_socket)
                 if raw_batch_bytes is None:
-                    logger.warning('Client connection closed or receive failed.')
-                    break
+                    logger.warning(
+                        f'[{user_id}] Client connection closed or receive failed while waiting for {data_type_label} batch.'
+                    )
+                    return False
 
                 batch = Batch.from_bytes(raw_batch_bytes)
                 total_batches += 1
                 if batch is None:
-                    logger.error(f'Failed to decode Batch #{total_batches}. Stopping.')
-                    self.is_running = False
-                    break
+                    logger.error(
+                        f'[{user_id}] Failed to decode Batch #{total_batches} for {data_type_label}.'
+                    )
+                    return False
 
                 logger.debug(
-                    f'Received Batch #{total_batches}: Type={batch.type.name}, Lines={len(batch.data)}'
+                    f'[{user_id}] Received Batch #{total_batches} ({data_type_label}): Type={batch.type.name}, Lines={len(batch.data)}'
                 )
 
                 if batch.type == BatchType.EOF:
                     logger.info(
-                        'EOF Batch received from client. Signaling end of all streams.'
+                        f'[{user_id}] EOF Batch received for {data_type_label}. End of this stream.'
                     )
-                    self._publish_eof(user_id)
+                    self._publish_eof(user_id, associated_message_type)
                     break
 
                 object_list = self.batch_to_list_objects(batch)
-
-                message_type_enum = None
-                if batch.type == BatchType.MOVIES:
-                    message_type_enum = MessageType.Movie
-                elif batch.type == BatchType.CREDITS:
-                    message_type_enum = MessageType.Cast
-                elif batch.type == BatchType.RATINGS:
-                    message_type_enum = MessageType.Rating
-
-                if not message_type_enum:
+                if not associated_message_type:
                     logger.warning(
-                        f'No target queue or message type defined for BatchType: {batch.type.name}. Skipping batch.'
+                        f'[{user_id}] No target queue or message type defined for BatchType: {batch.type.name}. Skipping batch.'
                     )
                     continue
 
-                count_in_batch = 0
-                model_object_list = []
-                for model_object in object_list:
-                    if not self.is_running:
-                        break
-                    try:
-                        model_object_list.append(model_object)
-                        count_in_batch += 1
-                    except Exception as e:
-                        obj_id = getattr(model_object, 'id', 'N/A')
-                        logger.error(
-                            f'Error publishing {message_type_enum.name} ID {obj_id}: {e}',
-                            exc_info=True,
-                        )
+                model_object_list = [obj for obj in object_list if self.is_running]
+                if not self.is_running and model_object_list:
+                    logger.info(
+                        f'[{user_id}] Server shutting down, aborting send for batch of {associated_message_type.name}'
+                    )
+                    return False
 
-                output_message = Message(user_id, message_type_enum, model_object_list)
-                self.connection.send(output_message)
-
-                if count_in_batch > 0:
-                    processed_counts[batch.type] += count_in_batch
-                    logger.debug(
-                        f'Published {count_in_batch} objects of type {batch.type.name} from Batch #{total_batches}'
+                if model_object_list:
+                    output_message = Message(
+                        user_id, associated_message_type, model_object_list
                     )
 
-                if not self.is_running:
-                    break
+                    self.connection.send(output_message)
+                    processed_counts[batch.type] += len(model_object_list)
+                    logger.debug(
+                        f'[{user_id}] Published {len(model_object_list)} objects of type {batch.type.name} from Batch #{total_batches}'
+                    )
 
+            except ConnectionResetError:
+                logger.warning(
+                    f'[{user_id}] Client connection reset during {data_type_label} processing.'
+                )
+                return False
             except ConnectionAbortedError:
-                logger.warning('Client connection aborted.')
-                self.is_running = False
+                logger.warning(
+                    f'[{user_id}] Client connection aborted during {data_type_label} processing.'
+                )
+                return False
+            except socket.error as e:
+                logger.warning(
+                    f'[{user_id}] Socket error during {data_type_label} processing: {e}'
+                )
+                return False
             except Exception as e:
                 if self.is_running:
                     logger.error(
-                        f'Unexpected error in receive loop: {e}', exc_info=True
+                        f'[{user_id}] Unexpected error in {data_type_label} receive loop: {e}',
+                        exc_info=True,
                     )
-                # self.is_running = False
+                return False
 
-        logger.info('Client data processing finished.')
-        logger.info(f'Processing Summary: {dict(processed_counts)}')
+        logger.info(
+            f'[{user_id}] Client data processing for {data_type_label} finished.'
+        )
+        logger.info(
+            f'[{user_id}] Processing Summary for {data_type_label}: {dict(processed_counts)}'
+        )
+        return True
 
-    def _publish_eof(self, user_id: int):
+    def _receive_results_loop(self):
+        logger.info(
+            'Result processing thread started. Waiting for messages from queue...'
+        )
         try:
-            eof_message = Message(user_id, MessageType.EOF, None)
-            self.connection.send(eof_message)
-        except Exception as e:
-            logger.error(f'Failed to publish EOF: {e}', exc_info=True)
+            while self.is_running:
+                try:
+                    self.connection.recv(self._process_message_from_queue)
 
-    def process_message(self, message: Message):
-        if message.message_type == MessageType.EOF:
-            logger.warning('Llego un EOF, ignorar')
+                except Exception as e:
+                    if self.is_running:
+                        logger.error(
+                            f'Error in message queue recv loop: {e}', exc_info=True
+                        )
+                        if isinstance(e, (KeyboardInterrupt, SystemExit)):
+                            raise
+                        break
+                    else:
+                        logger.info('Message queue recv loop exiting due to shutdown.')
+                        break
+        except Exception as e:
+            if self.is_running:
+                logger.critical(
+                    f'Fatal error in result processing thread: {e}', exc_info=True
+                )
+        finally:
+            logger.info('Result processing thread finished.')
+
+    def _publish_eof(self, user_id: int, stream_message_type: MessageType):
+        try:
+            logger.info(
+                f'[{user_id}] Publishing stream EOF for {stream_message_type.name} to message queue.'
+            )
+            eof_message_for_stream = Message(user_id, MessageType.EOF, None)
+            self.connection.send_eof(
+                eof_message_for_stream, target_queue_type=stream_message_type
+            )
+        except Exception as e:
+            logger.error(
+                f'[{user_id}] Failed to publish stream EOF for {stream_message_type.name}: {e}',
+                exc_info=True,
+            )
+
+    def _process_message_from_queue(self, message: Message):
+        user_id = message.user_id
+
+        with self.client_data_lock:
+            client_info = self.client_data.get(user_id)
+
+        if not client_info:
+            if message.message_type != MessageType.EOF:
+                logger.warning(
+                    f'[N/A User] Received message for unknown or disconnected user_id: {user_id}, type: {message.message_type.name}. Cannot deliver.'
+                )
+            else:
+                logger.debug(
+                    f'[N/A User] Received EOF for user_id: {user_id} not currently active or already cleaned up.'
+                )
             return
-        logger.info('Received message with results')
-        payload = message.to_bytes()
-        send_message(self.client_socket, payload)
-        self.querys_needed -= 1
-        if message.message_type == MessageType.Movie:
-            logger.info('Llego Q1')
-        elif message.message_type == MessageType.MovieBudgetCounter:
-            logger.info('Llego Q2')
-        elif message.message_type == MessageType.MovieRatingAvg:
-            logger.info('Llego Q3')
-        elif message.message_type == MessageType.ActorCount:
-            logger.info('Llego Q4')
-        elif message.message_type == MessageType.MovieAvgBudget:
-            logger.info('Llego Q5')
-        elif message.message_type == MessageType.EOF:
-            logger.warning('Llego un EOF, ignorar')
+
+        client_socket = client_info['socket']
+        client_specific_lock = client_info['lock']
+
+        if message.message_type == MessageType.EOF:
+            logger.debug(
+                f'[{user_id}] Received an EOF from processing queue for user. Not a query result.'
+            )
+            return
+
+        logger.info(f'[{user_id}] Received query result: {message.message_type.name}')
+
+        try:
+            payload = message.to_bytes()
+            send_message(client_socket, payload)
+        except (socket.error, ConnectionResetError, BrokenPipeError) as e:
+            logger.error(
+                f'[{user_id}] Failed to send message to client (socket error: {e}). Client might have disconnected.',
+                exc_info=False,
+            )
+            self._cleanup_client(user_id)
+            return
+        except Exception as e:
+            logger.error(
+                f'[{user_id}] Failed to send message to client (unexpected error: {e}). Cleaning up client.',
+                exc_info=True,
+            )
+            self._cleanup_client(user_id)
+            return
+
+        with client_specific_lock:
+            client_info['queries_received'] += 1
+            queries_received_count = client_info['queries_received']
+
+            log_msg_parts = [
+                f'[{user_id}] Query result {queries_received_count}/{self.expected_query_count} sent to client:'
+            ]
+            if message.message_type == MessageType.Movie:
+                log_msg_parts.append('Q1 (Movie)')
+            elif message.message_type == MessageType.MovieBudgetCounter:
+                log_msg_parts.append('Q2 (MovieBudgetCounter)')
+            elif message.message_type == MessageType.MovieRatingAvg:
+                log_msg_parts.append('Q3 (MovieRatingAvg)')
+            elif message.message_type == MessageType.ActorCount:
+                log_msg_parts.append('Q4 (ActorCount)')
+            elif message.message_type == MessageType.MovieAvgBudget:
+                log_msg_parts.append('Q5 (MovieAvgBudget)')
+            else:
+                log_msg_parts.append(
+                    f'Undefined query result ({message.message_type.name})'
+                )
+            logger.info(' '.join(log_msg_parts))
+
+            if queries_received_count >= self.expected_query_count:
+                logger.info(
+                    f'[{user_id}] All {self.expected_query_count} query results sent to client. Finalizing and closing connection.'
+                )
+                self._cleanup_client(user_id)
+
+    def _handle_single_client(self, client_socket, client_address):
+        user_id = self.generate_user_id()
+
+        logger.info(
+            f'[{user_id}] New connection accepted from {client_address[0]}:{client_address[1]}. Handling in thread: {threading.current_thread().name}'
+        )
+
+        with self.client_data_lock:
+            self.client_data[user_id] = {
+                'socket': client_socket,
+                'queries_received': 0,
+                'lock': threading.Lock(),
+            }
+
+        all_data_processed_successfully = True
+        try:
+            if all_data_processed_successfully:
+                all_data_processed_successfully = self._process_client_data(
+                    user_id, client_socket, 'MOVIES', MessageType.Movie
+                )
+
+            if all_data_processed_successfully and self.is_running:
+                all_data_processed_successfully = self._process_client_data(
+                    user_id, client_socket, 'CREDITS', MessageType.Cast
+                )
+
+            if all_data_processed_successfully and self.is_running:
+                all_data_processed_successfully = self._process_client_data(
+                    user_id, client_socket, 'RATINGS', MessageType.Rating
+                )
+
+            if not self.is_running:
+                logger.info(
+                    f'[{user_id}] Server shutdown initiated. Aborting further processing for this client.'
+                )
+                all_data_processed_successfully = False
+
+            if all_data_processed_successfully:
+                logger.info(
+                    f'[{user_id}] All data streams received from client and corresponding EOFs published to message queue. Client connection remains open, awaiting query results.'
+                )
+            else:
+                logger.warning(
+                    f'[{user_id}] Data processing failed or was incomplete for one or more streams. Cleaning up client.'
+                )
+                self._cleanup_client(user_id)
+
+        except Exception as e:
+            logger.error(
+                f'[{user_id}] Unhandled error in client handler for {client_address[0]}:{client_address[1]}: {e}',
+                exc_info=True,
+            )
+            if self.is_running:
+                self._cleanup_client(user_id)
+        finally:
+            logger.debug(
+                f'[{user_id}] Client handler thread for {client_address[0]}:{client_address[1]} is ending.'
+            )
+
+    def _cleanup_client(self, user_id: int):
+        logger.info(f'[{user_id}] Cleaning up client resources.')
+        with self.client_data_lock:
+            client_info = self.client_data.pop(user_id, None)
+
+        if client_info:
+            client_socket = client_info['socket']
+            try:
+                client_socket.shutdown(socket.SHUT_RDWR)
+            except (socket.error, OSError):
+                pass
+            try:
+                client_socket.close()
+                logger.info(f'[{user_id}] Client socket closed.')
+            except (socket.error, OSError) as e:
+                logger.warning(f'[{user_id}] Error closing client socket: {e}')
         else:
-            logger.warning('Mensaje indefinido')
-        if self.querys_needed <= 0:
-            self.shutdown()
+            logger.warning(
+                f'[{user_id}] Attempted to clean up client, but not found in active list.'
+            )
 
     def shutdown(self):
+        if not self.is_running:
+            return
         logger.info('Shutting down Cleaner...')
         self.is_running = False
 
-        if self.client_socket:
-            try:
-                self.client_socket.close()
-                logger.info('Client socket closed.')
-            except Exception as e:
-                logger.warning(f'Error closing client socket: {e}')
         if self.server_socket:
             try:
                 self.server_socket.close()
                 logger.info('Server socket closed.')
             except Exception as e:
                 logger.warning(f'Error closing server socket: {e}')
+            self.server_socket = None
 
-        try:
-            self.connection.close()
-            logger.info('Connection closed.')
-        except Exception as e:
-            logger.error(f'Error closing Connection: {e}', exc_info=True)
+        with self.client_data_lock:
+            active_user_ids = list(self.client_data.keys())
 
-        logger.info('Cleaner shutdown complete.')
+        logger.info(
+            f'Found {len(active_user_ids)} active clients to clean up during shutdown.'
+        )
+        for user_id in active_user_ids:
+            self._cleanup_client(user_id)
 
-    def process_results(self):
-        try:
-            logger.info('Begin to process results...')
-            self.connection.recv(self.process_message)
-        except Exception as e:
-            logger.critical(f'Fatal error while obtaining results: {e}', exc_info=True)
+        if self.connection:
+            try:
+                logger.info('Closing messaging connection...')
+                self.connection.close()
+                logger.info('Messaging connection closed.')
+            except Exception as e:
+                logger.error(f'Error closing messaging connection: {e}', exc_info=True)
+
+        logger.info('Cleaner shutdown sequence complete.')
 
     def run(self):
         if not self.is_running:
@@ -307,25 +468,89 @@ class Cleaner:
 
         self._setup_signal_handlers()
 
+        if not self._setup_server_socket():
+            logger.critical('Failed to setup server socket. Cleaner cannot run.')
+            return
+
+        self.results_processing_thread = threading.Thread(
+            target=self._receive_results_loop, daemon=True
+        )
+        self.results_processing_thread.name = 'ResultsQueueThread'
+        self.results_processing_thread.start()
+        logger.info('Results processing thread has been started.')
+
+        logger.info(
+            f'Cleaner server running on port {self.port}. Waiting for client connections...'
+        )
+
+        client_threads = []
         try:
-            if not self._setup_server_socket():
-                return
+            while self.is_running:
+                try:
+                    client_socket, client_address = self.server_socket.accept()
+                    if not self.is_running:
+                        client_socket.close()
+                        break
 
-            if self._accept_client():
-                user_id = self.generate_user_id()
-                logger.info('Beginning to receive movies...')
-                self._process_client_data(user_id, BatchType.MOVIES)
-                logger.info('Beginning to receive credits...')
-                self._process_client_data(user_id, BatchType.CREDITS)
-                logger.info('Beginning to receive ratings...')
-                self._process_client_data(user_id, BatchType.RATINGS)
+                    logger.info(
+                        f'Accepted new connection from {client_address[0]}:{client_address[1]}'
+                    )
 
-        except Exception as e:
-            logger.critical(f'Fatal error during Cleaner execution: {e}', exc_info=True)
+                    thread = threading.Thread(
+                        target=self._handle_single_client,
+                        args=(client_socket, client_address),
+                    )
+                    thread.daemon = True
+                    thread.name = (
+                        f'ClientThread-{client_address[0]}-{client_address[1]}'
+                    )
+                    thread.start()
+                    client_threads.append(thread)
 
-    def generate_user_id(self):
-        # TODO: properly generate the number
-        return randrange(100)
+                    client_threads = [t for t in client_threads if t.is_alive()]
+
+                except socket.error as e:
+                    if self.is_running:
+                        logger.error(
+                            f'Socket error while accepting connection: {e}',
+                            exc_info=True,
+                        )
+                    else:
+                        logger.info('Server socket closed, accept loop terminating.')
+                    break
+                except Exception as e:
+                    if self.is_running:
+                        logger.critical(
+                            f'Unexpected error in main accept loop: {e}', exc_info=True
+                        )
+
+                    break
+
+        except KeyboardInterrupt:
+            logger.info('KeyboardInterrupt received in run loop. Initiating shutdown.')
+        finally:
+            logger.info('Main client accept loop has finished.')
+            if self.is_running:
+                self.shutdown()
+
+            if self.results_processing_thread.is_alive():
+                logger.info('Waiting for results processing thread to complete...')
+                self.results_processing_thread.join(timeout=5.0)
+                if self.results_processing_thread.is_alive():
+                    logger.warning(
+                        'Results processing thread did not complete in the allocated time.'
+                    )
+
+            for t in client_threads:
+                if t.is_alive():
+                    t.join(timeout=1.0)
+            logger.info('Cleaner has finished its run method.')
+
+    def generate_user_id(self) -> int:
+        with self.user_id_lock:
+            user_id = self.next_user_id
+            self.next_user_id += 1
+        return user_id
 
 
 if __name__ == '__main__':
@@ -335,7 +560,6 @@ if __name__ == '__main__':
         initialize_log(config.log_level)
         cleaner_instance = Cleaner(config)
         cleaner_instance.run()
-        cleaner_instance.process_results()
         logger.info('Cleaner run method finished.')
         sys.exit(0)
     except ValueError as e:
@@ -345,6 +569,6 @@ if __name__ == '__main__':
         logger.critical(
             f'Unhandled exception in main execution block: {e}', exc_info=True
         )
-        if cleaner_instance:
+        if cleaner_instance and cleaner_instance.is_running:
             cleaner_instance.shutdown()
         sys.exit(1)
