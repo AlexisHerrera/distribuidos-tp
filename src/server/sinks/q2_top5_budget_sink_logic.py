@@ -10,13 +10,16 @@ logger = logging.getLogger(__name__)
 
 class Q2Top5BudgetSinkLogic(BaseSinkLogic):
     def __init__(self):
-        self.final_budgets = {}
+        self.final_budgets: dict[int, dict[str, MovieBudgetCounter]] = {}
         logger.info('Q2Top5BudgetSinkLogic initialized.')
 
     def merge_results(self, message: Message):
         movie_budget_counters: list[MovieBudgetCounter] = message.data
+        user_id = message.user_id
+        partial_result = self.final_budgets.get(user_id, {})
+
         for movie_budget_counter in movie_budget_counters:
-            counter = self.final_budgets.get(
+            counter = partial_result.get(
                 movie_budget_counter.country,
             )
 
@@ -25,21 +28,24 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
             else:
                 counter.total_budget += movie_budget_counter.total_budget
 
-            self.final_budgets[movie_budget_counter.country] = counter
+            partial_result[movie_budget_counter.country] = counter
+
+        self.final_budgets[user_id] = partial_result
 
     def message_result(self, user_id: int) -> Message:
-        sorted_countries = self._obtain_sorted_countries()
+        sorted_countries = self._obtain_sorted_countries(user_id)
         return Message(user_id, MessageType.MovieBudgetCounter, sorted_countries)
 
-    def _obtain_sorted_countries(self) -> list[MovieBudgetCounter]:
+    def _obtain_sorted_countries(self, user_id: int) -> list[MovieBudgetCounter]:
+        result = self.final_budgets.pop(user_id, {})
         logger.info('--- Sink: Final Global Country Budget Counts ---')
-        if not self.final_budgets:
+        if not result:
             logger.info('No country budgets aggregated.')
             return []
 
         try:
             sorted_countries = sorted(
-                self.final_budgets.items(),
+                result.items(),
                 key=lambda item: item[1].total_budget,
                 reverse=True,
             )

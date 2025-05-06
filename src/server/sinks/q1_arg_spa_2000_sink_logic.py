@@ -16,14 +16,14 @@ class Q1ArgSpa2000(BaseSinkLogic):
     def merge_results(self, message: Message):
         list_movies_genres: list[Movie] = message.data
         user_id = message.user_id
+        partial_result = self.final_movies_and_genres.get(user_id, [])
+
         for movie_genre in list_movies_genres:
             # Asumimos id unico de movie, por lo que no necesito
             # agrupar por id, además que hice que el filtro lo saque
-            partial_result = self.final_movies_and_genres.get(user_id, [])
-
             partial_result.append(movie_genre)
 
-            self.final_movies_and_genres[user_id] = partial_result
+        self.final_movies_and_genres[user_id] = partial_result
 
     def message_result(self, user_id: int) -> Message:
         result = self.final_movies_and_genres.pop(user_id, [])
