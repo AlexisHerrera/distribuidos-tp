@@ -15,4 +15,4 @@ connection:
       queue: credits_clean
       msg_type: Cast
 log:
-  level: ERROR
+  level: INFO
