@@ -28,6 +28,16 @@ class ScalableService:
         self.dockerfile = dockerfile
 
 
+class Config:
+    def __init__(self, data: dict):
+        # Dynamically generate attributes based on the `key`s from `data`
+        self.__dict__.update(data)
+
+        if 'all' in self.__dict__ and self.all is not None and self.all > 0:
+            for k in self.__dict__.keys():
+                self.__dict__[k] = self.all
+
+
 def create_docker_compose_base():
     return 'name: tp-escalabilidad\n'
 
@@ -55,11 +65,10 @@ def create_rabbitmq():
 """
 
 
-def create_client(dataset_path: str, client_number: int):
-    container_name = f"client{client_number}"
+def create_client(client_id: int, dataset_path: str):
     return f"""
-  {container_name}:
-    container_name: {container_name}
+  client-{client_id}:
+    container_name: client-{client_id}
     build:
       context: .
       dockerfile: src/client/Dockerfile
@@ -71,7 +80,6 @@ def create_client(dataset_path: str, client_number: int):
         ".data/ratings.csv",
         ".data/credits.csv",
       ]
-    image: client:latest
     environment:
       - SERVER_HOST=cleaner
       - SERVER_PORT=12345
@@ -125,23 +133,6 @@ def create_sink(n: int):
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q{n}_config.yaml:/app/config.yaml
-"""
-
-
-def create_sink_q3():
-    return f"""q3_sink:
-    container_name: q3_sink
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/sinks/main.py", "q3"]
-    networks:
-      - {NETWORK_NAME}
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/sinks/q3_config.yaml:/app/config.yaml
 """
 
 
@@ -199,11 +190,13 @@ def create_scalable(service: ScalableService):
     return nodes
 
 
-def create_services(scalable_services: list[ScalableService], dataset_path: str, num_clients: int):
+def create_services(
+    scalable_services: list[ScalableService], config: Config, dataset_path: str
+):
     rabbitmq = create_rabbitmq()
     clients = ''
-    for i in range(1, num_clients + 1):
-        clients += create_client(dataset_path, i)
+    for i in range(1, config.clients + 1):
+        clients += create_client(i, dataset_path)
     cleaner = create_cleaner()
     sinks = ''
     for i in list(range(1, 6)):
@@ -236,16 +229,6 @@ def create_networks():
     """
 
 
-def create_docker_compose_data(
-    scalable_services: list[ScalableService], dataset_path: str, num_clients: int
-):
-    base = create_docker_compose_base()
-    services = create_services(scalable_services, dataset_path, num_clients)
-    networks = create_networks()
-
-    return base + services + networks
-
-
 def parse_args():
     parser = argparse.ArgumentParser(
         prog='generate-compose', description='Docker compose generator'
@@ -258,25 +241,18 @@ def parse_args():
         action='store_true',
         help='Set if you want to use the small dataset path, else false.',
     )
-    parser.add_argument(
-        '-c',
-        '--clients',
-        type=int,
-        default=1,
-        help='Number of client instances to create.',
-    )
 
     return parser.parse_args()
 
 
-class Config:
-    def __init__(self, data: dict):
-        # Dynamically generate attributes based on the `key`s from `data`
-        self.__dict__.update(data)
+def create_docker_compose_data(
+    scalable_services: list[ScalableService], config: Config, dataset_path: str
+):
+    base = create_docker_compose_base()
+    services = create_services(scalable_services, config, dataset_path)
+    networks = create_networks()
 
-        if 'all' in self.__dict__ and self.all is not None and self.all > 0:
-            for k in self.__dict__.keys():
-                self.__dict__[k] = self.all
+    return base + services + networks
 
 
 def read_config() -> Config:
@@ -402,8 +378,7 @@ def main():
 
     dataset_path = SMALL_DATASET_PATH if args.small_dataset else DATASET_PATH
 
-    num_clients = args.clients
-    content = create_docker_compose_data(scalable_services, dataset_path, num_clients)
+    content = create_docker_compose_data(scalable_services, config, dataset_path)
 
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.write(content)

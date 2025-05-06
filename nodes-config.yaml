@@ -1,6 +1,9 @@
 # Scale all scalable nodes equally
 # all: ~
 
+# Clients
+clients: 1
+
 # Filters
 filter_single_country: 1
 filter_budget_revenue: 1
