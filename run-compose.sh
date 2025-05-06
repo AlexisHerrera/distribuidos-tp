@@ -1,30 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./run-compose.sh [yes/no] [number]
-# Where number represents the percentage that the dataset will be shrinked
-# in case the 'yes' is passed to use the small dataset
-# Ex 1: run without flags is the same as running `python3 generate-compose.py`
+# Usage: ./run-compose.sh [use_small_dataset] [dataset_percentage] [num_clients]
+# Where:
+#   - use_small_dataset: 'yes' to use a small dataset, 'no' for the full dataset. Defaults to no.
+#   - dataset_percentage: Percentage to shrink the dataset if use_small_dataset is 'yes'. Defaults to 10. Ignored if use_small_dataset is 'no'.
+#   - num_clients: Number of client instances to create. Defaults to 1.
+#
+# Examples:
+#
+# Ex 1: Run with default settings (full dataset)
 # $ ./run-compose.sh
 #
-# Ex 2: run with 'yes' uses small dataset, by default is 10%
+# Ex 2: Use small dataset (default 10%)
 # $ ./run-compose.sh yes
-# 
-# Ex 3: run with 'yes' and specify percentage
+#
+# Ex 3: Use small dataset (40%)
 # $ ./run-compose.sh yes 40
 
 SMALL_DATASET=${1:-no}
 DATASET_PERCENT_SIZE=${2:-10}
-SMALL_DATASET_FLAG=
+GENERATE_COMPOSE_ARGS=""
 
-if [[ ${SMALL_DATASET} != "no" ]]; then
-  echo ">>> Generando small dataset"
-  SMALL_DATASET_FLAG="-s"
-  bash ./generate-small-dataset.sh ${DATASET_PERCENT_SIZE}
+if [[ "${SMALL_DATASET}" == "yes" ]]; then
+  echo ">>> Generando small dataset con tamaño del ${DATASET_PERCENT_SIZE}%"
+  GENERATE_COMPOSE_ARGS="${GENERATE_COMPOSE_ARGS} -s"
+  bash ./generate-small-dataset.sh "${DATASET_PERCENT_SIZE}"
 fi
 
-echo ">>> Generando docker-compose.yaml con ${SMALL_DATASET_FLAG}"
-python generate-compose.py ${SMALL_DATASET_FLAG}
+echo ">>> Generando docker-compose.yaml con argumentos: '${GENERATE_COMPOSE_ARGS}'"
+GENERATE_COMPOSE_ARGS="${GENERATE_COMPOSE_ARGS}"
+python generate-compose.py ${GENERATE_COMPOSE_ARGS}
 
 echo ">>> Lanzando contenedores"
 make docker-compose-up
