@@ -28,7 +28,9 @@ class Config:
         # Replication config
         self.node_id = os.getenv('NODE_ID', '')
         self.port = os.getenv('PORT', '')
-        self.peers = os.getenv('PEERS', '').split(',')
+        self.peers = (
+            os.getenv('PEERS', '').split(',') if os.getenv('PEERS', '') != '' else []
+        )
         self.replicas_enabled = os.getenv('PEERS', '') != ''
 
     def get_env_var(self, var_name: str, default: str = None) -> str | None:
