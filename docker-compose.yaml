@@ -22,8 +22,8 @@ services:
       - testing_net
 
   
-  client:
-    container_name: client
+  client1:
+    container_name: client1
     build:
       context: .
       dockerfile: src/client/Dockerfile
