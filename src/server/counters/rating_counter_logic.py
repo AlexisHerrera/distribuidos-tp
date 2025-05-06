@@ -10,13 +10,16 @@ logger = logging.getLogger(__name__)
 
 class RatingCounterLogic(BaseCounterLogic):
     def __init__(self):
-        self.ratings: dict[int, MovieRatingCount] = {}
+        self.ratings: dict[int, dict[int, MovieRatingCount]] = {}
         logger.info('RatingCounterLogic initialized.')
 
     def process_message(self, message: Message):
         movie_rating: list[MovieRating] = message.data
+        user_id = message.user_id
+        partial_result = self.ratings.get(user_id, {})
+
         for movie in movie_rating:
-            counter = self.ratings.get(
+            counter = partial_result.get(
                 movie.movie_id,
             )
 
@@ -26,24 +29,28 @@ class RatingCounterLogic(BaseCounterLogic):
                 counter.partial_sum += movie.rating
                 counter.count += 1
 
-            self.ratings[movie.movie_id] = counter
+            partial_result[movie.movie_id] = counter
+
+        self.ratings[user_id] = partial_result
 
     def message_result(self, user_id: int) -> Message:
-        # user_id = 1  # TODO: `user_id` will probably be part of `self.actor_counts` and/or needs to be passed as parameter
         result = []
-        self.log_final_results()
-        for v in self.ratings.values():
+        self.log_final_results(user_id)
+        for v in self.ratings[user_id].values():
             result.append(v)
+
+        self.ratings.pop(user_id, None)  # Drop silently
 
         return Message(user_id, MessageType.MovieRatingCounter, result)
 
-    def log_final_results(self):
-        logger.info('--- Final Rating Counts ---')
-        if not self.ratings:
+    def log_final_results(self, user_id: int):
+        result = self.ratings.get(user_id, {})
+        logger.info(f'--- Final Rating Counts for {user_id} ---')
+        if not result:
             logger.info('No country budgets were counted.')
             return
 
-        for rating in self.ratings.values():
+        for rating in result.values():
             logger.info(f'{rating.title} {rating.partial_sum} {rating.count}')
 
         logger.info('-----------------------------')

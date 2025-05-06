@@ -38,7 +38,7 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
 
     def _obtain_sorted_countries(self, user_id: int) -> list[MovieBudgetCounter]:
         result = self.final_budgets.pop(user_id, {})
-        logger.info('--- Sink: Final Global Country Budget Counts ---')
+        logger.info(f'--- Sink: Final Global Country Budget Counts for {user_id} ---')
         if not result:
             logger.info('No country budgets aggregated.')
             return []

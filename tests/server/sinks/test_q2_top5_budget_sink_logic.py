@@ -80,6 +80,45 @@ class TestQ2Top5BudgetSinkLogic:
         assert result.user_id == user_id
         assert len(result.data) == 0
 
+    def test_group_by_user_id_same_movies_returns_same_result(self):
+        q2 = Q2Top5BudgetSinkLogic()
+
+        movies = [
+            MovieBudgetCounter('Spain', 200),
+            MovieBudgetCounter('Argentina', 100),
+            MovieBudgetCounter('Brazil', 50),
+        ]
+
+        user_id_1 = 1
+
+        user_id_2 = 2
+
+        q2.merge_results(Message(user_id_1, MessageType.MovieBudgetCounter, movies))
+
+        result_1 = q2.message_result(user_id_1)
+
+        assert result_1.user_id == user_id_1
+
+        data: list[MovieBudgetCounter] = result_1.data
+
+        assert len(data) == len(movies)
+
+        for i in range(len(data)):
+            assert data[i] == movies[i]
+
+        q2.merge_results(Message(user_id_2, MessageType.MovieBudgetCounter, movies))
+
+        result_2 = q2.message_result(user_id_2)
+
+        assert result_2.user_id == user_id_2
+
+        data: list[MovieBudgetCounter] = result_2.data
+
+        assert len(data) == len(movies)
+
+        for i in range(len(data)):
+            assert data[i] == movies[i]
+
 
 if __name__ == '__main__':
     unittest.main()

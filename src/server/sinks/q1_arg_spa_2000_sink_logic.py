@@ -28,7 +28,7 @@ class Q1ArgSpa2000(BaseSinkLogic):
     def message_result(self, user_id: int) -> Message:
         result = self.final_movies_and_genres.pop(user_id, [])
 
-        logger.info(f'Final Movie Genre: count {len(result)}')
+        logger.info(f'Final Movie Genre for user {user_id}: count {len(result)}')
         for movies_genre in result:
             logger.info(f'Movie: {movies_genre.title}, Genres: {movies_genre.genres}')
 

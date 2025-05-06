@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_budget_counter import MovieBudgetCounter
@@ -11,30 +10,38 @@ logger = logging.getLogger(__name__)
 
 class CountryBudgetLogic(BaseCounterLogic):
     def __init__(self):
-        self.country_budgets = defaultdict(int)
+        self.country_budgets: dict[int, dict[str, int]] = {}
         logger.info('CountryBudgetLogic initialized.')
 
     def process_message(self, message: Message):
         movie_list = message.data
+        user_id = message.user_id
+        partial_result = self.country_budgets.get(user_id, {})
+
         for movie in movie_list:
             production_countries = movie.production_countries
             country = production_countries[0]
             budget = int(movie.budget)
-            self.country_budgets[country] += budget
+            partial_result[country] = partial_result.get(country, 0) + budget
+
+        self.country_budgets[user_id] = partial_result
 
     def message_result(self, user_id: int) -> Message:
-        result = [MovieBudgetCounter(k, v) for k, v in self.country_budgets.items()]
+        result = [
+            MovieBudgetCounter(k, v) for k, v in self.country_budgets[user_id].items()
+        ]
         logger.info(f'Se mando: {result}')
         return Message(user_id, MessageType.MovieBudgetCounter, result)
 
-    def log_final_results(self):
+    def log_final_results(self, user_id: int):
+        result = self.country_budgets.get(user_id, {})
         logger.info('--- Final Country Budget Counts ---')
-        if not self.country_budgets:
+        if not result:
             logger.info('No country budgets were counted.')
             return
 
         sorted_countries = sorted(
-            self.country_budgets.items(), key=lambda item: item[1], reverse=True
+            result.items(), key=lambda item: item[1], reverse=True
         )
 
         logger.info('Top 5 Countries by Total Budget Invested (Single Production):')
