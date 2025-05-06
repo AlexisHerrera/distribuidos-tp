@@ -22,8 +22,8 @@ services:
       - testing_net
 
   
-  client-1:
-    container_name: client-1
+  client1:
+    container_name: client1
     build:
       context: .
       dockerfile: src/client/Dockerfile
@@ -35,6 +35,7 @@ services:
         ".data/ratings.csv",
         ".data/credits.csv",
       ]
+    image: client:latest
     environment:
       - SERVER_HOST=cleaner
       - SERVER_PORT=12345
@@ -42,33 +43,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
-      - ./.results:/app/.results
-    depends_on:
-      cleaner:
-        condition: service_started
-
-  client-2:
-    container_name: client-2
-    build:
-      context: .
-      dockerfile: src/client/Dockerfile
-    command:
-      [
-        "python",
-        "src/client/main.py",
-        ".data/movies_metadata.csv",
-        ".data/ratings.csv",
-        ".data/credits.csv",
-      ]
-    environment:
-      - SERVER_HOST=cleaner
-      - SERVER_PORT=12345
-      - BATCH_SIZE=20
-    networks:
-      - testing_net
-    volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
