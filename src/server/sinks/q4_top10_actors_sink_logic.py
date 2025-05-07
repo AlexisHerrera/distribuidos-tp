@@ -9,38 +9,45 @@ logger = logging.getLogger(__name__)
 
 class Q4Top10ActorsSinkLogic(BaseSinkLogic):
     def __init__(self):
-        self.final_actor_count: dict[str, ActorCount] = {}
+        self.final_actor_count: dict[int, dict[str, ActorCount]] = {}
         logger.info('Q4Top10ActorsSinkLogic initialized.')
 
     def merge_results(self, message: Message):
         result_list: list[ActorCount] = message.data
+        user_id = message.user_id
+        partial_result = self.final_actor_count.get(user_id, {})
+
         for actor_count in result_list:
-            counter = self.final_actor_count.get(actor_count.actor_name)
+            counter = partial_result.get(actor_count.actor_name)
 
             if counter is None:
                 counter = actor_count
             else:
                 counter.count += actor_count.count
 
-            self.final_actor_count[actor_count.actor_name] = counter
+            partial_result[actor_count.actor_name] = counter
+
+        self.final_actor_count[user_id] = partial_result
 
     def message_result(self, user_id: int) -> Message:
-        sorted_top10_actors = self._obtain_sorted_top10_actors()
+        sorted_top10_actors = self._obtain_sorted_top10_actors(user_id)
         logger.info(f'TOP 10: {sorted_top10_actors}')
         return Message(user_id, MessageType.ActorCount, sorted_top10_actors)
 
-    def _obtain_sorted_top10_actors(self) -> list[ActorCount]:
-        logger.info('--- Sink: Final Global TOP 10 Actors Counts ---')
+    def _obtain_sorted_top10_actors(self, user_id: int) -> list[ActorCount]:
+        logger.info(f'--- Sink: Final Global TOP 10 Actors Counts for {user_id} ---')
+
+        result = self.final_actor_count.pop(user_id, {})
 
         top10: list[ActorCount] = []
 
-        if not self.final_actor_count:
+        if not result:
             logger.info('No actors count aggregated.')
             return top10
 
         try:
             sorted_top10_actors = sorted(
-                self.final_actor_count.items(),
+                result.items(),
                 key=lambda item: (-item[1].count, item[1].actor_name),
             )
 

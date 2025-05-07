@@ -11,8 +11,8 @@ class BaseCounterLogic(ABC):
     def message_result(self, user_id: int) -> Message:
         pass
 
-    def log_final_results(self):
-        results = self.message_result()
+    def log_final_results(self, user_id):
+        results = self.message_result(user_id)
         logger.info('--- Final Counter Results ---')
         logger.info(f'{type(self).__name__} Results:\n{results}')
         logger.info('-----------------------------')
