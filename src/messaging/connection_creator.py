@@ -35,15 +35,16 @@ class ConnectionCreator:
 
     @staticmethod
     def create_multipublisher(config: Config) -> MultiPublisherConnection:
-        broker = RabbitMQBroker(config.rabbit_host)
+        broker_cons = RabbitMQBroker(config.rabbit_host)
+        broker_pub = RabbitMQBroker(config.rabbit_host)
 
         consumers_config = config.consumers
 
         if len(consumers_config) > 0:
             if consumers_config[0]['type'] == 'broadcast':
-                consumer = BroadcastConsumer(broker, consumers_config[0]['queue'])
+                consumer = BroadcastConsumer(broker_cons, consumers_config[0]['queue'])
             else:
-                consumer = NamedQueueConsumer(broker, consumers_config[0]['queue'])
+                consumer = NamedQueueConsumer(broker_cons, consumers_config[0]['queue'])
 
         publishers = {}
 
@@ -52,10 +53,10 @@ class ConnectionCreator:
             msg_type = MessageType(p['msg_type'])
 
             if p['type'] == 'broadcast':
-                publisher = BroadcastPublisher(broker, queue_name)
+                publisher = BroadcastPublisher(broker_pub, queue_name)
             else:
-                publisher = DirectPublisher(broker, queue_name)
+                publisher = DirectPublisher(broker_pub, queue_name)
 
             publishers[msg_type] = publisher
 
-        return MultiPublisherConnection(broker, publishers, consumer)
+        return MultiPublisherConnection(broker_cons, broker_pub, publishers, consumer)
