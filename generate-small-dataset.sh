@@ -16,7 +16,7 @@ RATINGS_FILE=ratings.csv
 create_small_file() {
     local filename=$1
     local total_lines=$(wc -l < ${DIR_WHOLE_DATA}/${filename})
-    local small_file_lines=$((total_lines / PERCENTAGE))
+    local small_file_lines=$(((total_lines * $PERCENTAGE) / 100))
     head -n ${small_file_lines} ${DIR_WHOLE_DATA}/${filename} > ${DIR_SMALL}/${filename}
 }
 
