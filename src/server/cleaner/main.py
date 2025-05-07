@@ -233,21 +233,7 @@ class Cleaner:
             'Result processing thread started. Waiting for messages from queue...'
         )
         try:
-            while self.is_running:
-                try:
-                    self.connection.recv(self._process_message_from_queue)
-
-                except Exception as e:
-                    if self.is_running:
-                        logger.error(
-                            f'Error in message queue recv loop: {e}', exc_info=True
-                        )
-                        if isinstance(e, (KeyboardInterrupt, SystemExit)):
-                            raise
-                        break
-                    else:
-                        logger.info('Message queue recv loop exiting due to shutdown.')
-                        break
+            self.connection.recv(self._process_message_from_queue)
         except Exception as e:
             if self.is_running:
                 logger.critical(
