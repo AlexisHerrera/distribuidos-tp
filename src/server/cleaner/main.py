@@ -1,10 +1,12 @@
 import logging
 import os
+import queue
 import signal
 import socket
 import sys
 import threading
 from collections import defaultdict
+from queue import Queue
 
 from src.common.protocol.batch import Batch, BatchType
 from src.common.socket_communication import (
@@ -28,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 class Cleaner:
     def __init__(self, config: Config):
-        self.results_processing_thread = None
         logger.info('Initializing Cleaner...')
         self.config = config
         self.is_running = True
@@ -39,6 +40,14 @@ class Cleaner:
         self.client_data_lock = threading.Lock()
         self.next_user_id = 0
         self.user_id_lock = threading.Lock()
+        # Sender Thread
+        self.send_queue: Queue[tuple[int, bytes]] = queue.Queue()
+        self.sender_thread = threading.Thread(
+            target=self._send_loop, name='SenderThread', daemon=True
+        )
+        self.results_processing_thread = threading.Thread(
+            target=self._receive_results_loop, name='ResultsQueueThread', daemon=True
+        )
 
         try:
             self.port = int(os.getenv('SERVER_PORT', '12345'))
@@ -266,71 +275,69 @@ class Cleaner:
         if not client_info:
             if message.message_type != MessageType.EOF:
                 logger.warning(
-                    f'[N/A User] Received message for unknown or disconnected user_id: {user_id}, type: {message.message_type.name}. Cannot deliver.'
+                    f'[N/A User] Received message for unknown or disconnected user_id: '
+                    f'{user_id}, type: {message.message_type.name}. Cannot deliver.'
                 )
             else:
                 logger.debug(
-                    f'[N/A User] Received EOF for user_id: {user_id} not currently active or already cleaned up.'
+                    f'[N/A User] Received EOF for user_id: {user_id} not active or already cleaned up.'
                 )
             return
-
-        client_socket = client_info['socket']
-        client_specific_lock = client_info['lock']
 
         if message.message_type == MessageType.EOF:
             logger.debug(
-                f'[{user_id}] Received an EOF from processing queue for user. Not a query result.'
+                f'[{user_id}] Received EOF from processing queue. Not a query result.'
             )
             return
 
-        logger.info(f'[{user_id}] Received query result: {message.message_type.name}')
+        code = {
+            MessageType.Movie: 'Q1 (Movie)',
+            MessageType.MovieBudgetCounter: 'Q2 (MovieBudgetCounter)',
+            MessageType.MovieRatingAvg: 'Q3 (MovieRatingAvg)',
+            MessageType.ActorCount: 'Q4 (ActorCount)',
+            MessageType.MovieAvgBudget: 'Q5 (MovieAvgBudget)',
+        }.get(message.message_type, f'Undefined ({message.message_type.name})')
 
-        try:
-            payload = message.to_bytes()
-            send_message(client_socket, payload)
-        except (socket.error, ConnectionResetError, BrokenPipeError) as e:
-            logger.error(
-                f'[{user_id}] Failed to send message to client (socket error: {e}). Client might have disconnected.',
-                exc_info=False,
-            )
-            self._cleanup_client(user_id)
-            return
-        except Exception as e:
-            logger.error(
-                f'[{user_id}] Failed to send message to client (unexpected error: {e}). Cleaning up client.',
-                exc_info=True,
-            )
-            self._cleanup_client(user_id)
-            return
+        logger.info(f'[{user_id}] Received query result: {code}')
 
-        with client_specific_lock:
-            client_info['queries_received'] += 1
-            queries_received_count = client_info['queries_received']
+        payload = message.to_bytes()
+        self.send_queue.put((user_id, payload))
 
-            log_msg_parts = [
-                f'[{user_id}] Query result {queries_received_count}/{self.expected_query_count} sent to client:'
-            ]
-            if message.message_type == MessageType.Movie:
-                log_msg_parts.append('Q1 (Movie)')
-            elif message.message_type == MessageType.MovieBudgetCounter:
-                log_msg_parts.append('Q2 (MovieBudgetCounter)')
-            elif message.message_type == MessageType.MovieRatingAvg:
-                log_msg_parts.append('Q3 (MovieRatingAvg)')
-            elif message.message_type == MessageType.ActorCount:
-                log_msg_parts.append('Q4 (ActorCount)')
-            elif message.message_type == MessageType.MovieAvgBudget:
-                log_msg_parts.append('Q5 (MovieAvgBudget)')
-            else:
-                log_msg_parts.append(
-                    f'Undefined query result ({message.message_type.name})'
+        logger.info(f'[{user_id}] Enqueued {code} for sending')
+
+    def _send_loop(self):
+        while self.is_running or not self.send_queue.empty():
+            try:
+                user_id, payload = self.send_queue.get(timeout=1)
+            except queue.Empty:
+                continue
+
+            with self.client_data_lock:
+                client_info = self.client_data.get(user_id)
+            if not client_info:
+                logger.debug(
+                    f'[{user_id}] Client disconnected before sending query result'
                 )
-            logger.info(' '.join(log_msg_parts))
+                self.send_queue.task_done()
+                continue
 
-            if queries_received_count >= self.expected_query_count:
-                logger.info(
-                    f'[{user_id}] All {self.expected_query_count} query results sent to client. Finalizing and closing connection.'
-                )
-                self._cleanup_client(user_id)
+            client_socket = client_info['socket']
+            client_lock = client_info['lock']
+
+            with client_lock:
+                try:
+                    logger.info(f'[{user_id}] Sending query result to client.')
+                    send_message(client_socket, payload)
+                    client_info['queries_received'] += 1
+                    if client_info['queries_received'] >= self.expected_query_count:
+                        self._cleanup_client(user_id)
+                except Exception as e:
+                    logger.error(
+                        f'[{user_id}] Error sending query result: {e}', exc_info=True
+                    )
+                    self._cleanup_client(user_id)
+                finally:
+                    self.send_queue.task_done()
 
     def _handle_single_client(self, client_socket, client_address):
         user_id = self.generate_user_id()
@@ -457,13 +464,10 @@ class Cleaner:
         if not self._setup_server_socket():
             logger.critical('Failed to setup server socket. Cleaner cannot run.')
             return
-
-        self.results_processing_thread = threading.Thread(
-            target=self._receive_results_loop, daemon=True
-        )
-        self.results_processing_thread.name = 'ResultsQueueThread'
         self.results_processing_thread.start()
         logger.info('Results processing thread has been started.')
+        self.sender_thread.start()
+        logger.info('Sender thread has been started.')
 
         logger.info(
             f'Cleaner server running on port {self.port}. Waiting for client connections...'
