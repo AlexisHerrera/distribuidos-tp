@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 from typing import Tuple
 
 from src.messaging.protocol.message import Message, MessageType
@@ -12,31 +11,38 @@ logger = logging.getLogger(__name__)
 
 class Q5SentimentAvgBudgetRevenueSinkLogic(BaseSinkLogic):
     def __init__(self):
-        self._stats: dict[str, dict[str, float]] = defaultdict(
-            lambda: {'sum': 0.0, 'count': 0}
-        )
+        self._stats: dict[int, dict[str, dict[str, float]]] = {}
         logger.info('Q5SentimentAvgBudgetRevenueSinkLogic initialized.')
 
     def merge_results(self, message: Message) -> None:
         list_movie_sentiments: list[MovieSentiment] = message.data
+        user_id = message.user_id
+        partial_result = self._stats.get(user_id, {})
+
         for ms in list_movie_sentiments:
             if ms.budget:
                 ratio = ms.revenue / ms.budget
-                stats = self._stats[ms.sentiment]
+                stats = partial_result.get(ms.sentiment, {'sum': 0.0, 'count': 0})
                 stats['sum'] += ratio
                 stats['count'] += 1
+                partial_result[ms.sentiment] = stats
             else:
                 logger.warning(f'Movie id={ms.id} tiene budget=0, se omite ratio.')
 
-    def _obtain_avg_budget_revenue(self) -> Tuple[float, float]:
-        pos = self._stats.get('POSITIVE', {'sum': 0.0, 'count': 0})
-        neg = self._stats.get('NEGATIVE', {'sum': 0.0, 'count': 0})
+        self._stats[user_id] = partial_result
+
+    def _obtain_avg_budget_revenue(self, user_id: int) -> Tuple[float, float]:
+        result = self._stats.pop(user_id, {})
+        pos = result.get('POSITIVE', {'sum': 0.0, 'count': 0})
+        neg = result.get('NEGATIVE', {'sum': 0.0, 'count': 0})
+
         avg_pos = pos['sum'] / pos['count'] if pos['count'] else 0.0
         avg_neg = neg['sum'] / neg['count'] if neg['count'] else 0.0
+
         return avg_pos, avg_neg
 
     def message_result(self, user_id: int) -> Message:
-        avg_pos, avg_neg = self._obtain_avg_budget_revenue()
+        avg_pos, avg_neg = self._obtain_avg_budget_revenue(user_id)
         logger.info(f'Averages by sentiment - POSITIVE: {avg_pos}, NEGATIVE: {avg_neg}')
         result = MovieAvgBudget(positive=avg_pos, negative=avg_neg)
         return Message(user_id, MessageType.MovieAvgBudget, result)
