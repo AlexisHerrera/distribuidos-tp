@@ -74,6 +74,32 @@ services:
       cleaner:
         condition: service_started
 
+  client-2:
+    container_name: client-2
+    build:
+      context: .
+      dockerfile: src/client/Dockerfile
+    command:
+      [
+        "python",
+        "src/client/main.py",
+        ".data/movies_metadata.csv",
+        ".data/ratings.csv",
+        ".data/credits.csv",
+      ]
+    environment:
+      - SERVER_HOST=cleaner
+      - SERVER_PORT=12345
+      - BATCH_SIZE=20
+    networks:
+      - testing_net
+    volumes:
+      - ./.data:/app/.data
+      - ./.results:/app/.results
+    depends_on:
+      cleaner:
+        condition: service_started
+
   cleaner:
     container_name: cleaner
     build:
