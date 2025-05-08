@@ -25,7 +25,7 @@ class GenericJoinerNode(BaseNode):
     def __init__(self, config: Config, counter_type: str):
         super().__init__(config, counter_type)
         logger.info(f"GenericJoinerNode '{counter_type}' initialized.")
-        self._base_loaded = threading.Event()
+        self._base_loaded_events: Dict[int, threading.Event] = {}
         threading.Thread(target=self._thread_load_base, daemon=True).start()
 
     def _thread_load_base(self):
@@ -34,27 +34,29 @@ class GenericJoinerNode(BaseNode):
         logger.info(f'LOAD BASE DATA FROM QUEUE: {queue_name} and exchange {exchange}')
         broker = RabbitMQBroker(self.config.rabbit_host)
         consumer = BroadcastConsumer(broker, exchange, queue_name)
-        data: dict[int, Any] = {}
+        base_data_local: dict[int, dict[int, Any]] = {}
 
         def on_msg(msg: Message):
+            user_id = msg.user_id
             if msg.message_type == MessageType.EOF:
                 logger.info('BASE_DB EOF received')
-                broker.basic_cancel(consumer.tag)
-                broker.close()
-                self.logic.base_data[msg.user_id] = data
-                self._base_loaded.set()
+                self.logic.base_data[user_id] = base_data_local.get(user_id, {})
+                event = self._base_loaded_events.setdefault(user_id, threading.Event())
+                event.set()
             else:
                 movies: list[Movie] = msg.data
+                bucket = base_data_local.setdefault(user_id, {})
                 for movie in movies:
-                    data[movie.id] = movie
-                logger.info(f'saved {len(movies)}')
+                    bucket[movie.id] = movie
+                logger.info(f'saved {len(movies)} movies for user {user_id}')
 
         consumer.basic_consume(broker, on_msg)
         consumer.start_consuming(broker, on_msg)
         logger.info('Start consuming db')
 
     def process_message(self, message: Message):
-        self._base_loaded.wait()
+        event = self._base_loaded_events.setdefault(message.user_id, threading.Event())
+        event.wait()
         super().process_message(message)
 
     def handle_message(self, message: Message):
