@@ -4,19 +4,20 @@ from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_rating import MovieRating
 from src.model.movie_rating_count import MovieRatingCount
 from src.server.counters.base_counter_logic import BaseCounterLogic
+from src.utils.safe_dict import SafeDict
 
 logger = logging.getLogger(__name__)
 
 
 class RatingCounterLogic(BaseCounterLogic):
     def __init__(self):
-        self.ratings: dict[int, dict[int, MovieRatingCount]] = {}
+        self.ratings = SafeDict()
         logger.info('RatingCounterLogic initialized.')
 
     def process_message(self, message: Message):
         movie_rating: list[MovieRating] = message.data
         user_id = message.user_id
-        partial_result = self.ratings.get(user_id, {})
+        partial_result: dict[int, MovieRatingCount] = self.ratings.get(user_id, {})
 
         for movie in movie_rating:
             counter = partial_result.get(
@@ -31,20 +32,19 @@ class RatingCounterLogic(BaseCounterLogic):
 
             partial_result[movie.movie_id] = counter
 
-        self.ratings[user_id] = partial_result
+        self.ratings.set(user_id, partial_result)
 
     def message_result(self, user_id: int) -> Message:
+        user_result = self.ratings.pop(user_id, {})
         result = []
         self.log_final_results(user_id)
-        for v in self.ratings[user_id].values():
+        for v in user_result.values():
             result.append(v)
-
-        self.ratings.pop(user_id, None)  # Drop silently
 
         return Message(user_id, MessageType.MovieRatingCounter, result)
 
     def log_final_results(self, user_id: int):
-        result = self.ratings.get(user_id, {})
+        result: dict[int, MovieRatingCount] = self.ratings.get(user_id, {})
         logger.info(f'--- Final Rating Counts for {user_id} ---')
         if not result:
             logger.info('No country budgets were counted.')
