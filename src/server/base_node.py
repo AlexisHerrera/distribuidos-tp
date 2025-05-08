@@ -10,6 +10,7 @@ from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
 from src.server.leader_election import LeaderElection
 from src.utils.config import Config
+from src.utils.eof_tracker import EOFTracker
 from src.utils.log import initialize_log
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ class BaseNode(ABC):
 
             if isinstance(peers, list) and peers and port_str is not None:
                 self.leader = LeaderElection(config, self)
+                self.eof_tracker = EOFTracker()
             else:
                 logger.info(
                     'Single-node configuration detected (peers list empty/missing or port missing). LeaderElection component will not be used.'
@@ -115,9 +117,21 @@ class BaseNode(ABC):
         except Exception as e:
             logger.error(f'Error sending final counter results: {e}', exc_info=True)
 
+    def wait_for_last_user_message(self, user_id: int, is_leader: bool):
+        # If there's more than one node and this is not the leader
+        if self.leader and not is_leader:
+            self.eof_tracker.add(user_id)
+            if self.eof_tracker.wait(user_id):
+                logger.info(f'Processed last message from {user_id}')
+            else:
+                logger.info(f'Message for {user_id} timeout')
+
     def process_message(self, message: Message):
         with self.completed_user_ids_lock:
             if message.user_id in self.completed_user_ids:
+                if self.leader:
+                    state = self.leader._get_or_create_client_state()
+                    logger.warning(f'{state}')
                 logger.warning(
                     f'Ignoring message for completed user_id: {message.user_id}'
                 )
@@ -135,20 +149,17 @@ class BaseNode(ABC):
                 self.leader.handle_incoming_eof(message.user_id)
             else:
                 # Single-Node
-                logger.info(
-                    f'User {message.user_id}: Single-node mode, finalizing directly.'
-                )
-                finalize_thread = threading.Thread(
-                    target=self._finalize_single_node,
-                    args=(message.user_id,),
-                    daemon=True,
-                )
-                finalize_thread.start()
+                self._finalize_single_node(message.user_id)
             return
         try:
             self.handle_message(message)
+            self._handle_last_message(message.user_id)
         except Exception as e:
             logger.error(f'Error en handle_message: {e}', exc_info=True)
+
+    def _handle_last_message(self, user_id: int):
+        if self.leader:
+            self.eof_tracker.set(user_id)
 
     def _finalize_single_node(self, user_id: int):
         logger.info(f'User {user_id}: Single-node waiting for executor tasks...')

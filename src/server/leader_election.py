@@ -1,6 +1,7 @@
 import logging
 import socket
 import threading
+
 from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
@@ -103,9 +104,13 @@ class LeaderElection:
         self.node.wait_for_executor()
         logger.info(f'User {user_id}: Executor tasks finished.')
 
+        is_leader = state['is_leader']
+
+        self.node.wait_for_last_user_message(user_id, is_leader)
+
         self.node.send_final_results(user_id)
 
-        if state['is_leader']:
+        if is_leader:
             wait_successful = self.wait_for_done(user_id, timeout=60)
             if wait_successful:
                 logger.info(

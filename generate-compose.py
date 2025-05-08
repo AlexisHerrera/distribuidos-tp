@@ -35,6 +35,8 @@ class Config:
 
         if 'all' in self.__dict__ and self.all is not None and self.all > 0:
             for k in self.__dict__.keys():
+                if k == 'clients':
+                    continue
                 self.__dict__[k] = self.all
 
 
