@@ -120,8 +120,6 @@ class BaseNode(ABC):
     def wait_for_last_user_message(self, user_id: int, is_leader: bool):
         # If there's more than one node and this is not the leader
         if self.leader and not is_leader:
-            # with self.completed_user_ids_lock:
-            #     self.completed_user_ids.add(user_id)
             self.eof_tracker.add(user_id)
             if self.eof_tracker.wait(user_id):
                 logger.info(f'Processed last message from {user_id}')
@@ -132,6 +130,9 @@ class BaseNode(ABC):
         # TODO: IF IT FAILS CHECK THIS
         with self.completed_user_ids_lock:
             if message.user_id in self.completed_user_ids:
+                if self.leader:
+                    state = self.leader._get_or_create_client_state()
+                    logger.warning(f'{state}')
                 logger.warning(
                     f'Ignoring message for completed user_id: {message.user_id}'
                 )
@@ -150,15 +151,6 @@ class BaseNode(ABC):
             else:
                 # Single-Node
                 self._finalize_single_node(message.user_id)
-                # logger.info(
-                #     f'User {message.user_id}: Single-node mode, finalizing directly.'
-                # )
-                # finalize_thread = threading.Thread(
-                #     target=self._finalize_single_node,
-                #     args=(message.user_id,),
-                #     daemon=True,
-                # )
-                # finalize_thread.start()
             return
         try:
             self.handle_message(message)

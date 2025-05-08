@@ -2,7 +2,7 @@ from threading import Event, Lock
 
 
 class EOFTracker:
-    TIMEOUT = 2.0
+    TIMEOUT = 5.0
 
     def __init__(self):
         self.user_lock = Lock()

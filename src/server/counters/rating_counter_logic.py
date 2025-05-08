@@ -35,9 +35,9 @@ class RatingCounterLogic(BaseCounterLogic):
         self.ratings.set(user_id, partial_result)
 
     def message_result(self, user_id: int) -> Message:
+        self.log_final_results(user_id)
         user_result = self.ratings.pop(user_id, {})
         result = []
-        self.log_final_results(user_id)
         for v in user_result.values():
             result.append(v)
 
@@ -47,7 +47,7 @@ class RatingCounterLogic(BaseCounterLogic):
         result: dict[int, MovieRatingCount] = self.ratings.get(user_id, {})
         logger.info(f'--- Final Rating Counts for {user_id} ---')
         if not result:
-            logger.info('No country budgets were counted.')
+            logger.info('No rating were counted.')
             return
 
         for rating in result.values():
