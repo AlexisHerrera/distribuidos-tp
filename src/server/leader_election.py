@@ -125,6 +125,7 @@ class LeaderElection:
 
         with self.client_states_lock:
             state['status'] = 'done'
+            state['waiting_for_eof'] = False
 
     def _on_done(self, user_id: int):
         state = self.get_or_create_client_state(user_id)

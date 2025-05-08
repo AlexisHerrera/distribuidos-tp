@@ -115,10 +115,11 @@ class BaseNode(ABC):
     def process_message(self, message: Message):
         if message.message_type == MessageType.EOF:
             user_id = message.user_id
-            logger.info(f'[{user_id}] RECEIVED EOF FROM QUEUE')
             if not self.leader_election:
                 # Single-node
-                logger.info(f'[{user_id}] Single-node, finishing single client.')
+                logger.info(
+                    f'[{user_id}] EOF Received in Single-node, finishing single client.'
+                )
                 threading.Thread(
                     target=self._finalize_single_node, args=(user_id,), daemon=True
                 ).start()
@@ -127,14 +128,14 @@ class BaseNode(ABC):
             state = self.leader_election.get_or_create_client_state(user_id)
 
             if state['is_leader'] is None:
-                logger.debug(f'[{user_id}] I am the LEADER, handling EOF')
+                logger.info(f'[{user_id}] RECEIVED EOF - I am the LEADER')
                 self.leader_election.handle_incoming_eof(user_id)
             else:
                 if not state['is_leader'] and state['waiting_for_eof']:
-                    logger.debug(f'[{user_id}] I am FOLLOWER, SENDING DONE')
+                    logger.info(f'[{user_id}] RECEIVED EOF - I am a FOLLOWER')
                     self.leader_election._finalize_client(user_id)
                 else:
-                    logger.debug(
+                    logger.info(
                         f'[{user_id}] EOF Ignored - I am the Leader or not waiting for EOF'
                     )
             return
@@ -147,7 +148,17 @@ class BaseNode(ABC):
         logger.info(f'[{user_id}] Single-node waiting for executor tasks...')
         self.wait_for_executor()
         logger.info(f'[{user_id}] Single-node executor finished.')
+        if not self.leader_election:
+            import time
 
+            # Ajusta este valor según sea necesario. Debería ser suficiente
+            # para cubrir la latencia típica de tus mensajes de datos de followers.
+            SINK_EOF_GRACE_PERIOD_SECONDS = 1  # o 1.0 segundos, por ejemplo
+            logger.info(
+                f'[{user_id}] Sink EOF grace period: waiting {SINK_EOF_GRACE_PERIOD_SECONDS}s for potential straggler messages...'
+            )
+            time.sleep(SINK_EOF_GRACE_PERIOD_SECONDS)
+            logger.info(f'[{user_id}] Sink EOF grace period ended.')
         self.send_final_results(user_id)
 
         logger.info(f'[{user_id}] Single-node propagating EOF.')
@@ -194,11 +205,13 @@ class BaseNode(ABC):
 
     def propagate_eof(self, user_id: int):
         try:
-            logger.info('Propagating EOF to next stage...')
+            logger.info(f'[{user_id}] Propagating EOF to next stage...')
             eof_message = Message(user_id, MessageType.EOF, None)
             self.connection.thread_safe_send(eof_message)
 
-            logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')
+            logger.info(
+                f'[{user_id}] EOF SENT to queue {self.config.publishers[0]["queue"]}'
+            )
         except Exception as e:
             logger.error(f'Could not publish EOF: {e}')
 

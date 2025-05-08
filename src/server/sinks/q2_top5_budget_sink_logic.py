@@ -17,6 +17,7 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
     def merge_results(self, message: Message):
         movie_budget_counters: list[MovieBudgetCounter] = message.data
         user_id = message.user_id
+        logger.info(f'[{user_id}] Processing {len(movie_budget_counters)} budgets')
         partial_result: dict[str, MovieBudgetCounter] = self.final_budgets.get(
             user_id, {}
         )

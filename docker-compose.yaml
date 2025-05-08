@@ -42,33 +42,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
-      - ./.results:/app/.results
-    depends_on:
-      cleaner:
-        condition: service_started
-
-  client-2:
-    container_name: client-2
-    build:
-      context: .
-      dockerfile: src/client/Dockerfile
-    command:
-      [
-        "python",
-        "src/client/main.py",
-        ".data/movies_metadata.csv",
-        ".data/ratings.csv",
-        ".data/credits.csv",
-      ]
-    environment:
-      - SERVER_HOST=cleaner
-      - SERVER_PORT=12345
-      - BATCH_SIZE=20
-    networks:
-      - testing_net
-    volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -409,7 +383,24 @@ services:
     environment:
       - NODE_ID=cast_splitter-1
       - PORT=6009
-      - PEERS=
+      - PEERS=cast_splitter-2:6009
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/splitters/config.yaml:/app/config.yaml
+  cast_splitter-2:
+    container_name: cast_splitter-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/splitters/main.py", "cast_splitter"]
+    environment:
+      - NODE_ID=cast_splitter-2
+      - PORT=6009
+      - PEERS=cast_splitter-1:6009
     networks:
       - testing_net
     depends_on:
