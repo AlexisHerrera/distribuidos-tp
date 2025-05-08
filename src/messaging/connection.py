@@ -11,10 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 class Connection:
-    def __init__(self, broker: Broker, publisher: Publisher, consumer: Consumer):
+    def __init__(
+        self,
+        broker: Broker,
+        publisher: Publisher,
+        consumer: Consumer,
+        eof_publisher: Publisher | None = None,
+        eof_consumer: Consumer | None = None,
+    ):
         self.__broker = broker
         self.__publisher = publisher
         self.__consumer = consumer
+        self.eof_publisher = eof_publisher
+        self.__eof_consumer = eof_consumer
         self.consumer_tag = None
 
     def send(self, message: Message):
@@ -29,8 +38,19 @@ class Connection:
         else:
             _publish()
 
+    def broadcast_eof(self, message: Message):
+        def _publish():
+            self.eof_publisher.put(self.__broker, message)
+
+        if hasattr(self.__broker, 'add_callback_threadsafe'):
+            self.__broker.add_callback_threadsafe(_publish)
+        else:
+            _publish()
+
     def recv(self, callback: Callable[[Message], None]):
         self.consumer_tag = self.__consumer.basic_consume(self.__broker, callback)
+        if self.__eof_consumer:
+            self.__eof_consumer.basic_consume(self.__broker, callback)
         self.__consumer.start_consuming(self.__broker, callback)
 
     def close(self):

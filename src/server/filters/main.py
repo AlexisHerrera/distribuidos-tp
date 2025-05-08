@@ -65,7 +65,7 @@ class FilterNode(BaseNode):
                     self.connection.send(
                         Message(message.user_id, MessageType.Movie, movies)
                     )
-                    logger.info(f'Se enviaron {len(movies)}')
+                    logger.info(f'[{message.user_id}] Se enviaron {len(movies)}')
                 except Exception as e:
                     logger.error(
                         f'Error Publishing movies: {e}',

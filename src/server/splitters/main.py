@@ -48,7 +48,7 @@ class SplitterNode(BaseNode):
                     self.connection.send(
                         Message(message.user_id, MessageType.ActorCount, list_to_send)
                     )
-                    logger.info(f'Se enviaron {len(list_to_send)}')
+                    logger.info(f'[{message.user_id}] Se enviaron {len(list_to_send)}')
                 except Exception as e:
                     logger.error(
                         f'Error Publishing movies: {e}',

@@ -1,6 +1,8 @@
 import logging
 import socket
 import threading
+
+from src.messaging.protocol.message import Message, MessageType
 from src.utils.config import Config
 
 logger = logging.getLogger(__name__)
@@ -54,7 +56,7 @@ class LeaderElection:
                 conn.close()
         self._sock.close()
 
-    def _get_or_create_client_state(self, user_id: int):
+    def get_or_create_client_state(self, user_id: int):
         with self.client_states_lock:
             if user_id not in self.client_states:
                 self.client_states[user_id] = {
@@ -64,32 +66,36 @@ class LeaderElection:
                     'done_event': threading.Event(),
                     'done_count': 0,
                     'peers_notified_eof': False,
+                    'waiting_for_eof': False,
                 }
             return self.client_states[user_id]
 
     def handle_incoming_eof(self, user_id: int):
-        state = self._get_or_create_client_state(user_id)
+        """Only leader should call this method."""
+        state = self.get_or_create_client_state(user_id)
 
         with self.client_states_lock:
             state['status'] = 'eof_received'
             if state['is_leader'] is None:
                 state['is_leader'] = True
                 state['leader_addr'] = (self.node_id, self.port)
-                logger.info(f'Node {self.node_id} is the LEADER for user_id {user_id}')
+                logger.info(f'[{user_id}] Node {self.node_id} is the LEADER')
             else:
                 logger.warning(
                     f'Node {self.node_id} already received an EOF for {user_id}'
                 )
 
-            if not state['peers_notified_eof']:
-                payload = f'EOF|{self.node_id}|{self.port}|{user_id}'.encode()
-                self.notify_peers(payload)
-                state['peers_notified_eof'] = True
-                self._trigger_finalization_logic(user_id)
-            else:
-                logger.warning(
-                    f'Already notified peers of EOF for {user_id}, not doing anything else'
-                )
+            if state['peers_notified_eof']:
+                logger.warning(f'Peers already notified for {user_id}, nothing to do')
+                return
+            # Notify peers only if this is the first EOF received
+            payload = f'EOF|{self.node_id}|{self.port}|{user_id}'.encode()
+            self.notify_peers(payload)
+            state['peers_notified_eof'] = True
+        # Broadcast EOF to local nodes
+        eof_msg = Message(user_id, MessageType.EOF, None)
+        self.node.connection.broadcast_eof(eof_msg)
+        self._trigger_finalization_logic(user_id)
 
     def _trigger_finalization_logic(self, user_id: int):
         threading.Thread(
@@ -97,7 +103,7 @@ class LeaderElection:
         ).start()
 
     def _finalize_client(self, user_id: int):
-        state = self._get_or_create_client_state(user_id)
+        state = self.get_or_create_client_state(user_id)
         logger.info(f'User {user_id}: Starting finalization process.')
         logger.info(f'User {user_id}: Waiting for executor tasks to finish...')
         self.node.wait_for_executor()
@@ -108,9 +114,7 @@ class LeaderElection:
         if state['is_leader']:
             wait_successful = self.wait_for_done(user_id, timeout=60)
             if wait_successful:
-                logger.info(
-                    f'User {user_id}: All followers DONE (or none required); propagating EOF downstream'
-                )
+                logger.info(f'[{user_id}] All followers DONE')
                 self.node.propagate_eof(user_id)
             else:
                 logger.error(
@@ -124,7 +128,7 @@ class LeaderElection:
             state['status'] = 'done'
 
     def _on_done(self, user_id: int):
-        state = self._get_or_create_client_state(user_id)
+        state = self.get_or_create_client_state(user_id)
         with self.client_states_lock:
             if not state['is_leader']:
                 logger.warning(
@@ -140,19 +144,19 @@ class LeaderElection:
                 state['done_event'].set()
 
     def _on_peer_eof(self, leader_host, leader_port, user_id: int):
-        state = self._get_or_create_client_state(user_id)
+        state = self.get_or_create_client_state(user_id)
         leader_addr = (leader_host, int(leader_port))
         with self.client_states_lock:
             state['status'] = 'eof_received'
             state['is_leader'] = False
             state['leader_addr'] = leader_addr
+            state['waiting_for_eof'] = True
             logger.info(
                 f'Node {self.node_id} is FOLLOWER for user_id {user_id} (peer EOF first)'
             )
-            self._trigger_finalization_logic(user_id)
 
     def wait_for_done(self, user_id: int, timeout=None):
-        state = self._get_or_create_client_state(user_id)
+        state = self.get_or_create_client_state(user_id)
         logger.info(
             f'User {user_id}: Leader waiting for DONE from {self._total_followers} followers...'
         )
@@ -167,7 +171,7 @@ class LeaderElection:
                 logger.error(f'Failed notifying {host}:{port}: {e}')
 
     def send_done(self, user_id: int):
-        state = self._get_or_create_client_state(user_id)
+        state = self.get_or_create_client_state(user_id)
         leader_addr = state.get('leader_addr')
         if not leader_addr:
             logger.error(f'User {user_id}: No leader address known; cannot send DONE')

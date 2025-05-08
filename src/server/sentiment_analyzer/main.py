@@ -21,9 +21,9 @@ class SentimentAnalyzerNode(BaseNode):
         return AVAILABLE_ANALYZER_LOGICS
 
     # def _start_eof_monitor(self):
-    #     if not self.leader.enabled:
+    #     if not self.leader_election.enabled:
     #         return
-    #     self.leader.wait_for_eof()
+    #     self.leader_election.wait_for_eof()
 
     #     logger.info('EOF detected by monitor — waiting for in-flight tasks...')
     #     self.__executor.shutdown(wait=True)

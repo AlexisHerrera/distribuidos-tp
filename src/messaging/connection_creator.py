@@ -5,33 +5,50 @@ from src.messaging.protocol.message import MessageType
 from src.messaging.publisher import BroadcastPublisher, DirectPublisher
 from src.utils.config import Config
 
+EOF_EXCHANGE_PREFIX = 'eof_notify_'
+
 
 class ConnectionCreator:
     @staticmethod
     def create(config: Config) -> Connection:
         broker = RabbitMQBroker(config.rabbit_host)
 
-        consumers_config = config.consumers
+        consumers_cfg = config.consumers[0]
+        queue_name = consumers_cfg['queue']
+        if consumers_cfg['type'] == 'broadcast':
+            consumer = BroadcastConsumer(
+                broker,
+                consumers_cfg['exchange'],
+                queue_name,
+            )
+        else:
+            consumer = NamedQueueConsumer(broker, queue_name)
 
-        if len(consumers_config) > 0:
-            if consumers_config[0]['type'] == 'broadcast':
-                consumer = BroadcastConsumer(
-                    broker,
-                    consumers_config[0]['exchange'],
-                    consumers_config[0]['queue'],
-                )
-            else:
-                consumer = NamedQueueConsumer(broker, consumers_config[0]['queue'])
+        eof_publisher = None
+        eof_consumer = None
+        if config.replicas_enabled:
+            eof_exchange = f'{EOF_EXCHANGE_PREFIX}{queue_name}'
+            broker.exchange_declare(eof_exchange, 'fanout')
+            # Creamos una cola exclusiva para recibir todos los EOF
+            eof_queue = broker.queue_declare('', exclusive=True, durable=False)
+            broker.queue_bind(eof_exchange, eof_queue)
+            # Este consumer escuchará esa cola anónima
+            eof_consumer = BroadcastConsumer(broker, eof_exchange, queue=None)
+            eof_publisher = BroadcastPublisher(broker, eof_exchange)
 
-        publiser_config = config.publishers
+        publishers_cfg = config.publishers[0]
+        if publishers_cfg['type'] == 'broadcast':
+            publisher = BroadcastPublisher(
+                broker,
+                publishers_cfg['queue'],
+            )
+        else:
+            publisher = DirectPublisher(
+                broker,
+                publishers_cfg['queue'],
+            )
 
-        if len(publiser_config) > 0:
-            if publiser_config[0]['type'] == 'broadcast':
-                publisher = BroadcastPublisher(broker, publiser_config[0]['queue'])
-            else:
-                publisher = DirectPublisher(broker, publiser_config[0]['queue'])
-
-        return Connection(broker, publisher, consumer)
+        return Connection(broker, publisher, consumer, eof_publisher, eof_consumer)
 
     @staticmethod
     def create_multipublisher(config: Config) -> MultiPublisherConnection:

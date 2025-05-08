@@ -27,10 +27,7 @@ class BaseNode(ABC):
         # Lock to ensure thread-safe shutdown
         self._shutdown_lock = threading.Lock()
         self.connection = ConnectionCreator.create(config)
-        self.leader = None
-        # Checks if it should continue processing messages
-        self.completed_user_ids = set()
-        self.completed_user_ids_lock = threading.Lock()
+        self.leader_election = None
         # sent results before eof
         self.should_send_results_before_eof = False
         # Threads executor (should be instantiated on node)
@@ -40,12 +37,12 @@ class BaseNode(ABC):
             port_str = getattr(config, 'port', None)
 
             if isinstance(peers, list) and peers and port_str is not None:
-                self.leader = LeaderElection(config, self)
+                self.leader_election = LeaderElection(config, self)
             else:
                 logger.info(
                     'Single-node configuration detected (peers list empty/missing or port missing). LeaderElection component will not be used.'
                 )
-                self.leader = None
+                self.leader_election = None
             self._load_logic()
             self._setup_signal_handlers()
             logger.info(f"BaseNode for '{self.node_type}' initialized.")
@@ -116,34 +113,31 @@ class BaseNode(ABC):
             logger.error(f'Error sending final counter results: {e}', exc_info=True)
 
     def process_message(self, message: Message):
-        with self.completed_user_ids_lock:
-            if message.user_id in self.completed_user_ids:
-                logger.warning(
-                    f'Ignoring message for completed user_id: {message.user_id}'
-                )
-                return
-
         if message.message_type == MessageType.EOF:
-            logger.info(f'RECEIVED EOF FROM QUEUE for user_id: {message.user_id}')
-            with self.completed_user_ids_lock:
-                self.completed_user_ids.add(message.user_id)
-            if self.leader:
-                # Multi-node
-                logger.debug(
-                    f'User {message.user_id}: Delegating EOF to LeaderElection.'
-                )
-                self.leader.handle_incoming_eof(message.user_id)
+            user_id = message.user_id
+            logger.info(f'[{user_id}] RECEIVED EOF FROM QUEUE for user_id')
+            if not self.leader_election:
+                # Single-node
+                logger.info(f'[{user_id}] Single-node, finishing single client.')
+                threading.Thread(
+                    target=self._finalize_single_node, args=(user_id,), daemon=True
+                ).start()
+                return
+            # Multi-node
+            state = self.leader_election.get_or_create_client_state(user_id)
+
+            if state['is_leader'] is None:
+                logger.debug(f'[{user_id}] I am the LEADER, handling EOF')
+                self.leader_election.handle_incoming_eof(user_id)
             else:
-                # Single-Node
-                logger.info(
-                    f'User {message.user_id}: Single-node mode, finalizing directly.'
-                )
-                finalize_thread = threading.Thread(
-                    target=self._finalize_single_node,
-                    args=(message.user_id,),
-                    daemon=True,
-                )
-                finalize_thread.start()
+                if not state['is_leader'] and state.get('waiting_for_eof', False):
+                    logger.debug(f'[{user_id}] I am FOLLOWER, SEND DONE')
+                    self.leader_election.send_done(user_id)
+                else:
+                    logger.debug(
+                        f'[{user_id}] EOF Ignored - I am the Leader or not waiting for EOF'
+                    )
+
             return
         try:
             self.handle_message(message)
@@ -151,15 +145,15 @@ class BaseNode(ABC):
             logger.error(f'Error en handle_message: {e}', exc_info=True)
 
     def _finalize_single_node(self, user_id: int):
-        logger.info(f'User {user_id}: Single-node waiting for executor tasks...')
+        logger.info(f'[{user_id}] Single-node waiting for executor tasks...')
         self.wait_for_executor()
-        logger.info(f'User {user_id}: Single-node executor finished.')
+        logger.info(f'[{user_id}] Single-node executor finished.')
 
         self.send_final_results(user_id)
 
-        logger.info(f'User {user_id}: Single-node propagating EOF.')
+        logger.info(f'[{user_id}] Single-node propagating EOF.')
         self.propagate_eof(user_id)
-        logger.info(f'User {user_id}: Single-node finalization complete.')
+        logger.info(f'[{user_id}] Single-node finalization complete.')
 
     def run(self):
         if not self.is_running():
@@ -193,8 +187,8 @@ class BaseNode(ABC):
                 logging.info('Now closing broker connection...')
                 self.connection.close()
                 logging.info('Connection closed')
-                logger.info('Stopping leader election...')
-                self.leader.stop()
+                logger.info('Stopping leader_election election...')
+                self.leader_election.stop()
                 logger.info('Leader election stopped')
             except Exception as e:
                 logger.error(f'Stopping or closing error: {e}')

@@ -4,11 +4,11 @@ from unittest.mock import Mock
 from src.messaging.broker import Broker
 from src.messaging.connection import Connection, MultiPublisherConnection
 from src.messaging.consumer import Consumer
-from src.messaging.protocol.message import Message, MessageType
 from src.messaging.publisher import Publisher
+from src.messaging.protocol.message import Message, MessageType
 
 
-class TestConnection:
+class TestConnection(unittest.TestCase):
     def test_message_send(self):
         broker = Mock(Broker)
         publisher = Mock(Publisher)
@@ -20,7 +20,6 @@ class TestConnection:
         message = Message(user_id, MessageType.Unknown, 'message')
 
         connection.send(message)
-
         publisher.put.assert_called_once_with(broker, message)
 
     def test_message_recv(self):
@@ -30,13 +29,8 @@ class TestConnection:
 
         connection = Connection(broker, publisher, consumer)
 
-        def __callback():
-            pass
-
-        callback = Mock(__callback)
-
+        callback = Mock()
         connection.recv(callback=callback)
-
         consumer.basic_consume.assert_called_once()
 
     def test_close(self):
@@ -45,9 +39,7 @@ class TestConnection:
         consumer = Mock(Consumer)
 
         connection = Connection(broker, publisher, consumer)
-
         connection.close()
-
         broker.close.assert_called_once()
 
     class TestMultiPublisherConnection(unittest.TestCase):

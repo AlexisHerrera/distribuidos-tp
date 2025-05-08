@@ -10,7 +10,9 @@ class Broker(ABC):
         pass
 
     @abstractmethod
-    def queue_declare(self, queue_name: str) -> str:
+    def queue_declare(
+        self, queue_name: str, exclusive: bool = False, durable: bool = True
+    ) -> str:
         pass
 
     @abstractmethod
