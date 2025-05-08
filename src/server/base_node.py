@@ -127,7 +127,6 @@ class BaseNode(ABC):
                 logger.info(f'Message for {user_id} timeout')
 
     def process_message(self, message: Message):
-        # TODO: IF IT FAILS CHECK THIS
         with self.completed_user_ids_lock:
             if message.user_id in self.completed_user_ids:
                 if self.leader:
