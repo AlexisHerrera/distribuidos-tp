@@ -5,19 +5,20 @@ from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_avg_budget import MovieAvgBudget
 from src.model.movie_sentiment import MovieSentiment
 from src.server.sinks.base_sink_logic import BaseSinkLogic
+from src.utils.safe_dict import SafeDict
 
 logger = logging.getLogger(__name__)
 
 
 class Q5SentimentAvgBudgetRevenueSinkLogic(BaseSinkLogic):
     def __init__(self):
-        self._stats: dict[int, dict[str, dict[str, float]]] = {}
+        self._stats = SafeDict()
         logger.info('Q5SentimentAvgBudgetRevenueSinkLogic initialized.')
 
     def merge_results(self, message: Message) -> None:
         list_movie_sentiments: list[MovieSentiment] = message.data
         user_id = message.user_id
-        partial_result = self._stats.get(user_id, {})
+        partial_result: dict[str, dict[str, float]] = self._stats.get(user_id, {})
 
         for ms in list_movie_sentiments:
             if ms.budget:
@@ -29,10 +30,10 @@ class Q5SentimentAvgBudgetRevenueSinkLogic(BaseSinkLogic):
             else:
                 logger.warning(f'Movie id={ms.id} tiene budget=0, se omite ratio.')
 
-        self._stats[user_id] = partial_result
+        self._stats.set(user_id, partial_result)
 
     def _obtain_avg_budget_revenue(self, user_id: int) -> Tuple[float, float]:
-        result = self._stats.pop(user_id, {})
+        result: dict[str, dict[str, float]] = self._stats.pop(user_id, {})
         pos = result.get('POSITIVE', {'sum': 0.0, 'count': 0})
         neg = result.get('NEGATIVE', {'sum': 0.0, 'count': 0})
 

@@ -3,19 +3,20 @@ import logging
 from src.messaging.protocol.message import Message, MessageType
 from src.model.actor_count import ActorCount
 from src.server.sinks.base_sink_logic import BaseSinkLogic
+from src.utils.safe_dict import SafeDict
 
 logger = logging.getLogger(__name__)
 
 
 class Q4Top10ActorsSinkLogic(BaseSinkLogic):
     def __init__(self):
-        self.final_actor_count: dict[int, dict[str, ActorCount]] = {}
+        self.final_actor_count = SafeDict()
         logger.info('Q4Top10ActorsSinkLogic initialized.')
 
     def merge_results(self, message: Message):
         result_list: list[ActorCount] = message.data
         user_id = message.user_id
-        partial_result = self.final_actor_count.get(user_id, {})
+        partial_result: dict[str, ActorCount] = self.final_actor_count.get(user_id, {})
 
         for actor_count in result_list:
             counter = partial_result.get(actor_count.actor_name)
@@ -27,7 +28,7 @@ class Q4Top10ActorsSinkLogic(BaseSinkLogic):
 
             partial_result[actor_count.actor_name] = counter
 
-        self.final_actor_count[user_id] = partial_result
+        self.final_actor_count.set(user_id, partial_result)
 
     def message_result(self, user_id: int) -> Message:
         sorted_top10_actors = self._obtain_sorted_top10_actors(user_id)
@@ -37,7 +38,7 @@ class Q4Top10ActorsSinkLogic(BaseSinkLogic):
     def _obtain_sorted_top10_actors(self, user_id: int) -> list[ActorCount]:
         logger.info(f'--- Sink: Final Global TOP 10 Actors Counts for {user_id} ---')
 
-        result = self.final_actor_count.pop(user_id, {})
+        result: dict[str, ActorCount] = self.final_actor_count.pop(user_id, {})
 
         top10: list[ActorCount] = []
 

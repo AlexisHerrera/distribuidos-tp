@@ -1,6 +1,8 @@
 import logging
+from collections import defaultdict
 
 from src.messaging.protocol.message import Message, MessageType
+from src.utils.safe_dict import SafeDict
 
 from ...model.movie import Movie
 from .base_sink_logic import BaseSinkLogic
@@ -10,20 +12,22 @@ logger = logging.getLogger(__name__)
 
 class Q1ArgSpa2000(BaseSinkLogic):
     def __init__(self):
-        self.final_movies_and_genres: dict[int, list[Movie]] = {}
+        self.final_movies_and_genres = SafeDict()
+        defaultdict()
         logger.info('Q1ArgSpa2000 initialized.')
 
     def merge_results(self, message: Message):
         list_movies_genres: list[Movie] = message.data
         user_id = message.user_id
-        partial_result = self.final_movies_and_genres.get(user_id, [])
+        partial_result: list[Movie] = self.final_movies_and_genres.get(user_id, [])
+        # partial_result = self.final_movies_and_genres.get(user_id, [])
 
         for movie_genre in list_movies_genres:
             # Asumimos id unico de movie, por lo que no necesito
             # agrupar por id, además que hice que el filtro lo saque
             partial_result.append(movie_genre)
 
-        self.final_movies_and_genres[user_id] = partial_result
+        self.final_movies_and_genres.set(user_id, partial_result)
 
     def message_result(self, user_id: int) -> Message:
         result = self.final_movies_and_genres.pop(user_id, [])
