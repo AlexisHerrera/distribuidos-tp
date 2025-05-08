@@ -12,14 +12,14 @@ logger = logging.getLogger(__name__)
 class RatingsJoinerLogic(BaseJoinerLogic):
     def __init__(self):
         # se inyecta desde GenericJoinerNode._thread_load_base
-        self.base_data: dict[int, Movie] = {}
+        self.base_data: dict[int, dict[int, Movie]] = {}
         logger.info('RatingsJoinerLogic initialized.')
 
     def merge(self, message: Message) -> Message:
         ratings: list[Rating] = message.data
         joined = []
         for rating in ratings:
-            movie = self.base_data.get(rating.movie_id)
+            movie = self.base_data.get(message.user_id).get(rating.movie_id)
             if movie is None:
                 # logger.warning(f'No movie in base_data for id={rating.movie_id}')
                 continue

@@ -41,7 +41,7 @@ class GenericJoinerNode(BaseNode):
                 logger.info('BASE_DB EOF received')
                 broker.basic_cancel(consumer.tag)
                 broker.close()
-                self.logic.base_data = data
+                self.logic.base_data[msg.user_id] = data
                 self._base_loaded.set()
             else:
                 movies: list[Movie] = msg.data
