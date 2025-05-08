@@ -32,7 +32,11 @@ class CountryBudgetLogic(BaseCounterLogic):
 
         result = [MovieBudgetCounter(k, v) for k, v in user_result.items()]
 
-        logger.info(f'Se mando: {result}')
+        logger.info(f'[{user_id}] Sending: {len(result)} country budgets')
+        for i, movie_budget_counter in enumerate(result):
+            logger.info(
+                f'  {i + 1}. {movie_budget_counter.country}: {movie_budget_counter.total_budget}'
+            )
 
         return Message(user_id, MessageType.MovieBudgetCounter, result)
 

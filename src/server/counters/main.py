@@ -30,6 +30,9 @@ class GenericCounterNode(BaseNode):
         if not self.is_running():
             return
         try:
+            logger.info(
+                f'[{message.user_id}] Processing message of type {message.message_type}'
+            )
             self.logic.process_message(message)
 
         except Exception as e:

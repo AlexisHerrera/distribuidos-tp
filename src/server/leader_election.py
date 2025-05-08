@@ -104,10 +104,10 @@ class LeaderElection:
 
     def _finalize_client(self, user_id: int):
         state = self.get_or_create_client_state(user_id)
-        logger.info(f'User {user_id}: Starting finalization process.')
-        logger.info(f'User {user_id}: Waiting for executor tasks to finish...')
+        logger.info(f'[{user_id}]: Starting finalization process.')
+        logger.info(f'[{user_id}]: Waiting for executor tasks to finish...')
         self.node.wait_for_executor()
-        logger.info(f'User {user_id}: Executor tasks finished.')
+        logger.info(f'[{user_id}]: Executor tasks finished.')
 
         self.node.send_final_results(user_id)
 
@@ -118,10 +118,9 @@ class LeaderElection:
                 self.node.propagate_eof(user_id)
             else:
                 logger.error(
-                    f'User {user_id}: Timed out waiting for DONE messages from followers. EOF will not be propagated.'
+                    f'[{user_id}]: Timed out waiting for DONE messages from followers. EOF will not be propagated.'
                 )
         else:
-            logger.info(f'User {user_id}: Follower sending DONE to leader')
             self.send_done(user_id)
 
         with self.client_states_lock:
@@ -137,10 +136,10 @@ class LeaderElection:
                 return
             state['done_count'] += 1
             logger.info(
-                f'User {user_id}: Received DONE ({state["done_count"]}/{self._total_followers})'
+                f'[{user_id}]: Received DONE ({state["done_count"]}/{self._total_followers})'
             )
             if state['done_count'] >= self._total_followers:
-                logger.info(f'User {user_id}: All followers reported DONE.')
+                logger.info(f'[{user_id}]: All followers reported DONE.')
                 state['done_event'].set()
 
     def _on_peer_eof(self, leader_host, leader_port, user_id: int):
@@ -158,7 +157,7 @@ class LeaderElection:
     def wait_for_done(self, user_id: int, timeout=None):
         state = self.get_or_create_client_state(user_id)
         logger.info(
-            f'User {user_id}: Leader waiting for DONE from {self._total_followers} followers...'
+            f'[{user_id}]: Leader waiting for DONE from {self._total_followers} followers...'
         )
         return state['done_event'].wait(timeout)
 
@@ -174,17 +173,17 @@ class LeaderElection:
         state = self.get_or_create_client_state(user_id)
         leader_addr = state.get('leader_addr')
         if not leader_addr:
-            logger.error(f'User {user_id}: No leader address known; cannot send DONE')
+            logger.error(f'[{user_id}]: No leader address known; cannot send DONE')
             return
 
-        logger.info(f'User {user_id}: Follower sending DONE to leader at {leader_addr}')
+        logger.info(f'[{user_id}]: Follower sending DONE to leader at {leader_addr}')
         payload = f'DONE|{user_id}'.encode()
         try:
             with socket.create_connection(leader_addr, timeout=5) as s:
                 s.sendall(payload)
         except Exception as e:
             logger.error(
-                f'User {user_id}: Error sending DONE to leader {leader_addr}: {e}'
+                f'[{user_id}]: Error sending DONE to leader {leader_addr}: {e}'
             )
 
     def stop(self):

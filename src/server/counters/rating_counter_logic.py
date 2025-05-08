@@ -17,6 +17,7 @@ class RatingCounterLogic(BaseCounterLogic):
     def process_message(self, message: Message):
         movie_rating: list[MovieRating] = message.data
         user_id = message.user_id
+        logger.info(f'[{user_id}] Processing {len(movie_rating)} ratings')
         partial_result: dict[int, MovieRatingCount] = self.ratings.get(user_id, {})
 
         for movie in movie_rating:

@@ -115,7 +115,7 @@ class BaseNode(ABC):
     def process_message(self, message: Message):
         if message.message_type == MessageType.EOF:
             user_id = message.user_id
-            logger.info(f'[{user_id}] RECEIVED EOF FROM QUEUE for user_id')
+            logger.info(f'[{user_id}] RECEIVED EOF FROM QUEUE')
             if not self.leader_election:
                 # Single-node
                 logger.info(f'[{user_id}] Single-node, finishing single client.')
@@ -130,14 +130,13 @@ class BaseNode(ABC):
                 logger.debug(f'[{user_id}] I am the LEADER, handling EOF')
                 self.leader_election.handle_incoming_eof(user_id)
             else:
-                if not state['is_leader'] and state.get('waiting_for_eof', False):
-                    logger.debug(f'[{user_id}] I am FOLLOWER, SEND DONE')
-                    self.leader_election.send_done(user_id)
+                if not state['is_leader'] and state['waiting_for_eof']:
+                    logger.debug(f'[{user_id}] I am FOLLOWER, SENDING DONE')
+                    self.leader_election._finalize_client(user_id)
                 else:
                     logger.debug(
                         f'[{user_id}] EOF Ignored - I am the Leader or not waiting for EOF'
                     )
-
             return
         try:
             self.handle_message(message)
