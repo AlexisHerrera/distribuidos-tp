@@ -1,3 +1,3 @@
-FROM rabbitmq:alpine
+FROM rabbitmq:management-alpine
 
 RUN apk update && apk upgrade
