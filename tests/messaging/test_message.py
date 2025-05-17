@@ -1,4 +1,5 @@
 import unittest
+import uuid
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.cast import Cast
@@ -16,25 +17,26 @@ class TestMessage:
         return int.from_bytes(buf[0:bytes_amount], 'big', signed=False)
 
     def test_message_user_id(self):
-        user_id = 1
+        user_id = uuid.uuid4()
         message = Message(user_id, MessageType.EOF)
         message_bytes = message.to_bytes()
 
-        assert message_bytes[
-            Message.USER_ID_POS : Message.USER_ID_SIZE
-        ] == self.int_to_bytes(user_id, Message.USER_ID_SIZE)
+        assert (
+            message_bytes[Message.USER_ID_POS : Message.USER_ID_SIZE] == user_id.bytes
+        )
 
     class TestMovie:
         def test_encode_movie(self):
             movie = Movie(1, 'Toy Story')
-            user_id = 1
+            user_id = uuid.uuid4()
             message = Message(user_id, MessageType.Movie, [movie])
 
             message_bytes = message.to_bytes()
 
-            assert message_bytes[
-                Message.USER_ID_POS : Message.USER_ID_SIZE
-            ] == TestMessage.int_to_bytes(user_id, message.USER_ID_SIZE)
+            assert (
+                message_bytes[Message.USER_ID_POS : Message.USER_ID_SIZE]
+                == user_id.bytes
+            )
 
             assert message_bytes[
                 Message.MSG_TYPE_POS : Message.MSG_TYPE_POS + Message.MSG_TYPE_SIZE
@@ -49,7 +51,7 @@ class TestMessage:
 
         def test_encode_and_decode_movie_should_return_same_movie(self):
             movie = Movie(1, 'Toy Story')
-            user_id = 1
+            user_id = uuid.uuid4()
             message = Message(user_id, MessageType.Movie, [movie])
 
             message_bytes = message.to_bytes()
@@ -69,14 +71,15 @@ class TestMessage:
     class TestRating:
         def test_encode_rating(self):
             rating = Rating(1, 4.5)
-            user_id = 1
+            user_id = uuid.uuid4()
             message = Message(user_id, MessageType.Rating, [rating])
 
             message_bytes = message.to_bytes()
 
-            assert message_bytes[
-                Message.USER_ID_POS : Message.USER_ID_SIZE
-            ] == TestMessage.int_to_bytes(user_id, Message.USER_ID_SIZE)
+            assert (
+                message_bytes[Message.USER_ID_POS : Message.USER_ID_SIZE]
+                == user_id.bytes
+            )
 
             assert message_bytes[
                 Message.MSG_TYPE_POS : Message.MSG_TYPE_POS + Message.MSG_TYPE_SIZE
@@ -90,7 +93,7 @@ class TestMessage:
 
         def test_encode_and_decode_rating_should_return_same_rating(self):
             rating = Rating(1, 4.5)
-            user_id = 1
+            user_id = uuid.uuid4()
             message = Message(user_id, MessageType.Rating, [rating])
 
             message_bytes = message.to_bytes()
@@ -110,7 +113,7 @@ class TestMessage:
     class TestCast:
         def test_encode_cast(self):
             cast = Cast(1, ['Ricardo Darín', 'Guillermo Francella'])
-            user_id = 1
+            user_id = uuid.uuid4()
             message = Message(user_id, MessageType.Cast, [cast])
 
             message_bytes = message.to_bytes()
@@ -127,7 +130,7 @@ class TestMessage:
 
         def test_encode_and_decode_cast_should_return_same_cast(self):
             cast = Cast(1, ['Ricardo Darín', 'Guillermo Francella'])
-            user_id = 1
+            user_id = uuid.uuid4()
             message = Message(user_id, MessageType.Cast, [cast])
 
             message_bytes = message.to_bytes()
@@ -147,7 +150,7 @@ class TestMessage:
 
     class TestEOF:
         def test_encode_eof_should_return_empty_data(self):
-            user_id = 1
+            user_id = uuid.uuid4()
             message = Message(user_id, MessageType.EOF)
 
             result = message.to_bytes()
@@ -160,7 +163,7 @@ class TestMessage:
             ] == TestMessage.int_to_bytes(0, Message.MSG_LEN_SIZE)
 
         def test_decode_eof_should_return_eof_type(self):
-            user_id = 1
+            user_id = uuid.uuid4()
             message = Message(user_id, MessageType.EOF, None)
 
             message_bytes = message.to_bytes()

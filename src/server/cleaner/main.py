@@ -7,6 +7,7 @@ import sys
 import threading
 from collections import defaultdict
 from queue import Queue
+import uuid
 
 from src.common.protocol.batch import Batch, BatchType
 from src.common.socket_communication import (
@@ -138,7 +139,7 @@ class Cleaner:
 
     def _process_client_data(
         self,
-        user_id: int,
+        user_id: uuid.UUID,
         client_socket,
         data_type_label: str,
         associated_message_type: MessageType,
@@ -536,10 +537,9 @@ class Cleaner:
                     t.join(timeout=1.0)
             logger.info('Cleaner has finished its run method.')
 
-    def generate_user_id(self) -> int:
+    def generate_user_id(self) -> uuid.UUID:
         with self.user_id_lock:
-            user_id = self.next_user_id
-            self.next_user_id += 1
+            user_id = uuid.uuid4()
         return user_id
 
 
