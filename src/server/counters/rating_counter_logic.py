@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_rating import MovieRating
@@ -34,7 +35,7 @@ class RatingCounterLogic(BaseCounterLogic):
 
         self.ratings.set(user_id, partial_result)
 
-    def message_result(self, user_id: int) -> Message:
+    def message_result(self, user_id: uuid.UUID) -> Message:
         self.log_final_results(user_id)
         user_result = self.ratings.pop(user_id, {})
         result = []
@@ -43,7 +44,7 @@ class RatingCounterLogic(BaseCounterLogic):
 
         return Message(user_id, MessageType.MovieRatingCounter, result)
 
-    def log_final_results(self, user_id: int):
+    def log_final_results(self, user_id: uuid.UUID):
         result: dict[int, MovieRatingCount] = self.ratings.get(user_id, {})
         logger.info(f'--- Final Rating Counts for {user_id} ---')
         if not result:

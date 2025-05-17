@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_rating_avg import MovieRatingAvg
@@ -35,11 +36,11 @@ class Q3MaxMinAvgRatingSinkLogic(BaseSinkLogic):
 
         self.rating_counts.set(user_id, partial_result)
 
-    def message_result(self, user_id: int) -> Message:
+    def message_result(self, user_id: uuid.UUID) -> Message:
         result = self._get_max_min_average_rating(user_id)
         return Message(user_id, MessageType.MovieRatingAvg, result)
 
-    def _get_max_min_average_rating(self, user_id: int) -> dict:
+    def _get_max_min_average_rating(self, user_id: uuid.UUID) -> dict:
         logger.info(f'--- Sink: Final Global Q3 Max Min Avg Rating for {user_id} ---')
         result: dict[int, MovieRatingCount] = self.rating_counts.pop(user_id, {})
         final_result = {

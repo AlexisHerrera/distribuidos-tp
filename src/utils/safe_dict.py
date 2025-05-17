@@ -6,7 +6,7 @@ class SafeDict:
         self.lock = threading.Lock()
         self.data = {}
 
-    def get(self, key, default: None = None) -> object:
+    def get(self, key, default: object = None) -> object:
         with self.lock:
             return self.data.get(key, default)
 
@@ -14,6 +14,6 @@ class SafeDict:
         with self.lock:
             self.data[key] = value
 
-    def pop(self, key, default: None = None) -> object:
+    def pop(self, key, default: object = None) -> object:
         with self.lock:
             return self.data.pop(key, default)

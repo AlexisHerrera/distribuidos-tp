@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.actor_count import ActorCount
@@ -30,12 +31,12 @@ class Q4Top10ActorsSinkLogic(BaseSinkLogic):
 
         self.final_actor_count.set(user_id, partial_result)
 
-    def message_result(self, user_id: int) -> Message:
+    def message_result(self, user_id: uuid.UUID) -> Message:
         sorted_top10_actors = self._obtain_sorted_top10_actors(user_id)
         logger.info(f'TOP 10: {sorted_top10_actors}')
         return Message(user_id, MessageType.ActorCount, sorted_top10_actors)
 
-    def _obtain_sorted_top10_actors(self, user_id: int) -> list[ActorCount]:
+    def _obtain_sorted_top10_actors(self, user_id: uuid.UUID) -> list[ActorCount]:
         logger.info(f'--- Sink: Final Global TOP 10 Actors Counts for {user_id} ---')
 
         result: dict[str, ActorCount] = self.final_actor_count.pop(user_id, {})

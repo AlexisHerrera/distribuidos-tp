@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_budget_counter import MovieBudgetCounter
@@ -27,7 +28,7 @@ class CountryBudgetLogic(BaseCounterLogic):
 
         self.country_budgets.set(user_id, partial_result)
 
-    def message_result(self, user_id: int) -> Message:
+    def message_result(self, user_id: uuid.UUID) -> Message:
         user_result = self.country_budgets.pop(user_id, {})
 
         result = [MovieBudgetCounter(k, v) for k, v in user_result.items()]
@@ -36,7 +37,7 @@ class CountryBudgetLogic(BaseCounterLogic):
 
         return Message(user_id, MessageType.MovieBudgetCounter, result)
 
-    def log_final_results(self, user_id: int):
+    def log_final_results(self, user_id: uuid.UUID):
         result = self.country_budgets.get(user_id, {})
         logger.info(f'--- Final Country Budget Counts for {user_id} ---')
         if not result:

@@ -5,9 +5,9 @@ import signal
 import socket
 import sys
 import threading
+import uuid
 from collections import defaultdict
 from queue import Queue
-import uuid
 
 from src.common.protocol.batch import Batch, BatchType
 from src.common.socket_communication import (
@@ -252,7 +252,7 @@ class Cleaner:
         finally:
             logger.info('Result processing thread finished.')
 
-    def _publish_eof(self, user_id: int, stream_message_type: MessageType):
+    def _publish_eof(self, user_id: uuid.UUID, stream_message_type: MessageType):
         try:
             logger.info(
                 f'[{user_id}] Publishing stream EOF for {stream_message_type.name} to message queue.'
@@ -399,7 +399,7 @@ class Cleaner:
                 f'[{user_id}] Client handler thread for {client_address[0]}:{client_address[1]} is ending.'
             )
 
-    def _cleanup_client(self, user_id: int):
+    def _cleanup_client(self, user_id: uuid.UUID):
         logger.info(f'[{user_id}] Cleaning up client resources.')
         with self.client_data_lock:
             client_info = self.client_data.pop(user_id, None)

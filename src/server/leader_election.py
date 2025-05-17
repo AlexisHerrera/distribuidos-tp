@@ -1,6 +1,7 @@
 import logging
 import socket
 import threading
+import uuid
 
 from src.utils.config import Config
 
@@ -38,10 +39,12 @@ class LeaderElection:
 
                 if decoded_data.startswith('EOF|'):
                     _, leader_host, leader_port, user_id_str = decoded_data.split('|')
-                    self._on_peer_eof(leader_host, int(leader_port), int(user_id_str))
+                    self._on_peer_eof(
+                        leader_host, int(leader_port), uuid.UUID(user_id_str)
+                    )
                 elif decoded_data.startswith('DONE|'):
                     _, user_id_str = decoded_data.split('|')
-                    self._on_done(int(user_id_str))
+                    self._on_done(uuid.UUID(user_id_str))
                 else:
                     logger.warning(f'Received unknown peer message: {decoded_data}')
 
@@ -55,7 +58,7 @@ class LeaderElection:
                 conn.close()
         self._sock.close()
 
-    def _get_or_create_client_state(self, user_id: int):
+    def _get_or_create_client_state(self, user_id: uuid.UUID):
         with self.client_states_lock:
             if user_id not in self.client_states:
                 self.client_states[user_id] = {
@@ -68,7 +71,7 @@ class LeaderElection:
                 }
             return self.client_states[user_id]
 
-    def handle_incoming_eof(self, user_id: int):
+    def handle_incoming_eof(self, user_id: uuid.UUID):
         state = self._get_or_create_client_state(user_id)
 
         with self.client_states_lock:
@@ -83,7 +86,7 @@ class LeaderElection:
                 )
 
             if not state['peers_notified_eof']:
-                payload = f'EOF|{self.node_id}|{self.port}|{user_id}'.encode()
+                payload = f'EOF|{self.node_id}|{self.port}|{str(user_id)}'.encode()
                 self.notify_peers(payload)
                 state['peers_notified_eof'] = True
                 self._trigger_finalization_logic(user_id)
@@ -92,12 +95,12 @@ class LeaderElection:
                     f'Already notified peers of EOF for {user_id}, not doing anything else'
                 )
 
-    def _trigger_finalization_logic(self, user_id: int):
+    def _trigger_finalization_logic(self, user_id: uuid.UUID):
         threading.Thread(
             target=self._finalize_client, args=(user_id,), daemon=True
         ).start()
 
-    def _finalize_client(self, user_id: int):
+    def _finalize_client(self, user_id: uuid.UUID):
         state = self._get_or_create_client_state(user_id)
         logger.info(f'User {user_id}: Starting finalization process.')
         logger.info(f'User {user_id}: Waiting for executor tasks to finish...')
@@ -128,7 +131,7 @@ class LeaderElection:
         with self.client_states_lock:
             state['status'] = 'done'
 
-    def _on_done(self, user_id: int):
+    def _on_done(self, user_id: uuid.UUID):
         state = self._get_or_create_client_state(user_id)
         with self.client_states_lock:
             if not state['is_leader']:
@@ -144,7 +147,7 @@ class LeaderElection:
                 logger.info(f'User {user_id}: All followers reported DONE.')
                 state['done_event'].set()
 
-    def _on_peer_eof(self, leader_host, leader_port, user_id: int):
+    def _on_peer_eof(self, leader_host, leader_port, user_id: uuid.UUID):
         state = self._get_or_create_client_state(user_id)
         leader_addr = (leader_host, int(leader_port))
         with self.client_states_lock:
@@ -156,7 +159,7 @@ class LeaderElection:
             )
             self._trigger_finalization_logic(user_id)
 
-    def wait_for_done(self, user_id: int, timeout=None):
+    def wait_for_done(self, user_id: uuid.UUID, timeout=None):
         state = self._get_or_create_client_state(user_id)
         logger.info(
             f'User {user_id}: Leader waiting for DONE from {self._total_followers} followers...'
@@ -171,7 +174,7 @@ class LeaderElection:
             except Exception as e:
                 logger.error(f'Failed notifying {host}:{port}: {e}')
 
-    def send_done(self, user_id: int):
+    def send_done(self, user_id: uuid.UUID):
         state = self._get_or_create_client_state(user_id)
         leader_addr = state.get('leader_addr')
         if not leader_addr:

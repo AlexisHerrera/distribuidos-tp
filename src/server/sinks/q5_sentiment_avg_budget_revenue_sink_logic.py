@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Tuple
 
 from src.messaging.protocol.message import Message, MessageType
@@ -32,7 +33,7 @@ class Q5SentimentAvgBudgetRevenueSinkLogic(BaseSinkLogic):
 
         self._stats.set(user_id, partial_result)
 
-    def _obtain_avg_budget_revenue(self, user_id: int) -> Tuple[float, float]:
+    def _obtain_avg_budget_revenue(self, user_id: uuid.UUID) -> Tuple[float, float]:
         result: dict[str, dict[str, float]] = self._stats.pop(user_id, {})
         pos = result.get('POSITIVE', {'sum': 0.0, 'count': 0})
         neg = result.get('NEGATIVE', {'sum': 0.0, 'count': 0})
@@ -42,7 +43,7 @@ class Q5SentimentAvgBudgetRevenueSinkLogic(BaseSinkLogic):
 
         return avg_pos, avg_neg
 
-    def message_result(self, user_id: int) -> Message:
+    def message_result(self, user_id: uuid.UUID) -> Message:
         avg_pos, avg_neg = self._obtain_avg_budget_revenue(user_id)
         logger.info(f'Averages by sentiment - POSITIVE: {avg_pos}, NEGATIVE: {avg_neg}')
         result = MovieAvgBudget(positive=avg_pos, negative=avg_neg)

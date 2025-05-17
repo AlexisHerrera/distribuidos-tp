@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from src.messaging.protocol.message import Message, MessageType
 from src.utils.safe_dict import SafeDict
@@ -26,7 +27,7 @@ class ActorCounterLogic(BaseCounterLogic):
 
         self.actor_counts.set(user_id, partial_result)
 
-    def message_result(self, user_id: int) -> Message:
+    def message_result(self, user_id: uuid.UUID) -> Message:
         final_result = []
         self.log_final_results(user_id)
         for name, count in self.actor_counts.get(user_id, {}).items():
@@ -35,8 +36,8 @@ class ActorCounterLogic(BaseCounterLogic):
         self.actor_counts.pop(user_id, None)  # Drop silently
         return Message(user_id, MessageType.ActorCount, final_result)
 
-    def log_final_results(self, user_id: int):
-        result = self.actor_counts.get(user_id, {})
+    def log_final_results(self, user_id: uuid.UUID):
+        result: dict[str, int] = self.actor_counts.get(user_id, {})
         logger.info(f'--- Final Actor Counts for {user_id}---')
         if not result:
             logger.info('No actors count were counted.')
