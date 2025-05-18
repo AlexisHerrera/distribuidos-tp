@@ -10,18 +10,11 @@ logger = logging.getLogger(__name__)
 
 class SentimentAnalyzer:
     def __init__(self):
-        # args = {'from_tf': True}
         logger.info('Initializing SentimentAnalyzer')
-        # model = BertModel.from_pretrained(
-        #     'distilbert-base-uncased-finetuned-sst-2-english', from_tf=True
-        # )
 
         self.__analyzer = pipeline(
             'sentiment-analysis',
             model='distilbert-base-uncased-finetuned-sst-2-english',
-            # torch_dtype=torch.float16,
-            # framework='pt',
-            # device='cpu',
         )
 
     def handle_message(self, movies: list[Movie]):
