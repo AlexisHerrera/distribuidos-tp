@@ -5,6 +5,7 @@ import signal
 import socket
 import sys
 import threading
+import uuid
 from collections import defaultdict
 from queue import Queue
 
@@ -138,7 +139,7 @@ class Cleaner:
 
     def _process_client_data(
         self,
-        user_id: int,
+        user_id: uuid.UUID,
         client_socket,
         data_type_label: str,
         associated_message_type: MessageType,
@@ -251,7 +252,7 @@ class Cleaner:
         finally:
             logger.info('Result processing thread finished.')
 
-    def _publish_eof(self, user_id: int, stream_message_type: MessageType):
+    def _publish_eof(self, user_id: uuid.UUID, stream_message_type: MessageType):
         try:
             logger.info(
                 f'[{user_id}] Publishing stream EOF for {stream_message_type.name} to message queue.'
@@ -398,7 +399,7 @@ class Cleaner:
                 f'[{user_id}] Client handler thread for {client_address[0]}:{client_address[1]} is ending.'
             )
 
-    def _cleanup_client(self, user_id: int):
+    def _cleanup_client(self, user_id: uuid.UUID):
         logger.info(f'[{user_id}] Cleaning up client resources.')
         with self.client_data_lock:
             client_info = self.client_data.pop(user_id, None)
@@ -536,10 +537,9 @@ class Cleaner:
                     t.join(timeout=1.0)
             logger.info('Cleaner has finished its run method.')
 
-    def generate_user_id(self) -> int:
+    def generate_user_id(self) -> uuid.UUID:
         with self.user_id_lock:
-            user_id = self.next_user_id
-            self.next_user_id += 1
+            user_id = uuid.uuid4()
         return user_id
 
 

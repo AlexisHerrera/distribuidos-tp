@@ -3,6 +3,7 @@ import logging
 import signal
 import sys
 import threading
+import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Type
 
@@ -107,7 +108,7 @@ class BaseNode(ABC):
     def handle_message(self, message: Message):
         pass
 
-    def send_final_results(self, user_id: int):
+    def send_final_results(self, user_id: uuid.UUID):
         if not self.should_send_results_before_eof:
             return
         try:
@@ -117,7 +118,7 @@ class BaseNode(ABC):
         except Exception as e:
             logger.error(f'Error sending final counter results: {e}', exc_info=True)
 
-    def wait_for_last_user_message(self, user_id: int, is_leader: bool):
+    def wait_for_last_user_message(self, user_id: uuid.UUID, is_leader: bool):
         # If there's more than one node and this is not the leader
         if self.leader and not is_leader:
             self.eof_tracker.add(user_id)
@@ -157,11 +158,11 @@ class BaseNode(ABC):
         except Exception as e:
             logger.error(f'Error en handle_message: {e}', exc_info=True)
 
-    def _handle_last_message(self, user_id: int):
+    def _handle_last_message(self, user_id: uuid.UUID):
         if self.leader:
             self.eof_tracker.set(user_id)
 
-    def _finalize_single_node(self, user_id: int):
+    def _finalize_single_node(self, user_id: uuid.UUID):
         logger.info(f'User {user_id}: Single-node waiting for executor tasks...')
         self.wait_for_executor()
         logger.info(f'User {user_id}: Single-node executor finished.')
@@ -210,7 +211,7 @@ class BaseNode(ABC):
             except Exception as e:
                 logger.error(f'Stopping or closing error: {e}')
 
-    def propagate_eof(self, user_id: int):
+    def propagate_eof(self, user_id: uuid.UUID):
         try:
             logger.info('Propagating EOF to next stage...')
             eof_message = Message(user_id, MessageType.EOF, None)

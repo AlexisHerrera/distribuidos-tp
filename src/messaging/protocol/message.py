@@ -1,3 +1,4 @@
+import uuid
 from enum import Enum
 
 from src.messaging.protocol.actor_count import ActorCountProtocol
@@ -41,7 +42,7 @@ class MessageType(Enum):
 
 
 class Message:
-    USER_ID_SIZE = 4
+    USER_ID_SIZE = 16
     MSG_TYPE_SIZE = 1
     MSG_LEN_SIZE = 2
 
@@ -50,7 +51,9 @@ class Message:
     MSG_LEN_POS = MSG_TYPE_POS + MSG_TYPE_SIZE
     MSG_DATA_POS = MSG_LEN_POS + MSG_LEN_SIZE
 
-    def __init__(self, user_id: int, message_type: MessageType, data: object = None):
+    def __init__(
+        self, user_id: uuid.UUID, message_type: MessageType, data: object = None
+    ):
         self.user_id = user_id
         self.message_type = message_type
         self.data = data
@@ -60,7 +63,7 @@ class Message:
 
         (data_encoded, bytes_amount) = encoder.to_bytes(self.data)
 
-        user_id_encoded = Message.__int_to_bytes(self.user_id, Message.USER_ID_SIZE)
+        user_id_encoded = self.user_id.bytes
 
         msg_type_encoded = Message.__int_to_bytes(
             self.message_type.value, Message.MSG_TYPE_SIZE
@@ -74,9 +77,10 @@ class Message:
 
     @staticmethod
     def from_bytes(buf: bytes):
-        user_id = Message.__int_from_bytes(
-            buf[Message.USER_ID_POS :], Message.USER_ID_SIZE
+        user_id = uuid.UUID(
+            bytes=buf[Message.USER_ID_POS : Message.USER_ID_POS + Message.USER_ID_SIZE]
         )
+
         msg_type_from_buf = Message.__int_from_bytes(
             buf[Message.MSG_TYPE_POS :], Message.MSG_TYPE_SIZE
         )

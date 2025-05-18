@@ -1,4 +1,5 @@
 import logging
+import uuid
 from collections import defaultdict
 
 from src.messaging.protocol.message import Message, MessageType
@@ -20,7 +21,6 @@ class Q1ArgSpa2000(BaseSinkLogic):
         list_movies_genres: list[Movie] = message.data
         user_id = message.user_id
         partial_result: list[Movie] = self.final_movies_and_genres.get(user_id, [])
-        # partial_result = self.final_movies_and_genres.get(user_id, [])
 
         for movie_genre in list_movies_genres:
             # Asumimos id unico de movie, por lo que no necesito
@@ -29,7 +29,7 @@ class Q1ArgSpa2000(BaseSinkLogic):
 
         self.final_movies_and_genres.set(user_id, partial_result)
 
-    def message_result(self, user_id: int) -> Message:
+    def message_result(self, user_id: uuid.UUID) -> Message:
         result = self.final_movies_and_genres.pop(user_id, [])
 
         logger.info(f'Final Movie Genre for user {user_id}: count {len(result)}')

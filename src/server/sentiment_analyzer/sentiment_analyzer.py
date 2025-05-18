@@ -10,11 +10,11 @@ logger = logging.getLogger(__name__)
 
 class SentimentAnalyzer:
     def __init__(self):
+        logger.info('Initializing SentimentAnalyzer')
+
         self.__analyzer = pipeline(
             'sentiment-analysis',
             model='distilbert-base-uncased-finetuned-sst-2-english',
-            framework='pt',
-            device='cpu',
         )
 
     def handle_message(self, movies: list[Movie]):

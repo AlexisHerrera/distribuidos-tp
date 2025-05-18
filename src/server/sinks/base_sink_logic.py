@@ -1,5 +1,7 @@
 import logging
+import uuid
 from abc import ABC, abstractmethod
+
 from src.messaging.protocol.message import Message
 
 logger = logging.getLogger(__name__)
@@ -11,5 +13,5 @@ class BaseSinkLogic(ABC):
         pass
 
     @abstractmethod
-    def message_result(self, user_id: int) -> Message:
+    def message_result(self, user_id: uuid.UUID) -> Message:
         pass
