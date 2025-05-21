@@ -203,9 +203,6 @@ def create_services(
     sinks = ''
     for i in list(range(1, 6)):
         sinks += create_sink(i)
-    joiners = ''
-    for joiner in ['ratings', 'cast']:
-        joiners += create_joiner(f'{joiner}_joiner')
     services = ''
     for service in scalable_services:
         services += create_scalable(service)
@@ -217,7 +214,6 @@ services:
   {cleaner}
   {services}
   {sinks}
-  {joiners}
 """
 
 
@@ -348,6 +344,20 @@ def main():
             'actor_counter',
             './src/server/counters/actor_counter_config.yaml',
         ),
+        (
+            'ratings_joiner',
+            config.ratings_joiner,
+            'src/server/joiners/main.py',
+            'ratings_joiner',
+            './src/server/joiners/ratings_joiner_config.yaml',
+        ),
+        (
+            'cast_joiner',
+            config.cast_joiner,
+            'src/server/joiners/main.py',
+            'cast_joiner',
+            './src/server/joiners/cast_joiner_config.yaml',
+        )
     ]
     for idx, (name, count, script, logic, cfg) in enumerate(mapping):
         if count and count > 0:
