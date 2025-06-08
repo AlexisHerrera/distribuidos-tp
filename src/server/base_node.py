@@ -121,18 +121,19 @@ class BaseNode(ABC):
     def wait_for_last_user_message(self, user_id: uuid.UUID, is_leader: bool):
         # If there's more than one node and this is not the leader
         if self.leader and not is_leader:
-            self.eof_tracker.add(user_id)
-            if self.eof_tracker.wait(user_id):
-                logger.info(f'Processed last message from {user_id}')
-            else:
-                logger.info(f'Message for {user_id} timeout')
+            self.eof_tracker.wait(user_id)
+            return
 
     def process_message(self, message: Message):
+        if self.leader:
+            self.eof_tracker.processing(message.user_id)
+
         with self.completed_user_ids_lock:
             if message.user_id in self.completed_user_ids:
                 if self.leader:
                     state = self.leader._get_or_create_client_state()
                     logger.warning(f'{state}')
+                    self.eof_tracker.done(message.user_id)
                 logger.warning(
                     f'Ignoring message for completed user_id: {message.user_id}'
                 )
@@ -148,19 +149,18 @@ class BaseNode(ABC):
                     f'User {message.user_id}: Delegating EOF to LeaderElection.'
                 )
                 self.leader.handle_incoming_eof(message.user_id)
+                self.eof_tracker.done(message.user_id)
             else:
                 # Single-Node
                 self._finalize_single_node(message.user_id)
             return
         try:
             self.handle_message(message)
-            self._handle_last_message(message.user_id)
         except Exception as e:
             logger.error(f'Error en handle_message: {e}', exc_info=True)
-
-    def _handle_last_message(self, user_id: uuid.UUID):
-        if self.leader:
-            self.eof_tracker.set(user_id)
+        finally:
+            if self.leader:
+                self.eof_tracker.done(message.user_id)
 
     def _finalize_single_node(self, user_id: uuid.UUID):
         logger.info(f'User {user_id}: Single-node waiting for executor tasks...')

@@ -43,30 +43,30 @@ Example 3: run with `yes` and specify percentage
 
 ## Message Structure
 
-| UserId  | MsgId  | MsgLen  | ProtobufData    |
-| ------- | ------ | ------- | --------------- |
-| 4 Bytes | 1 Byte | 2 Bytes | Variable Length |
+| UserId  | MsgType | MsgLen  | ProtobufData    |
+| ------- | ------- | ------- | --------------- |
+| 4 Bytes | 1 Byte  | 2 Bytes | Variable Length |
 
 > [!Note]
 > The 2 Bytes for message len should be enough for a batch of size < 8kb
 
 ### Message types
 
-| MsgId |      TypeName      |
-| :---: | :----------------: |
-|   0   |      Unknown       |
-|   1   |       Movie        |
-|   2   |       Rating       |
-|   3   |        Cast        |
-|   4   |   MovieSentiment   |
-|   5   |   MovieAvgBudget   |
-|   6   | MovieBudgetCounter |
-|   7   |    MovieRating     |
-|   8   |   MovieRatingAvg   |
-|   9   |     MovieCast      |
-|  10   |     ActorCount     |
-|  90   |    ReportResult    |
-|  100  |        EOF         |
+| Id  |      TypeName      |
+| :-: | :----------------: |
+|  0  |      Unknown       |
+|  1  |       Movie        |
+|  2  |       Rating       |
+|  3  |        Cast        |
+|  4  |   MovieSentiment   |
+|  5  |   MovieAvgBudget   |
+|  6  | MovieBudgetCounter |
+|  7  |    MovieRating     |
+|  8  |   MovieRatingAvg   |
+|  9  |     MovieCast      |
+| 10  |     ActorCount     |
+| 90  |    ReportResult    |
+| 100 |        EOF         |
 
 ```
 1 Movie:
@@ -192,12 +192,12 @@ Best case scenario:
 1. One node receives EOF for user `a` and becomes the leader, then it notifies other nodes.
 2. Node `n` receives the notification from leader node.
 3. Node `n` can be in different states:
-    1. It is processing a message for user `a`.
-        1. Finish processing the message and notify leader that the node is done.
-    2. It is processing a message for other user, say `b`.
-        1. It is assumed[^1] that the last message for user `a` has already been proceseed, so notify the leader that the node is done.
-    3. It is not processing any message.[^1]
-        1. Send the leader node that the node is done.
+   1. It is processing a message for user `a`.
+      1. Finish processing the message and notify leader that the node is done.
+   2. It is processing a message for other user, say `b`.
+      1. It is assumed[^1] that the last message for user `a` has already been proceseed, so notify the leader that the node is done.
+   3. It is not processing any message.[^1]
+      1. Send the leader node that the node is done.
 
 [^1] As messages are delivered in order, the last message before `EOF` for user `a` must have been delivered.
 
@@ -206,6 +206,5 @@ Worst case scenario:
 1. One node receives EOF for user `a` and becomes the leader, then it notifies other nodes.
 2. Node `n` receives the notification from leader node.
 3. Node `n` can be in different states:
-    1. It is processing a message for user `a` and fails (sends `nack`).
-        1. If other node receives the message it must return `nack` until the message is back to the node `n`.
-
+   1. It is processing a message for user `a` and fails (sends `nack`).
+      1. If other node receives the message it must return `nack` until the message is back to the node `n`.
