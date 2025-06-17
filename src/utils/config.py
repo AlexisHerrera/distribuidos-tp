@@ -16,6 +16,7 @@ class Config:
         rabbit_config = config['rabbit']
         connection = config['connection']
         log_config = config['log']
+        heartbeat = config['heartbeat']
 
         self.rabbit_host = os.getenv('RABBIT_HOST', rabbit_config['host'])
 
@@ -33,8 +34,26 @@ class Config:
         )
         self.replicas_enabled = os.getenv('PEERS', '') != ''
 
+        # Heartbeat config
+        self.heartbeat_port = heartbeat['port']
+        self.heartbeat_watcher_port = heartbeat['watcher_port']
+
     def get_env_var(self, var_name: str, default: str = None) -> str | None:
         return os.getenv(var_name, default)
+
+
+class WatcherConfig:
+    def __init__(self, filename: str = 'config.yaml'):
+        config = {}
+
+        with open(filename, 'r') as f:
+            config = yaml.safe_load(f)
+
+        self.server_port = config.get('server_port', 13434)
+        self.client_port = config.get('client_port', 13435)
+        self.log_level = config.get('log_level', 'info')
+        self.nodes = config.get('nodes', [])
+        self.timeout = config.get('timeout', 2000)
 
 
 def print_config(config: Config):
