@@ -6,7 +6,7 @@ connection:
       queue: reporter
   publisher:
     - type: broadcast
-      queue: movies_metadata_clean
+      exchange: movies_metadata_clean
       msg_type: Movie
     - type: direct
       queue: ratings_clean

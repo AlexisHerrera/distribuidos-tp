@@ -22,15 +22,15 @@ AVAILABLE_COUNTER_LOGICS: Dict[str, Type[BaseCounterLogic]] = {
 class GenericCounterNode(BaseNode):
     def __init__(self, config: Config, counter_type: str):
         super().__init__(config, counter_type)
-        self._final_results_sent = False
         logger.info(f"GenericCounterNode '{counter_type}' initialized.")
-        self.should_send_results_before_eof = True
 
     def handle_message(self, message: Message):
         if not self.is_running():
             return
         try:
-            self.logic.process_message(message)
+            output_message = self.logic.process_message(message)
+            if output_message:
+                self.connection.send(output_message)
 
         except Exception as e:
             logger.error(f'Error processing message in CounterNode: {e}', exc_info=True)
