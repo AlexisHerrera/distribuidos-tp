@@ -11,8 +11,12 @@ class TCPSocket:
         return cls(s)
 
     @classmethod
-    def create_and_connect(cls, addr: tuple):
+    def create_and_connect(cls, addr: tuple, timeout: int | None = None):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        if timeout:
+            s.settimeout(timeout)
+
         s.connect(addr)
 
         return cls(s)
@@ -23,8 +27,8 @@ class TCPSocket:
     def bind(self, addr):
         self.socket.bind(addr)
 
-    def listen(self, n: int):
-        self.socket.listen(n)
+    def listen(self, backlog: int):
+        self.socket.listen(backlog)
 
     def send(self, message: bytes, bytes_amount: int):
         total_bytes_sent = 0
