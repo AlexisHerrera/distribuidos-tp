@@ -7,6 +7,6 @@ connection:
       exchange: movies_metadata_clean
   publisher:
     - type: broadcast
-      queue: post_2000
+      exchange: post_2000
 log:
   level: INFO
