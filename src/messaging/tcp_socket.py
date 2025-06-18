@@ -1,33 +1,50 @@
-from socket import AF_INET, SOCK_STREAM, socket
+import socket
 
 
 class TCPSocket:
-    def __init__(self, port: int):
-        self.socket = socket(AF_INET, SOCK_STREAM)
-        self.socket.bind(('', port))
+    def __init__(self, socket: socket):
+        self.socket: socket = socket
 
-    def sendto(self, addr: tuple, message: bytes, bytes_amount: int):
+    @classmethod
+    def create(cls):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        return cls(s)
+
+    @classmethod
+    def create_and_connect(cls, addr: tuple):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(addr)
+
+        return cls(s)
+
+    def accept(self):
+        return self.socket.accept()
+
+    def bind(self, addr):
+        self.socket.bind(addr)
+
+    def listen(self, n: int):
+        self.socket.listen(n)
+
+    def send(self, message: bytes, bytes_amount: int):
         total_bytes_sent = 0
         while total_bytes_sent < bytes_amount:
-            bytes_sent = self.socket.sendto(
-                message[total_bytes_sent:bytes_amount], addr
-            )
+            bytes_sent = self.socket.send(message[total_bytes_sent:bytes_amount])
             total_bytes_sent += bytes_sent
 
-    def recvfrom(self, bytes_amount: int):
+    def recv(self, bytes_amount: int) -> bytes:
         message = b''
-        host = None
         total_bytes_amount = 0
         while total_bytes_amount < bytes_amount:
-            (msg_bytes, addr) = self.socket.recvfrom(bytes_amount - total_bytes_amount)
+            msg_bytes = self.socket.recv(bytes_amount - total_bytes_amount)
             msg_bytes_len = len(msg_bytes)
             if msg_bytes_len == 0:
-                return None, None
+                return None
             total_bytes_amount += msg_bytes_len
             message += msg_bytes
-            host = addr
 
-        return message, host
+        return message
 
     def stop(self):
-        self.socket.close()
+        if self.socket:
+            self.socket.close()
