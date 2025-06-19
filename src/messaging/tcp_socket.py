@@ -1,4 +1,7 @@
+import logging
 import socket
+
+logger = logging.getLogger(__name__)
 
 
 class TCPSocket:
@@ -50,5 +53,11 @@ class TCPSocket:
         return message
 
     def stop(self):
-        if self.socket:
+        try:
+            self.socket.shutdown(socket.SHUT_RDWR)
+        except OSError as e:
+            logger.error(f'Error while shutting down socket: {e}')
+        try:
             self.socket.close()
+        except OSError as e:
+            logger.error(f'Error while closing socket: {e}')
