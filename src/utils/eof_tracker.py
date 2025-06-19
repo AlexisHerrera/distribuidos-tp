@@ -1,73 +1,31 @@
 import uuid
-from threading import Event, Lock
+from threading import Condition
 
 
 class EOFTracker:
-    TIMEOUT = 5.0
-
     def __init__(self):
-        self.user_lock = Lock()
-        self.users: dict[uuid.UUID, (bool, Event | None)] = {}
+        self.users_condition = Condition()
+        # (is_processing, ok)
+        # is_processing: True if there's a message of the user being processed
+        # ok: if False the process didn't terminate successfully,
+        #     True otherwise
+        self.users: dict[uuid.UUID, (bool, bool)] = {}
 
     def processing(self, user_id: uuid.UUID):
-        with self.user_lock:
-            self.users[user_id] = (True, Event())
+        with self.users_condition:
+            self.users[user_id] = (True, True)
+            self.users_condition.notify_all()
 
-    def done(self, user_id: uuid.UUID):
-        with self.user_lock:
-            (_, event) = self.users[user_id]
-            event.set()
-            self.users[user_id] = (False, None)
+    def done(self, user_id: uuid.UUID, ok: bool = True):
+        with self.users_condition:
+            self.users[user_id] = (False, ok)
+            self.users_condition.notify_all()
 
     def wait(self, user_id: uuid.UUID):
-        with self.user_lock:
-            (processing, event) = self.users.get(user_id, (False, None))
+        with self.users_condition:
+            while not self.__user_finished(user_id):
+                self.users_condition.wait()
 
-        if processing:
-            event.wait()
-
-    # def adquire(self, user_id: uuid.UUID):
-    #     with self.user_lock:
-    #         try:
-    #             sem = self.users[user_id]
-    #             sem.acquire()
-    #         except KeyError:
-    #             self.users[user_id] = Lock()
-    #             self.users[user_id].acquire()
-    #
-    # def release(self, user_id: uuid.UUID):
-    #     with self.user_lock:
-    #         try:
-    #             sem = self.users[user_id]
-    #             sem.release()
-    #         except KeyError:
-    #             # There is no Semaphore created
-    #             return
-
-    # def get_or_create_user_lock(self, user_id: uuid.UUID):
-    #     with self.user_lock:
-    #         try:
-    #             return self.users[user_id]
-    #         except KeyError:
-    #             self.users[user_id] = Lock()
-    #             return self.users[user_id]
-
-    # def add(self, user_id: uuid.UUID):
-    #     with self.user_lock:
-    #         self.users[user_id] = Semaphore(1)
-    #
-    # def set(self, user_id: uuid.UUID):
-    #     with self.user_lock:
-    #         if user_id in self.users:
-    #             self.users[user_id].release()
-    #
-    # def wait(self, user_id: uuid.UUID) -> bool:
-    #     with self.user_lock:
-    #         sem = self.users[user_id]
-    #
-    #     result = sem.acquire()
-    #
-    #     with self.user_lock:
-    #         self.users.pop(user_id, None)  # Silently drop
-    #
-    #     return result
+    def __user_finished(self, user_id):
+        (processing, ok) = self.users.get(user_id, (False, True))
+        return not processing and ok
