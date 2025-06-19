@@ -8,6 +8,8 @@ BASE_PORT = 6000
 SMALL_DATASET_PATH = './.data-small'
 DATASET_PATH = './.data'
 RESULTS_PATH = './.results'
+WATCHER_NODES = []
+WATCHER_CONFIG_PATH = './src/server/watcher/config.yaml'
 
 
 class ScalableService:
@@ -98,6 +100,7 @@ def create_client(client_id: int, dataset_path: str):
 
 
 def create_cleaner():
+    # WATCHER_NODES.append('cleaner')
     return f"""cleaner:
     container_name: cleaner
     build:
@@ -121,6 +124,7 @@ def create_cleaner():
 
 
 def create_sink(n: int):
+    WATCHER_NODES.append(f'q{n}_sink')
     return f"""
   q{n}_sink:
     container_name: q{n}_sink
@@ -139,6 +143,7 @@ def create_sink(n: int):
 
 
 def create_joiner(joiner_type: str) -> str:
+    WATCHER_NODES.append(joiner_type)
     return f"""
   {joiner_type}:
     container_name: {joiner_type}
@@ -158,12 +163,17 @@ def create_joiner(joiner_type: str) -> str:
 
 def create_node(service: ScalableService, index: int):
     container = f'{service.name}-{index}'
+
+    WATCHER_NODES.append(container)
+
     peers = [
         f'{service.name}-{i}:{service.port}'
         for i in range(1, service.nodes + 1)
         if i != index
     ]
+
     peers_env = ','.join(peers)
+
     return f"""{container}:
     container_name: {container}
     build:
@@ -405,6 +415,13 @@ def main():
 
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.write(content)
+
+    with open(WATCHER_CONFIG_PATH, 'r+', encoding='utf-8') as f:
+        data = yaml.safe_load(f)
+
+        data['nodes'] = WATCHER_NODES
+        f.seek(0)
+        yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
 
 
 if __name__ == '__main__':

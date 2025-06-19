@@ -8,5 +8,7 @@ connection:
   publisher:
     - type: broadcast
       queue: argentina_post_2000
+heartbeat:
+  port: 13434
 log:
   level: INFO

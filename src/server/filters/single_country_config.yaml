@@ -8,5 +8,7 @@ connection:
   publisher:
     - type: direct
       queue: solo_country
+heartbeat:
+  port: 13434
 log:
   level: INFO

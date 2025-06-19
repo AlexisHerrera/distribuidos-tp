@@ -105,12 +105,14 @@ class Watcher:
             logger.error(f'Error while watching node: {e}')
 
     def _connect_to_node(self, addr: tuple, timeout: int) -> TCPSocket:
-        while True:
+        while self.is_running:
             try:
                 socket = TCPSocket.create_and_connect(addr, timeout)
                 return socket
             except ConnectionRefusedError:
                 logger.warning(f'Could not connect to {addr}')
+                time.sleep(timeout)
+            except OSError:
                 time.sleep(timeout)
 
     def _initialize_heartbeaters(self):

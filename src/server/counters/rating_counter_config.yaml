@@ -7,5 +7,7 @@ connection:
   publisher:
     - type: direct
       queue: movies_rating_counted
+heartbeat:
+  port: 13434
 log:
   level: INFO

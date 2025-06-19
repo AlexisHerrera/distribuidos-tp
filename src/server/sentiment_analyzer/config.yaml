@@ -8,7 +8,6 @@ connection:
     - type: direct
       queue: sentiment_analyzed
 heartbeat:
-  server_port: 13434
-  client_port: 13434
+  port: 13434
 log:
   level: INFO

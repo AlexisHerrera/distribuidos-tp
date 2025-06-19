@@ -8,5 +8,7 @@ connection:
   publisher:
     - type: direct
       queue: argentina_and_spain
+heartbeat:
+  port: 13434
 log:
   level: INFO
