@@ -1,4 +1,5 @@
 import queue
+import socket
 import threading
 import time
 import unittest
@@ -8,7 +9,7 @@ import pytest
 from src.messaging.tcp_socket import TCPSocket
 
 
-@pytest.mark.skip(reason='May leave sockets open')
+@pytest.mark.skip(reason='May throw warning with address already in use')
 class TestTCPSocket:
     def test_tcpsocket_send_and_recv_message(self):
         server_port = 12345
@@ -23,7 +24,14 @@ class TestTCPSocket:
             message = client_accepted.recv(1)
 
             assert message == sent_message
-            client_accepted.close()
+            try:
+                client_accepted.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                client_accepted.close()
+            except OSError:
+                pass
 
         t = threading.Thread(target=run_server)
         t.start()
@@ -47,7 +55,6 @@ class TestTCPSocket:
     def test_tcpsocket_recv_after_close(self):
         server_port = 12349
         server_addr = ('127.0.0.1', server_port)
-        # sent_message = b'H'
         server = TCPSocket.create()
         q = queue.SimpleQueue()
 
@@ -61,6 +68,7 @@ class TestTCPSocket:
         t = threading.Thread(target=run_server)
         t.start()
 
+        # Wait for server to bind and listen
         _ = q.get()
         server.stop()
         t.join()
