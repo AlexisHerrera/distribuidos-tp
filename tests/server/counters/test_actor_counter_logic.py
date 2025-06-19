@@ -1,47 +1,60 @@
 import unittest
+import uuid
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.actor_count import ActorCount
 from src.server.counters.actor_counter_logic import ActorCounterLogic
 
 
-class TestActorCounterSinkLogic:
-    def test_group_by_user_id_success(self):
-        controller = ActorCounterLogic()
+class TestActorCounterLogic(unittest.TestCase):
+    def test_process_batch_aggregates_correctly(self):
+        """
+        Verify that a single message (batch) with multiple actor counts
+        is aggregated correctly and returned immediately.
+        """
+        logic = ActorCounterLogic()
+        user_id = uuid.uuid4()
 
-        actor_counts_1 = []
-        actor_names = ['a', 'b', 'c', 'd', 'e', 'f']
+        input_actors = [
+            ActorCount('Ricardo Darin', 1),
+            ActorCount('Guillermo Francella', 1),
+            ActorCount('Ricardo Darin', 1),
+            ActorCount('Soledad Villamil', 1),
+            ActorCount('Ricardo Darin', 1),
+        ]
+        input_message = Message(user_id, MessageType.ActorCount, input_actors)
 
-        for i in range(len(actor_names)):
-            actor_counts_1.append(ActorCount(actor_names[i], i))
+        output_message = logic.process_message(input_message)
 
-        user_id = 1
-
-        controller.process_message(
-            Message(user_id, MessageType.ActorCount, actor_counts_1)
+        self.assertIsNotNone(
+            output_message, 'The method should return a Message, not None.'
         )
+        self.assertEqual(user_id, output_message.user_id)
+        self.assertEqual(MessageType.ActorCount, output_message.message_type)
 
-        result = controller.message_result(user_id)
+        actual_counts = {actor.actor_name: actor.count for actor in output_message.data}
 
-        assert result.user_id == user_id
-        assert len(result.data) == len(actor_counts_1)
+        expected_counts = {
+            'Ricardo Darin': 3,
+            'Guillermo Francella': 1,
+            'Soledad Villamil': 1,
+        }
 
-        actor_counts_2 = []
-        reduced_len = len(actor_names) // 2
+        self.assertEqual(expected_counts, actual_counts)
 
-        for i in range(len(actor_names[:reduced_len])):
-            actor_counts_2.append(ActorCount(actor_names[i], i))
+    def test_process_empty_batch_returns_none(self):
+        """
+        Verify that processing a message with no data returns None.
+        """
+        logic = ActorCounterLogic()
+        user_id = uuid.uuid4()
+        input_message = Message(user_id, MessageType.ActorCount, [])
 
-        user_id = 2
+        output_message = logic.process_message(input_message)
 
-        controller.process_message(
-            Message(user_id, MessageType.ActorCount, actor_counts_2)
+        self.assertIsNone(
+            output_message, 'Processing an empty list should return None.'
         )
-
-        result = controller.message_result(user_id)
-
-        assert result.user_id == user_id
-        assert len(result.data) == len(actor_counts_2)
 
 
 if __name__ == '__main__':

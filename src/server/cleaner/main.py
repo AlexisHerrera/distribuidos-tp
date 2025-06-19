@@ -23,6 +23,7 @@ from src.model.rating import Rating
 from src.server.cleaner.clean_credits import parse_line_to_credits
 from src.server.cleaner.clean_movies import parse_line_to_movie
 from src.server.cleaner.clean_ratings import parse_line_to_rating
+from src.server.heartbeat import Heartbeat
 from src.utils.config import Config
 from src.utils.log import initialize_log
 
@@ -34,6 +35,7 @@ class Cleaner:
         logger.info('Initializing Cleaner...')
         self.config = config
         self.is_running = True
+        self.heartbeat: Heartbeat = Heartbeat(config)
         self.connection = ConnectionCreator.create_multipublisher(config)
         self.server_socket = None
         self.expected_query_count = 5
@@ -450,6 +452,11 @@ class Cleaner:
                 logger.info('Messaging connection closed.')
             except Exception as e:
                 logger.error(f'Error closing messaging connection: {e}', exc_info=True)
+
+        try:
+            self.heartbeat.stop()
+        except Exception as e:
+            logger.error(f'Error stopping heartbeater: {e}')
 
         logger.info('Cleaner shutdown sequence complete.')
 

@@ -27,7 +27,7 @@ class ConnectionCreator:
 
         if len(publiser_config) > 0:
             if publiser_config[0]['type'] == 'broadcast':
-                publisher = BroadcastPublisher(broker, publiser_config[0]['queue'])
+                publisher = BroadcastPublisher(broker, publiser_config[0]['exchange'])
             else:
                 publisher = DirectPublisher(broker, publiser_config[0]['queue'])
 
@@ -49,13 +49,12 @@ class ConnectionCreator:
         publishers: list[tuple[MessageType, Publisher]] = []
 
         for p in config.publishers:
-            queue_name = p['queue']
             msg_type = MessageType(p['msg_type'])
 
             if p['type'] == 'broadcast':
-                publisher = BroadcastPublisher(broker_pub, queue_name)
+                publisher = BroadcastPublisher(broker_pub, p['exchange'])
             else:
-                publisher = DirectPublisher(broker_pub, queue_name)
+                publisher = DirectPublisher(broker_pub, p['queue'])
 
             publishers.append((msg_type, publisher))
 
