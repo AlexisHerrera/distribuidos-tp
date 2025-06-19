@@ -100,7 +100,7 @@ def create_client(client_id: int, dataset_path: str):
 
 
 def create_cleaner():
-    # WATCHER_NODES.append('cleaner')
+    WATCHER_NODES.append('cleaner')
     return f"""cleaner:
     container_name: cleaner
     build:

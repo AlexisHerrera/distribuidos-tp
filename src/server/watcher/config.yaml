@@ -2,6 +2,7 @@ heartbeat_port: 13434
 timeout: 5
 log_level: DEBUG
 nodes:
+- cleaner
 - q1_sink
 - q2_sink
 - q3_sink
