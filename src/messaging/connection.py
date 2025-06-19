@@ -99,7 +99,7 @@ class MultiPublisherConnection:
             return
 
         logger.info(
-            f'[{eof_message.user_id}]Preparing to send EOF message to target queue type {target_queue_type}'
+            f'[{eof_message.user_id}] Preparing to send EOF message to target queue type {target_queue_type}'
         )
 
         with self._pub_lock:
