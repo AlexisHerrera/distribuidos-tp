@@ -203,6 +203,15 @@ def create_scalable(service: ScalableService):
 
 
 def create_watcher():
+    # Create config file
+    data = {}
+    with open(WATCHER_CONFIG_PATH, 'r', encoding='utf-8') as f:
+        data = yaml.safe_load(f)
+
+    with open(WATCHER_CONFIG_PATH, 'w', encoding='utf-8') as f:
+        data['nodes'] = WATCHER_NODES
+        yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
+
     return f"""watcher:
     container_name: watcher
     build:
