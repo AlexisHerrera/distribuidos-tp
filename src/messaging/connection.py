@@ -1,11 +1,12 @@
 import logging
 import threading
+import uuid
 from typing import Callable
 
 from src.messaging.broker import Broker
 from src.messaging.consumer import Consumer
 from src.messaging.protocol.message import Message, MessageType
-from src.messaging.publisher import Publisher
+from src.messaging.publisher import Publisher, DirectPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class MultiPublisherConnection:
         self,
         broker_cons: Broker,
         broker_pub: Broker,
-        publishers: dict[MessageType, Publisher],
+        publishers: list[tuple[MessageType, Publisher]],
         consumer: Consumer,
     ):
         self.__broker_cons = broker_cons
@@ -55,8 +56,30 @@ class MultiPublisherConnection:
         self.__consumer = consumer
         self._pub_lock = threading.Lock()
 
-    def _get_publisher(self, message_type: MessageType) -> Publisher | None:
-        return self.__publishers.get(message_type)
+    def _get_publisher(self, message: Message) -> Publisher | None:
+        publishers_by_message_type = self._get_publishers_by_message_type(message)
+        
+        if(len(publishers_by_message_type) == 1):
+            return publishers_by_message_type[0]
+        else: # Only for Direct Publishers with more than one client.
+            return self._get_publisher_for_client(publishers_by_message_type,message.user_id)
+    
+    def _get_publishers_by_message_type(self, message: Message) -> list[Publisher] | None:
+        return [publisher for message_type, publisher in self.__publishers if message_type == message.message_type]
+    
+    def _get_publisher_for_client(
+        self,
+        directPublishers: list[DirectPublisher],
+        user_id: uuid.UUID
+    ) -> DirectPublisher | None:
+        user_id_str = str(user_id)
+
+        for publisher in directPublishers:
+            routing_key = getattr(publisher, '__routing_key', 'UNKNOWN')
+            if user_id_str in routing_key:
+                return publisher
+
+        return None
 
     def _perform_publish(self, publisher: Publisher, message: Message):
         try:
@@ -74,7 +97,7 @@ class MultiPublisherConnection:
             )
             return
 
-        publisher = self._get_publisher(message.message_type)
+        publisher = self._get_publisher(message)
         if not publisher:
             logger.error(
                 f'Message type {message.message_type} not in publishers for send'
@@ -91,7 +114,7 @@ class MultiPublisherConnection:
             )
             return
 
-        publisher = self._get_publisher(target_queue_type)
+        publisher = self._get_publisher(eof_message)
         if not publisher:
             logger.error(
                 f'[{eof_message.user_id}] Target queue type {target_queue_type} for EOF not in publishers'
