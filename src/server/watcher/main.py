@@ -4,15 +4,13 @@ from src.server.watcher.watcher import Watcher
 from src.utils.config import WatcherConfig
 from src.utils.log import initialize_log
 
-logger = logging.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def main():
     config = WatcherConfig()
     initialize_log(config.log_level)
-    watcher = Watcher(
-        config.server_port, config.client_port, config.nodes, config.timeout
-    )
+    watcher = Watcher(config.heartbeat_port, config.nodes, config.timeout)
 
     try:
         watcher.run()

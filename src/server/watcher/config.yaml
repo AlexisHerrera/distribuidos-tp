@@ -1,0 +1,6 @@
+heartbeat_port: 13434
+# Timeout between heartbeats, in seconds
+timeout: 5
+log_level: DEBUG
+nodes:
+  - filter_post_2000-1

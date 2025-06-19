@@ -36,7 +36,6 @@ class Config:
 
         # Heartbeat config
         self.heartbeat_port = heartbeat['port']
-        self.heartbeat_watcher_port = heartbeat['watcher_port']
 
     def get_env_var(self, var_name: str, default: str = None) -> str | None:
         return os.getenv(var_name, default)
@@ -49,11 +48,11 @@ class WatcherConfig:
         with open(filename, 'r') as f:
             config = yaml.safe_load(f)
 
-        self.server_port = config.get('server_port', 13434)
-        self.client_port = config.get('client_port', 13435)
-        self.log_level = config.get('log_level', 'info')
+        self.heartbeat_port = config.get('heartbeat_port', 13434)
+        self.log_level = config.get('log_level', 'INFO')
         self.nodes = config.get('nodes', [])
-        self.timeout = config.get('timeout', 2000)
+        # Timeout between heartbeats, in seconds
+        self.timeout = config.get('timeout', 2)
 
 
 def print_config(config: Config):

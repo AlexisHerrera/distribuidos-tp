@@ -192,6 +192,24 @@ def create_scalable(service: ScalableService):
     return nodes
 
 
+def create_watcher():
+    return f"""watcher:
+    container_name: watcher
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/watcher/main.py"]
+    networks:
+      - {NETWORK_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/watcher/config.yaml:/app/config.yaml
+      - /var/run/docker.sock:/var/run/docker.sock
+  """
+
+
 def create_services(
     scalable_services: list[ScalableService], config: Config, dataset_path: str
 ):
@@ -210,6 +228,8 @@ def create_services(
     for service in scalable_services:
         services += create_scalable(service)
 
+    watcher = create_watcher()
+
     return f"""
 services:
   {rabbitmq}
@@ -218,6 +238,7 @@ services:
   {services}
   {sinks}
   {joiners}
+  {watcher}
 """
 
 

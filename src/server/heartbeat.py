@@ -5,6 +5,8 @@ from src.messaging.server_socket import ServerSocket
 from src.utils.config import Config
 
 RECV_BYTES_AMOUNT = 1
+MESSAGE_TO_SEND = b'B'  # Beat
+SEND_BYTES_AMOUNT = len(MESSAGE_TO_SEND)
 
 logger = logging.getLogger(__name__)
 
@@ -18,17 +20,18 @@ class Heartbeat:
         self.heartbeat_thread.start()
 
     def _manage_client(self):
-        message = b'B'  # Beat
-        bytes_amount = len(message)
         while self.is_running:
-            _ = self.client.recv(RECV_BYTES_AMOUNT)
+            message = self.client.recv(RECV_BYTES_AMOUNT)
+            logger.debug(f'Received {message}')
 
-            self.client.send(message, bytes_amount)
+            self.client.send(MESSAGE_TO_SEND, SEND_BYTES_AMOUNT)
+            logger.debug(f'Sent {MESSAGE_TO_SEND}')
 
     def run(self):
         try:
             while self.is_running:
-                self.client, _address = self.socket.accept()
+                self.client, address = self.socket.accept()
+                logger.debug(f'Received new heartbeater from {address}')
 
                 self._manage_client()
         except Exception as e:

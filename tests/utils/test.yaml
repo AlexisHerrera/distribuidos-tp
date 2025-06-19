@@ -9,6 +9,5 @@ connection:
       queue: another_queue
 heartbeat:
   port: 13434
-  watcher_port: 13434
 log:
   level: ERROR
