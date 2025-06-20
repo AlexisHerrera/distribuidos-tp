@@ -253,7 +253,6 @@ services:
   {cleaner}
   {services}
   {sinks}
-  {joiners}
   {watcher}
 """
 
