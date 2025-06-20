@@ -3,9 +3,11 @@ import signal
 import subprocess
 import threading
 import time
-from queue import Queue, SimpleQueue
+from queue import SimpleQueue
 
 from src.messaging.tcp_socket import TCPSocket
+from src.server.heartbeat import Heartbeat
+from src.utils.config import WatcherConfig
 
 logger = logging.getLogger(__name__)
 
@@ -20,17 +22,19 @@ MAX_CONNECT_TRIES = 3
 
 
 class Watcher:
-    def __init__(self, heartbeat_port: int, nodes: list[str], timeout: int):
-        self.heartbeat_port: int = heartbeat_port
-        self.nodes: list[str] = nodes
+    def __init__(self, config: WatcherConfig):
+        self.heartbeat: Heartbeat = Heartbeat(config.heartbeat_port)
+        # self.bully = Bully(config.bully_port, config.peers)
+        self.heartbeat_port: int = config.heartbeat_port
+        self.nodes: list[str] = config.nodes
+        self.peers: list[str] = config.peers
         self.sockets_lock: threading.Lock = threading.Lock()
         self.sockets: dict[str, TCPSocket] = {}
 
         self.heartbeater_threads: list[threading.Thread] = []
 
         self.exit_queue: SimpleQueue = SimpleQueue()
-        self.heartbeater_queues: dict[str, Queue] = {}
-        self.timeout: int = timeout
+        self.timeout: int = config.timeout
 
         self.is_running = True
         self._setup_signal_handlers()
@@ -170,3 +174,6 @@ class Watcher:
         # Stop threads
         for h in self.heartbeater_threads:
             h.join()
+
+        # self.bully.stop()
+        self.heartbeat.stop()

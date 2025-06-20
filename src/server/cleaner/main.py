@@ -35,7 +35,7 @@ class Cleaner:
         logger.info('Initializing Cleaner...')
         self.config = config
         self.is_running = True
-        self.heartbeat: Heartbeat = Heartbeat(config)
+        self.heartbeat: Heartbeat = Heartbeat(config.heartbeat_port)
         self.connection = ConnectionCreator.create_multipublisher(config)
         self.server_socket = None
         self.expected_query_count = 5

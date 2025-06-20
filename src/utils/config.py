@@ -53,6 +53,11 @@ class WatcherConfig:
         self.nodes = config.get('nodes', [])
         # Timeout between heartbeats, in seconds
         self.timeout = config.get('timeout', 2)
+        self.bully_port = config.get('bully_port', 25117)
+        self.node_id = os.getenv('NODE_ID', '')
+
+        peers = os.getenv('PEERS', '')
+        self.peers = peers.split(',') if peers != '' else []
 
 
 def print_config(config: Config):

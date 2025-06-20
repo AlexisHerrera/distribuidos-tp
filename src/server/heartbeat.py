@@ -4,7 +4,6 @@ from queue import Empty, SimpleQueue
 
 from src.messaging.server_socket import ServerSocket
 from src.messaging.tcp_socket import TCPSocket
-from src.utils.config import Config
 
 RECV_BYTES_AMOUNT = 1
 MESSAGE_TO_SEND = b'B'  # Beat
@@ -14,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class Heartbeat:
-    def __init__(self, config: Config):
-        self.socket = ServerSocket(config.heartbeat_port, 5)
+    def __init__(self, heartbeat_port: int):
+        self.socket = ServerSocket(heartbeat_port, 5)
         self.is_running = True
         self.manager_queue: SimpleQueue = SimpleQueue()
         self.clients: dict[tuple, (threading.Thread, TCPSocket)] = {}
