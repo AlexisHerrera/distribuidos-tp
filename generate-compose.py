@@ -120,6 +120,7 @@ def create_cleaner():
         condition: service_healthy
     volumes:
       - ./src/server/cleaner/config.yaml:/app/config.yaml
+      - ./client_uuids.csv:/app/client_uuids.csv
 """
 
 
