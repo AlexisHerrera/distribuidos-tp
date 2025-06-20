@@ -32,5 +32,8 @@ echo ">>> Generando docker-compose.yaml con argumentos: '${GENERATE_COMPOSE_ARGS
 GENERATE_COMPOSE_ARGS="${GENERATE_COMPOSE_ARGS}"
 python generate-compose.py ${GENERATE_COMPOSE_ARGS}
 
+echo ">>> Creando archivos de configuracion con multiqueues..."
+python create_multiqueues_config_files.py
+
 echo ">>> Lanzando contenedores"
 make docker-compose-up
