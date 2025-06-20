@@ -42,7 +42,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -68,7 +68,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -557,7 +557,7 @@ services:
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ./src/server/watcher/main.py
+    command: ["python", "./src/server/watcher/main.py"]
     networks:
       - testing_net
     environment:
@@ -574,7 +574,7 @@ services:
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ./src/server/watcher/main.py
+    command: ["python", "./src/server/watcher/main.py"]
     networks:
       - testing_net
     environment:

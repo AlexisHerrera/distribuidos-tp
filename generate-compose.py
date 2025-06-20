@@ -440,7 +440,7 @@ def main():
     watcher = ScalableService(
         name='watcher',
         nodes=config.watcher,
-        command='./src/server/watcher/main.py',
+        command='["python", "./src/server/watcher/main.py"]',
         config_file='./src/server/watcher/config.yaml',
     )
     content = create_docker_compose_data(
