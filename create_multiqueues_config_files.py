@@ -1,4 +1,5 @@
 import yaml
+import csv
 
 
 class IndentDumper(yaml.Dumper):
@@ -6,23 +7,23 @@ class IndentDumper(yaml.Dumper):
         return super().increase_indent(flow, False)
 
 
-def read_num_clients(scaling_config_path: str) -> int:
+def read_uuids_from_csv(csv_path: str) -> list[str]:
     try:
-        with open(scaling_config_path, 'r') as f:
-            data = yaml.safe_load(f)
-            num_clients = data.get('clients', None)
-            if not isinstance(num_clients, int) or num_clients < 1:
-                raise ValueError("Invalid or missing 'clients' key in scaling config.")
-            return num_clients
+        with open(csv_path, 'r', newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            row = next(reader)
+            if not row:
+                raise ValueError("CSV file is empty or improperly formatted.")
+            return row
     except FileNotFoundError:
-        print(f"Scaling config file not found at: {scaling_config_path}")
+        print(f"UUID CSV file not found at: {csv_path}")
         raise
-    except yaml.YAMLError as e:
-        print(f"Error parsing YAML: {e}")
+    except Exception as e:
+        print(f"Error reading UUID CSV file: {e}")
         raise
 
 
-def create_config(num_clients: int) -> dict:
+def create_config(client_uuids: list[str]) -> dict:
     config = {
         'rabbit': {
             'host': 'rabbitmq'
@@ -39,16 +40,6 @@ def create_config(num_clients: int) -> dict:
                     'type': 'broadcast',
                     'exchange': 'movies_metadata_clean',
                     'msg_type': 'Movie'
-                },
-                {
-                    'type': 'direct',
-                    'queue': 'ratings_clean',
-                    'msg_type': 'Rating'
-                },
-                {
-                    'type': 'direct',
-                    'queue': 'credits_clean',
-                    'msg_type': 'Cast'
                 }
             ]
         },
@@ -60,15 +51,15 @@ def create_config(num_clients: int) -> dict:
         }
     }
 
-    for i in range(1, num_clients + 1):
+    for client_id in client_uuids:
         config['connection']['publisher'].append({
             'type': 'direct',
-            'queue': f'ratings_clean_{i}',
+            'queue': f'ratings_clean_{client_id}',
             'msg_type': 'Rating'
         })
         config['connection']['publisher'].append({
             'type': 'direct',
-            'queue': f'credits_clean_{i}',
+            'queue': f'credits_clean_{client_id}',
             'msg_type': 'Cast'
         })
 
@@ -76,17 +67,17 @@ def create_config(num_clients: int) -> dict:
 
 
 def main():
-    scaling_config_path = 'nodes-config.yaml'
+    uuid_csv_path = 'client_uuids.csv'
     output_config_path = 'src/server/cleaner/config.yaml'
 
     try:
-        num_clients = read_num_clients(scaling_config_path)
-        config = create_config(num_clients)
+        client_uuids = read_uuids_from_csv(uuid_csv_path)
+        config = create_config(client_uuids)
 
         with open(output_config_path, 'w') as file:
             yaml.dump(config, file, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
 
-        print(f"Configuration file '{output_config_path}' created successfully with {num_clients} clients.")
+        print(f"Configuration file '{output_config_path}' created successfully with {len(client_uuids)} UUID-based queues.")
     except Exception as e:
         print(f"Error: {e}")
 
