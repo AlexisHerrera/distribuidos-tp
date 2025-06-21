@@ -173,6 +173,7 @@ def create_node(service: ScalableService, index: int):
     ]
 
     peers_env = ','.join(peers)
+    state_volume_path = f'./.state/{container}'
 
     return f"""{container}:
     container_name: {container}
@@ -191,6 +192,7 @@ def create_node(service: ScalableService, index: int):
         condition: service_healthy
     volumes:
       - {service.config_file}:/app/config.yaml
+      - {state_volume_path}:/app/state
   """
 
 

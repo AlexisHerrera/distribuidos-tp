@@ -42,7 +42,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data-small:/app/.data
+      - ./.data:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -68,7 +68,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data-small:/app/.data
+      - ./.data:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -103,7 +103,7 @@ services:
     environment:
       - NODE_ID=filter_single_country-1
       - PORT=6000
-      - PEERS=
+      - PEERS=filter_single_country-2:6000
     networks:
       - testing_net
     depends_on:
@@ -111,6 +111,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/single_country_config.yaml:/app/config.yaml
+      - ./.state/filter_single_country-1:/app/state
+  filter_single_country-2:
+    container_name: filter_single_country-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "solo_country"]
+    environment:
+      - NODE_ID=filter_single_country-2
+      - PORT=6000
+      - PEERS=filter_single_country-1:6000
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/single_country_config.yaml:/app/config.yaml
+      - ./.state/filter_single_country-2:/app/state
   country_budget_counter-1:
     container_name: country_budget_counter-1
     build:
@@ -120,7 +139,7 @@ services:
     environment:
       - NODE_ID=country_budget_counter-1
       - PORT=6001
-      - PEERS=
+      - PEERS=country_budget_counter-2:6001
     networks:
       - testing_net
     depends_on:
@@ -128,6 +147,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/country_budget_config.yaml:/app/config.yaml
+      - ./.state/country_budget_counter-1:/app/state
+  country_budget_counter-2:
+    container_name: country_budget_counter-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/main.py", "country_budget"]
+    environment:
+      - NODE_ID=country_budget_counter-2
+      - PORT=6001
+      - PEERS=country_budget_counter-1:6001
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/counters/country_budget_config.yaml:/app/config.yaml
+      - ./.state/country_budget_counter-2:/app/state
   filter_budget_revenue-1:
     container_name: filter_budget_revenue-1
     build:
@@ -137,7 +175,7 @@ services:
     environment:
       - NODE_ID=filter_budget_revenue-1
       - PORT=6002
-      - PEERS=
+      - PEERS=filter_budget_revenue-2:6002
     networks:
       - testing_net
     depends_on:
@@ -145,6 +183,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/budget_revenue_config.yaml:/app/config.yaml
+      - ./.state/filter_budget_revenue-1:/app/state
+  filter_budget_revenue-2:
+    container_name: filter_budget_revenue-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "budget_revenue"]
+    environment:
+      - NODE_ID=filter_budget_revenue-2
+      - PORT=6002
+      - PEERS=filter_budget_revenue-1:6002
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/budget_revenue_config.yaml:/app/config.yaml
+      - ./.state/filter_budget_revenue-2:/app/state
   sentiment_analyzer-1:
     container_name: sentiment_analyzer-1
     build:
@@ -154,7 +211,7 @@ services:
     environment:
       - NODE_ID=sentiment_analyzer-1
       - PORT=6003
-      - PEERS=
+      - PEERS=sentiment_analyzer-2:6003
     networks:
       - testing_net
     depends_on:
@@ -162,6 +219,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
+      - ./.state/sentiment_analyzer-1:/app/state
+  sentiment_analyzer-2:
+    container_name: sentiment_analyzer-2
+    build:
+      context: .
+      dockerfile: src/server/sentiment_analyzer/Dockerfile
+    command: ["python", "src/server/sentiment_analyzer/main.py", "sentiment"]
+    environment:
+      - NODE_ID=sentiment_analyzer-2
+      - PORT=6003
+      - PEERS=sentiment_analyzer-1:6003
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
+      - ./.state/sentiment_analyzer-2:/app/state
   filter_post_2000-1:
     container_name: filter_post_2000-1
     build:
@@ -171,7 +247,7 @@ services:
     environment:
       - NODE_ID=filter_post_2000-1
       - PORT=6004
-      - PEERS=
+      - PEERS=filter_post_2000-2:6004
     networks:
       - testing_net
     depends_on:
@@ -179,6 +255,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/post_2000_config.yaml:/app/config.yaml
+      - ./.state/filter_post_2000-1:/app/state
+  filter_post_2000-2:
+    container_name: filter_post_2000-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "post_2000"]
+    environment:
+      - NODE_ID=filter_post_2000-2
+      - PORT=6004
+      - PEERS=filter_post_2000-1:6004
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/post_2000_config.yaml:/app/config.yaml
+      - ./.state/filter_post_2000-2:/app/state
   filter_argentina-1:
     container_name: filter_argentina-1
     build:
@@ -188,7 +283,7 @@ services:
     environment:
       - NODE_ID=filter_argentina-1
       - PORT=6005
-      - PEERS=
+      - PEERS=filter_argentina-2:6005
     networks:
       - testing_net
     depends_on:
@@ -196,6 +291,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/argentina_config.yaml:/app/config.yaml
+      - ./.state/filter_argentina-1:/app/state
+  filter_argentina-2:
+    container_name: filter_argentina-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "argentina"]
+    environment:
+      - NODE_ID=filter_argentina-2
+      - PORT=6005
+      - PEERS=filter_argentina-1:6005
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/argentina_config.yaml:/app/config.yaml
+      - ./.state/filter_argentina-2:/app/state
   filter_argentina_and_spain-1:
     container_name: filter_argentina_and_spain-1
     build:
@@ -205,7 +319,7 @@ services:
     environment:
       - NODE_ID=filter_argentina_and_spain-1
       - PORT=6006
-      - PEERS=
+      - PEERS=filter_argentina_and_spain-2:6006
     networks:
       - testing_net
     depends_on:
@@ -213,6 +327,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/argentina_and_spain_config.yaml:/app/config.yaml
+      - ./.state/filter_argentina_and_spain-1:/app/state
+  filter_argentina_and_spain-2:
+    container_name: filter_argentina_and_spain-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "argentina_and_spain"]
+    environment:
+      - NODE_ID=filter_argentina_and_spain-2
+      - PORT=6006
+      - PEERS=filter_argentina_and_spain-1:6006
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/argentina_and_spain_config.yaml:/app/config.yaml
+      - ./.state/filter_argentina_and_spain-2:/app/state
   filter_decade_00-1:
     container_name: filter_decade_00-1
     build:
@@ -222,7 +355,7 @@ services:
     environment:
       - NODE_ID=filter_decade_00-1
       - PORT=6007
-      - PEERS=
+      - PEERS=filter_decade_00-2:6007
     networks:
       - testing_net
     depends_on:
@@ -230,6 +363,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/decade_00_config.yaml:/app/config.yaml
+      - ./.state/filter_decade_00-1:/app/state
+  filter_decade_00-2:
+    container_name: filter_decade_00-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/filters/main.py", "decade_00"]
+    environment:
+      - NODE_ID=filter_decade_00-2
+      - PORT=6007
+      - PEERS=filter_decade_00-1:6007
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/filters/decade_00_config.yaml:/app/config.yaml
+      - ./.state/filter_decade_00-2:/app/state
   rating_counter-1:
     container_name: rating_counter-1
     build:
@@ -239,7 +391,7 @@ services:
     environment:
       - NODE_ID=rating_counter-1
       - PORT=6008
-      - PEERS=
+      - PEERS=rating_counter-2:6008
     networks:
       - testing_net
     depends_on:
@@ -247,6 +399,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/rating_counter_config.yaml:/app/config.yaml
+      - ./.state/rating_counter-1:/app/state
+  rating_counter-2:
+    container_name: rating_counter-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/main.py", "rating"]
+    environment:
+      - NODE_ID=rating_counter-2
+      - PORT=6008
+      - PEERS=rating_counter-1:6008
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/counters/rating_counter_config.yaml:/app/config.yaml
+      - ./.state/rating_counter-2:/app/state
   cast_splitter-1:
     container_name: cast_splitter-1
     build:
@@ -256,7 +427,7 @@ services:
     environment:
       - NODE_ID=cast_splitter-1
       - PORT=6009
-      - PEERS=
+      - PEERS=cast_splitter-2:6009
     networks:
       - testing_net
     depends_on:
@@ -264,6 +435,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/splitters/config.yaml:/app/config.yaml
+      - ./.state/cast_splitter-1:/app/state
+  cast_splitter-2:
+    container_name: cast_splitter-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/splitters/main.py", "cast_splitter"]
+    environment:
+      - NODE_ID=cast_splitter-2
+      - PORT=6009
+      - PEERS=cast_splitter-1:6009
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/splitters/config.yaml:/app/config.yaml
+      - ./.state/cast_splitter-2:/app/state
   actor_counter-1:
     container_name: actor_counter-1
     build:
@@ -273,7 +463,7 @@ services:
     environment:
       - NODE_ID=actor_counter-1
       - PORT=6010
-      - PEERS=
+      - PEERS=actor_counter-2:6010
     networks:
       - testing_net
     depends_on:
@@ -281,6 +471,25 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/actor_counter_config.yaml:/app/config.yaml
+      - ./.state/actor_counter-1:/app/state
+  actor_counter-2:
+    container_name: actor_counter-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/counters/main.py", "actor_counter"]
+    environment:
+      - NODE_ID=actor_counter-2
+      - PORT=6010
+      - PEERS=actor_counter-1:6010
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/counters/actor_counter_config.yaml:/app/config.yaml
+      - ./.state/actor_counter-2:/app/state
   
   
   q1_sink:
