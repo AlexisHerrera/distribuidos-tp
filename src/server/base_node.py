@@ -12,7 +12,7 @@ from src.messaging.protocol.message import Message, MessageType
 from src.server.heartbeat import Heartbeat
 from src.server.leader_election import LeaderElection
 from src.utils.config import Config
-from src.utils.eof_tracker import EOFTracker
+from src.utils.in_flight_tracker import InFlightTracker
 from src.utils.log import initialize_log
 
 logger = logging.getLogger(__name__)
@@ -31,9 +31,8 @@ class BaseNode(ABC):
         self._shutdown_lock = threading.Lock()
         self.connection = ConnectionCreator.create(config)
         self.leader = None
-        # Checks if it should continue processing messages
-        self.completed_user_ids = set()
-        self.completed_user_ids_lock = threading.Lock()
+        self.in_flight_tracker = InFlightTracker()
+
         # sent results before eof
         self.should_send_results_before_eof = False
         # Threads executor (should be instantiated on node)
@@ -45,7 +44,6 @@ class BaseNode(ABC):
 
             if isinstance(peers, list) and peers and port_str is not None:
                 self.leader = LeaderElection(config, self)
-                self.eof_tracker = EOFTracker()
             else:
                 logger.info(
                     'Single-node configuration detected (peers list empty/missing or port missing). LeaderElection component will not be used.'
@@ -64,6 +62,9 @@ class BaseNode(ABC):
     @abstractmethod
     def _get_logic_registry(self) -> Dict[str, Type]:
         pass
+
+    def get_in_flight_count(self, user_id: uuid.UUID) -> int:
+        return self.in_flight_tracker.get(user_id)
 
     def _load_logic(self):
         logic_registry = self._get_logic_registry()
@@ -120,49 +121,31 @@ class BaseNode(ABC):
         except Exception as e:
             logger.error(f'Error sending final counter results: {e}', exc_info=True)
 
-    def wait_for_last_user_message(self, user_id: uuid.UUID, is_leader: bool):
-        # If there's more than one node and this is not the leader
-        if self.leader and not is_leader:
-            self.eof_tracker.wait(user_id)
-            return
-
     def process_message(self, message: Message):
-        if self.leader:
-            self.eof_tracker.processing(message.user_id)
-
-        with self.completed_user_ids_lock:
-            if message.user_id in self.completed_user_ids:
-                if self.leader:
-                    state = self.leader._get_or_create_client_state()
-                    logger.warning(f'{state}')
-                    self.eof_tracker.done(message.user_id)
-                logger.warning(
-                    f'Ignoring message for completed user_id: {message.user_id}'
-                )
-                return
+        user_id = message.user_id
 
         if message.message_type == MessageType.EOF:
             logger.info(f'RECEIVED EOF FROM QUEUE for user_id: {message.user_id}')
-            with self.completed_user_ids_lock:
-                self.completed_user_ids.add(message.user_id)
             if self.leader:
                 # Multi-node
                 logger.debug(
                     f'User {message.user_id}: Delegating EOF to LeaderElection.'
                 )
                 self.leader.handle_incoming_eof(message.user_id)
-                self.eof_tracker.done(message.user_id)
             else:
                 # Single-Node
                 self._finalize_single_node(message.user_id)
             return
         try:
+            if self.leader:
+                self.in_flight_tracker.increment(user_id)
             self.handle_message(message)
         except Exception as e:
             logger.error(f'Error en handle_message: {e}', exc_info=True)
+            raise
         finally:
             if self.leader:
-                self.eof_tracker.done(message.user_id)
+                self.in_flight_tracker.decrement(user_id)
 
     def _finalize_single_node(self, user_id: uuid.UUID):
         logger.info(f'User {user_id}: Single-node waiting for executor tasks...')
@@ -180,7 +163,6 @@ class BaseNode(ABC):
             logger.critical('Node init failed.')
             return
         logger.info(f'Starting Node (Type: {self.node_type})...')
-
         try:
             logic_name = type(self.logic).__name__ if self.logic else 'N/A'
             logger.info(f"Node '{logic_name}' running. Consuming. Waiting...")

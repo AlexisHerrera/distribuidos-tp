@@ -30,5 +30,6 @@ nodes:
 - rating_counter-1
 - rating_counter-2
 - cast_splitter-1
+- cast_splitter-2
 - actor_counter-1
 - actor_counter-2
