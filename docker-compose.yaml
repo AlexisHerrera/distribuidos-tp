@@ -42,7 +42,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -68,7 +68,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -601,24 +601,7 @@ services:
       - testing_net
     environment:
       - NODE_ID=1
-      - PEERS=2:watcher-2
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/watcher/config.yaml:/app/config.yaml:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-  watcher-2:
-    container_name: watcher-2
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "./src/server/watcher/main.py"]
-    networks:
-      - testing_net
-    environment:
-      - NODE_ID=2
-      - PEERS=1:watcher-1
+      - PEERS=
     depends_on:
       rabbitmq:
         condition: service_healthy

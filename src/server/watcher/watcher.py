@@ -36,6 +36,7 @@ class Watcher:
         self.heartbeater_threads: list[threading.Thread] = []
 
         self.timeout: int = config.timeout
+        self.reconnection_timeout = config.reconnection_timeout
 
         self.bully: Bully = Bully(
             port=config.bully_port,
@@ -65,7 +66,9 @@ class Watcher:
 
     def _initialize_heartbeaters(self, nodes: list[str]):
         for node_name in nodes:
-            h = Heartbeater(node_name, self.heartbeat_port, self.timeout)
+            h = Heartbeater(
+                node_name, self.heartbeat_port, self.timeout, self.reconnection_timeout
+            )
             t = threading.Thread(target=h.run)
             self.heartbeaters[node_name] = h
             self.heartbeater_threads.append(t)

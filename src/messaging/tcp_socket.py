@@ -35,12 +35,11 @@ class TCPSocket:
         retry_timeout: int = DEFAULT_RETRY_TIMEOUT,
         timeout: int | None = None,
     ):
+        addr = (host, port)
         socket = None
         while condition():
             try:
-                socket = TCPSocket.create_and_connect(
-                    addr=(host, port), timeout=timeout
-                )
+                socket = TCPSocket.create_and_connect(addr, timeout)
                 break
             except ConnectionRefusedError as e:
                 logger.warning(f'Could not connect to {host}:{port}: {e}')

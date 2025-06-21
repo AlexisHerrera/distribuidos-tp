@@ -15,10 +15,13 @@ RECV_BYTES_AMOUNT = len(EXPECTED_REPLY_MESSAGE)
 
 
 class Heartbeater:
-    def __init__(self, node_name: str, port: int, timeout: int):
+    def __init__(
+        self, node_name: str, port: int, timeout: int, reconnection_timeout: int
+    ):
         self.node_name = node_name
         self.port = port
         self.timeout = timeout
+        self.reconnection_timeout = reconnection_timeout
 
         self.is_running_lock: Lock = Lock()
         self.is_running = True
@@ -30,7 +33,7 @@ class Heartbeater:
         heartbeats = 0
 
         try:
-            self._get_socket()
+            self._first_connection()
 
             while self._is_running():
                 try:
@@ -59,12 +62,34 @@ class Heartbeater:
                     logger.warning(f'{self.node_name} with connection error')
 
                 if heartbeats >= MAX_MISSING_HEARTBEATS:
-                    self._restart_service()
-                    self._get_socket()
+                    self._restart_and_reconnect_service()
                     heartbeats = 0
 
         except Exception as e:
             logger.error(f'Error while watching {self.node_name}: {e}')
+
+    def _first_connection(self):
+        try:
+            # Try to connect when node has just started
+            self._connect_to_service()
+            logger.debug(f'Connected to node {self.node_name}')
+        except Exception:
+            # Suppose that the node had some error to start
+            # so force the start and connect
+            self._restart_and_reconnect_service()
+
+    def _restart_and_reconnect_service(self):
+        while self._is_running():
+            try:
+                self._restart_service()
+                self._connect_to_service()
+                logger.debug(f'Successfuly restarted and connected to {self.node_name}')
+                break
+            except Exception as e:
+                logger.warning(
+                    f'Could not restart and reconnect to {self.node_name}: {e}'
+                )
+            time.sleep(self.reconnection_timeout)
 
     def _restart_service(self):
         logger.info(f'Restarting service {self.node_name}')
@@ -79,17 +104,13 @@ class Heartbeater:
             f'Output={result.stdout}. Error={result.stderr}'
         )
 
-    def _get_socket(self):
+    def _connect_to_service(self):
         with self.socket_lock:
             if self.socket:
                 self.socket.stop()
 
-            self.socket = TCPSocket.connect_while_condition(
-                host=self.node_name,
-                port=self.port,
-                condition=self._is_running,
-                timeout=self.timeout,
-            )
+            addr = (self.node_name, self.port)
+            self.socket = TCPSocket.create_and_connect(addr, self.timeout)
 
     def _is_running(self) -> bool:
         with self.is_running_lock:

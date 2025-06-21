@@ -37,7 +37,7 @@ class Config:
 
         if 'all' in self.__dict__ and self.all is not None and self.all > 0:
             for k in self.__dict__.keys():
-                if k == 'clients':
+                if k == 'clients' or k == 'watcher':
                     continue
                 self.__dict__[k] = self.all
 
@@ -453,13 +453,6 @@ def main():
 
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.write(content)
-
-    with open(WATCHER_CONFIG_PATH, 'r+', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-
-        data['nodes'] = WATCHER_NODES
-        f.seek(0)
-        yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
 
 
 if __name__ == '__main__':

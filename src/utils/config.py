@@ -53,6 +53,7 @@ class WatcherConfig:
         self.nodes: list[str] = config.get('nodes', [])
         # Timeout between heartbeats, in seconds
         self.timeout: int = config.get('timeout', 2)
+        self.reconnection_timeout: int = config.get('reconnection_timeout', 1)
         self.bully_port: int = config.get('bully_port', 25117)
         self.node_id: int = int(os.getenv('NODE_ID', ''))
 
