@@ -21,7 +21,7 @@ class Heartbeat:
         self.heartbeat_thread = threading.Thread(target=self.run)
         self.heartbeat_thread.start()
 
-    def _manage_client(self, socket: TCPSocket, address: tuple):
+    def _manage_client(self, socket: TCPSocket, addr: tuple):
         try:
             while self.is_running:
                 message = socket.recv(RECV_BYTES_AMOUNT)
@@ -32,7 +32,7 @@ class Heartbeat:
         except Exception as e:
             logger.error(f'Error while managing client in heartbeat: {e}')
         finally:
-            self.manager_queue.put(address)
+            self.manager_queue.put(addr)
 
     def _clean_clients(self):
         while not self.manager_queue.empty():
@@ -49,7 +49,9 @@ class Heartbeat:
         try:
             while self.is_running:
                 heartbeater_socket, addr = self.socket.accept()
-                logger.debug(f'Received new heartbeater from {addr}')
+                logger.info(
+                    f'Received new heartbeater from {TCPSocket.gethostbyaddress(addr)}'
+                )
 
                 client = threading.Thread(
                     target=self._manage_client, args=(heartbeater_socket, addr)

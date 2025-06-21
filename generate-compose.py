@@ -216,7 +216,9 @@ def create_watcher(watcher: ScalableService):
     for i in range(1, watcher.nodes + 1):
         container_name = f'{watcher.name}-{i}'
 
-        peers = [f'{watcher.name}-{j}' for j in range(1, watcher.nodes + 1) if j != i]
+        peers = [
+            f'{j}:{watcher.name}-{j}' for j in range(1, watcher.nodes + 1) if j != i
+        ]
         peers_env = ','.join(peers)
 
         watchers += f"""{container_name}:

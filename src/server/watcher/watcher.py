@@ -1,12 +1,12 @@
 import logging
 import signal
-import subprocess
 import threading
-import time
 from queue import SimpleQueue
+from threading import Event
 
-from src.messaging.tcp_socket import TCPSocket
 from src.server.heartbeat import Heartbeat
+from src.server.watcher.bully import Bully
+from src.server.watcher.heartbeater import Heartbeater
 from src.utils.config import WatcherConfig
 
 logger = logging.getLogger(__name__)
@@ -24,20 +24,25 @@ MAX_CONNECT_TRIES = 3
 class Watcher:
     def __init__(self, config: WatcherConfig):
         self.heartbeat: Heartbeat = Heartbeat(config.heartbeat_port)
-        # self.bully = Bully(config.bully_port, config.peers)
+        self.bully: Bully = Bully(
+            port=config.bully_port,
+            peers=config.peers,
+            node_id=config.node_id,
+            as_leader=self._run_as_leader,
+            as_follower=self._run_as_follower,
+        )
         self.heartbeat_port: int = config.heartbeat_port
+        self.heartbeaters: dict[str, Heartbeater] = {}
         self.nodes: list[str] = config.nodes
-        # self.peers: list[str] = config.peers
-        self.sockets_lock: threading.Lock = threading.Lock()
-        self.sockets: dict[str, TCPSocket] = {}
+        self.peers: list[str] = [peer_name for peer_name in config.peers.keys()]
 
         self.heartbeater_threads: list[threading.Thread] = []
 
         self.exit_queue: SimpleQueue = SimpleQueue()
         self.timeout: int = config.timeout
 
-        self.is_running_lock = threading.Lock()
-        self.is_running = True
+        self.is_running_lock: threading.Lock = threading.Lock()
+        self.is_running: bool = True
         self._setup_signal_handlers()
 
     def _setup_signal_handlers(self):
@@ -51,113 +56,35 @@ class Watcher:
         signal.signal(signal.SIGINT, signal_handler)
         logger.info('Signal handlers configured.')
 
-    def _restart_service(self, node_name: str):
-        logger.info(f'Restarting service {node_name}')
-        result = subprocess.run(
-            ['docker', 'start', node_name],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        logger.info(
-            f'Command executed. Result={result.returncode}. Output={result.stdout}. Error={result.stderr}'
-        )
-
-    def _watch_node(
-        self,
-        node_name: str,
-        heartbeat_port: int,
-        timeout: int,
-    ):
-        heartbeats = 0
-
-        try:
-            socket = self._get_socket(node_name, heartbeat_port)
-
-            while self._is_running():
-                try:
-                    logger.debug(f'Sending heartbeat to {node_name}')
-                    socket.send(MESSAGE_TO_SEND, SEND_BYTES_AMOUNT)
-
-                    logger.debug(f'Waiting heartbeat of {node_name}')
-                    message = socket.recv(RECV_BYTES_AMOUNT)
-
-                    if message is None:
-                        raise ConnectionError
-
-                    if message == EXPECTED_REPLY_MESSAGE:
-                        logger.debug(
-                            f'Received heartbeat from {node_name}. Sleeping...'
-                        )
-                        heartbeats = 0
-                        time.sleep(timeout)
-                except TimeoutError:
-                    heartbeats += 1
-                    logger.debug(f'{node_name} has {heartbeats} unreplied heartbeats')
-                except ConnectionError:
-                    heartbeats = MAX_MISSING_HEARTBEATS
-                    logger.warning(f'{node_name} with connection error')
-
-                if heartbeats >= MAX_MISSING_HEARTBEATS:
-                    self._restart_service(node_name)
-                    socket = self._get_socket(node_name, heartbeat_port)
-                    heartbeats = 0
-
-        except Exception as e:
-            logger.error(f'Error while watching {node_name}: {e}')
-
-    def _update_sockets(self, node_name: str, socket: TCPSocket):
-        if socket:
-            with self.sockets_lock:
-                old_socket = self.sockets.get(node_name, None)
-
-                if old_socket:
-                    old_socket.stop()
-
-                self.sockets[node_name] = socket
-
-    def _get_socket(self, node_name: str, port: int) -> TCPSocket:
-        socket = TCPSocket.connect_while_condition(
-            node_name,
-            port,
-            condition=self._is_running,
-            timeout=self.timeout,
-        )
-        self._update_sockets(node_name, socket)
-
-        return socket
-
     def _is_running(self) -> bool:
         with self.is_running_lock:
             return self.is_running
 
     def _initialize_heartbeaters(self):
-        # if self.bully.am_i_leader():
-        #     for node_name in self.nodes...
-        # else:
-        #     self.heartbeats.stop()
-        #     heartbeat to other watchers
         for node_name in self.nodes:
-            # h = Heartbeater(node_name, self.heartbeat_port, self.timeout)
-            # threading.Thread(target=h.run)
-            # t.start()
-            #
-            # heartbeaters.stop()
-            # t.join()
-            t = threading.Thread(
-                target=self._watch_node,
-                args=(
-                    node_name,
-                    self.heartbeat_port,
-                    self.timeout,
-                ),
-            )
+            h = Heartbeater(node_name, self.heartbeat_port, self.timeout)
+            t = threading.Thread(target=h.run)
+            self.heartbeaters[node_name] = h
+            self.heartbeater_threads.append(t)
 
             t.start()
 
-            self.heartbeater_threads.append(t)
+    def _run_as_leader(self, change_leader: Event):
+        self._initialize_heartbeaters()
+
+        change_leader.wait()
+        # Stop heartbeaters
+
+    def _run_as_follower(self, change_leader: Event):
+        # self._initialize_heartbeaters() # for peers
+        while self._is_running():
+            change_leader.wait()
+            if self.bully.am_i_leader():
+                # Stop heartbeaters
+                break
 
     def run(self):
+        # self.bully.run()
         self._initialize_heartbeaters()
 
         while self._is_running():
@@ -174,14 +101,15 @@ class Watcher:
         with self.is_running_lock:
             self.is_running = False
 
-        # Stop sockets
-        with self.sockets_lock:
-            for _, s in self.sockets.items():
-                s.stop()
+        self.bully.stop()
+
+        # Stop heartbeaters
+        for _, h in self.heartbeaters.items():
+            h.stop()
 
         # Stop threads
-        for h in self.heartbeater_threads:
-            h.join()
+        for t in self.heartbeater_threads:
+            t.join()
 
         # self.bully.stop()
         self.heartbeat.stop()

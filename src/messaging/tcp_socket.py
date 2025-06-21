@@ -51,6 +51,11 @@ class TCPSocket:
 
         return socket
 
+    @staticmethod
+    def gethostbyaddress(addr: tuple) -> str:
+        (host, _, _) = socket.gethostbyaddr(addr[0])
+        return host.split('.')[0]  # Take the first part of the host name
+
     def accept(self):
         return self.socket.accept()
 
