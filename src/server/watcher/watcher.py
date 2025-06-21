@@ -36,6 +36,7 @@ class Watcher:
         self.exit_queue: SimpleQueue = SimpleQueue()
         self.timeout: int = config.timeout
 
+        self.is_running_lock = threading.Lock()
         self.is_running = True
         self._setup_signal_handlers()
 
@@ -69,12 +70,11 @@ class Watcher:
         timeout: int,
     ):
         heartbeats = 0
-        socket = self._connect_to_node(
-            node_name=node_name, port=heartbeat_port, timeout=timeout
-        )
 
         try:
-            while self.is_running:
+            socket = self._get_socket(node_name, heartbeat_port)
+
+            while self._is_running():
                 try:
                     logger.debug(f'Sending heartbeat to {node_name}')
                     socket.send(MESSAGE_TO_SEND, SEND_BYTES_AMOUNT)
@@ -100,30 +100,13 @@ class Watcher:
 
                 if heartbeats >= MAX_MISSING_HEARTBEATS:
                     self._restart_service(node_name)
-                    socket = self._connect_to_node(
-                        node_name=node_name, port=heartbeat_port, timeout=timeout
-                    )
+                    socket = self._get_socket(node_name, heartbeat_port)
                     heartbeats = 0
+
         except Exception as e:
             logger.error(f'Error while watching {node_name}: {e}')
 
-    def _connect_to_node(
-        self, node_name: str, port: int, timeout: int
-    ) -> TCPSocket | None:
-        socket = None
-        while self.is_running:
-            try:
-                socket = TCPSocket.create_and_connect(
-                    addr=(node_name, port), timeout=timeout
-                )
-                break
-            except ConnectionRefusedError as e:
-                logger.warning(f'Could not connect to {node_name}:{port}: {e}')
-            except OSError as e:
-                logger.warning(f'Could not connect to {node_name}:{port}: {e}')
-
-            time.sleep(timeout)
-
+    def _update_sockets(self, node_name: str, socket: TCPSocket):
         if socket:
             with self.sockets_lock:
                 old_socket = self.sockets.get(node_name, None)
@@ -133,10 +116,34 @@ class Watcher:
 
                 self.sockets[node_name] = socket
 
+    def _get_socket(self, node_name: str, port: int) -> TCPSocket:
+        socket = TCPSocket.connect_while_condition(
+            node_name,
+            port,
+            condition=self._is_running,
+            timeout=self.timeout,
+        )
+        self._update_sockets(node_name, socket)
+
         return socket
 
+    def _is_running(self) -> bool:
+        with self.is_running_lock:
+            return self.is_running
+
     def _initialize_heartbeaters(self):
+        # if self.bully.am_i_leader():
+        #     for node_name in self.nodes...
+        # else:
+        #     self.heartbeats.stop()
+        #     heartbeat to other watchers
         for node_name in self.nodes:
+            # h = Heartbeater(node_name, self.heartbeat_port, self.timeout)
+            # threading.Thread(target=h.run)
+            # t.start()
+            #
+            # heartbeaters.stop()
+            # t.join()
             t = threading.Thread(
                 target=self._watch_node,
                 args=(
@@ -153,7 +160,7 @@ class Watcher:
     def run(self):
         self._initialize_heartbeaters()
 
-        while self.is_running:
+        while self._is_running():
             try:
                 exit_msg = self.exit_queue.get()
                 if exit_msg == EXIT_QUEUE:
@@ -164,7 +171,8 @@ class Watcher:
                 break
 
     def stop(self):
-        self.is_running = False
+        with self.is_running_lock:
+            self.is_running = False
 
         # Stop sockets
         with self.sockets_lock:

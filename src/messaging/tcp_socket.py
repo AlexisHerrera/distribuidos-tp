@@ -1,7 +1,10 @@
 import logging
 import socket
+import time
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_RETRY_TIMEOUT = 2  # seconds
 
 
 class TCPSocket:
@@ -23,6 +26,30 @@ class TCPSocket:
         s.connect(addr)
 
         return cls(s)
+
+    @staticmethod
+    def connect_while_condition(
+        host: str,
+        port: int,
+        condition: callable,
+        retry_timeout: int = DEFAULT_RETRY_TIMEOUT,
+        timeout: int | None = None,
+    ):
+        socket = None
+        while condition():
+            try:
+                socket = TCPSocket.create_and_connect(
+                    addr=(host, port), timeout=timeout
+                )
+                break
+            except ConnectionRefusedError as e:
+                logger.warning(f'Could not connect to {host}:{port}: {e}')
+            except OSError as e:
+                logger.warning(f'Could not connect to {host}:{port}: {e}')
+
+            time.sleep(retry_timeout)
+
+        return socket
 
     def accept(self):
         return self.socket.accept()
