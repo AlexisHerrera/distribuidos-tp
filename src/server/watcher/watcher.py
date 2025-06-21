@@ -27,7 +27,7 @@ class Watcher:
         # self.bully = Bully(config.bully_port, config.peers)
         self.heartbeat_port: int = config.heartbeat_port
         self.nodes: list[str] = config.nodes
-        self.peers: list[str] = config.peers
+        # self.peers: list[str] = config.peers
         self.sockets_lock: threading.Lock = threading.Lock()
         self.sockets: dict[str, TCPSocket] = {}
 
