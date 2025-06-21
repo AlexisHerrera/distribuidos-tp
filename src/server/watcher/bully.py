@@ -36,9 +36,14 @@ class Bully:
         self.peers = peers
 
         self.leader_lock = Lock()
-        self.leader = max(max(peers.values()), node_id)
-        self.change_leader: Event = Event()
+
+        if len(peers) > 0:
+            self.leader = max(max(peers.values()), node_id)
+        else:
+            self.leader = node_id
+
         self.node_id = node_id
+        self.change_leader: Event = Event()
         logger.info(f'Leader is node_id: {self.leader}')
         self.as_leader = as_leader
         self.as_follower = as_follower
@@ -51,7 +56,9 @@ class Bully:
 
         self.message_queue: SimpleQueue = SimpleQueue()
         self.listener_thread = Thread(target=self._listener)
+        self.runner_thread = Thread(target=self.run)
         self.listener_thread.start()
+        self.runner_thread.start()
 
     def am_i_leader(self) -> bool:
         with self.leader_lock:
@@ -77,13 +84,18 @@ class Bully:
         return self.peers[node_name]
 
     def _listener(self):
-        while self._is_running():
-            client_socket, addr = self.socket.accept()
+        try:
+            while self._is_running():
+                client_socket, addr = self.socket.accept()
 
-            node_name = TCPSocket.gethostbyaddress(addr)
-            node_id = self._get_node_id_by_name(node_name)
+                node_name = TCPSocket.gethostbyaddress(addr)
+                node_id = self._get_node_id_by_name(node_name)
 
-            self._add_node(client_socket, node_name, node_id)
+                self._add_node(client_socket, node_name, node_id)
+        except Exception as e:
+            logger.error(
+                f'Error while listening for connections in node_id {self.node_id}: {e}'
+            )
 
     def _connect_to_peers(self):
         for node_name, node_id in self.peers.items():
@@ -96,6 +108,13 @@ class Bully:
     def run(self):
         self._connect_to_peers()
 
+        while self._is_running():
+            if self.am_i_leader():
+                self.as_leader(self.change_leader)
+            else:
+                self.as_follower(self.change_leader)
+
+    def _not_run(self):
         while self._is_running():
             (message, node_id) = self.message_queue.get()
 
@@ -131,10 +150,12 @@ class Bully:
         with self.is_running_lock:
             self.is_running = False
 
+        # Unlock threads that are waiting for leader change
+        self.change_leader.set()
+
         self.socket.stop()
-        for _, (client, socket) in self.clients_threads.items():
-            socket.stop()
-            client.join()
+        for _, n in self.nodes.items():
+            n.stop()
 
         # Stop main threads
         self.listener_thread.join()

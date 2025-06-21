@@ -60,9 +60,8 @@ class WatcherConfig:
         self.peers: dict[str, int] = {}
         if peers != '':
             for p in peers.split(','):
-                for node in p:
-                    node_id, node_name = node.split(':')
-                    self.peers[node_name] = node_id
+                node_id, node_name = p.split(':')
+                self.peers[node_name] = int(node_id)
 
 
 def print_config(config: Config):

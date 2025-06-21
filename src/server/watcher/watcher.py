@@ -23,14 +23,11 @@ MAX_CONNECT_TRIES = 3
 
 class Watcher:
     def __init__(self, config: WatcherConfig):
+        self.is_running_lock: threading.Lock = threading.Lock()
+        self.is_running: bool = True
+
         self.heartbeat: Heartbeat = Heartbeat(config.heartbeat_port)
-        self.bully: Bully = Bully(
-            port=config.bully_port,
-            peers=config.peers,
-            node_id=config.node_id,
-            as_leader=self._run_as_leader,
-            as_follower=self._run_as_follower,
-        )
+
         self.heartbeat_port: int = config.heartbeat_port
         self.heartbeaters: dict[str, Heartbeater] = {}
         self.nodes: list[str] = config.nodes
@@ -38,11 +35,17 @@ class Watcher:
 
         self.heartbeater_threads: list[threading.Thread] = []
 
-        self.exit_queue: SimpleQueue = SimpleQueue()
         self.timeout: int = config.timeout
 
-        self.is_running_lock: threading.Lock = threading.Lock()
-        self.is_running: bool = True
+        self.bully: Bully = Bully(
+            port=config.bully_port,
+            peers=config.peers,
+            node_id=config.node_id,
+            as_leader=self._run_as_leader,
+            as_follower=self._run_as_follower,
+        )
+
+        self.exit_queue: SimpleQueue = SimpleQueue()
         self._setup_signal_handlers()
 
     def _setup_signal_handlers(self):
@@ -60,8 +63,8 @@ class Watcher:
         with self.is_running_lock:
             return self.is_running
 
-    def _initialize_heartbeaters(self):
-        for node_name in self.nodes:
+    def _initialize_heartbeaters(self, nodes: list[str]):
+        for node_name in nodes:
             h = Heartbeater(node_name, self.heartbeat_port, self.timeout)
             t = threading.Thread(target=h.run)
             self.heartbeaters[node_name] = h
@@ -69,24 +72,33 @@ class Watcher:
 
             t.start()
 
+    def _stop_heartbeaters(self):
+        # Stop heartbeaters
+        for _, h in self.heartbeaters.items():
+            h.stop()
+
+        # Stop threads
+        for t in self.heartbeater_threads:
+            t.join()
+
     def _run_as_leader(self, change_leader: Event):
-        self._initialize_heartbeaters()
+        self._initialize_heartbeaters(self.nodes)
 
         change_leader.wait()
         # Stop heartbeaters
+        self._stop_heartbeaters()
 
     def _run_as_follower(self, change_leader: Event):
-        # self._initialize_heartbeaters() # for peers
+        self._initialize_heartbeaters(self.peers)
+
         while self._is_running():
             change_leader.wait()
             if self.bully.am_i_leader():
                 # Stop heartbeaters
+                self._stop_heartbeaters()
                 break
 
     def run(self):
-        # self.bully.run()
-        self._initialize_heartbeaters()
-
         while self._is_running():
             try:
                 exit_msg = self.exit_queue.get()
@@ -103,13 +115,4 @@ class Watcher:
 
         self.bully.stop()
 
-        # Stop heartbeaters
-        for _, h in self.heartbeaters.items():
-            h.stop()
-
-        # Stop threads
-        for t in self.heartbeater_threads:
-            t.join()
-
-        # self.bully.stop()
         self.heartbeat.stop()
