@@ -81,8 +81,9 @@ class LeaderElection:
                     'Invalidating state to prevent split-brain. Will become a follower if notified.'
                 )
                 with self.state_lock:
-                    del self.persisted_states[user_id_str]
-                self.state_manager.save_state(self.persisted_states)
+                    if user_id_str in self.persisted_states:
+                        del self.persisted_states[user_id_str]
+                    self.state_manager.save_state(self.persisted_states)
 
             elif role == 'follower':
                 logger.warning(
