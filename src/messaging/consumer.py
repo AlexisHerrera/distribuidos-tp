@@ -8,6 +8,7 @@ from pika.spec import Basic, BasicProperties
 
 from src.messaging.broker import Broker, RabbitMQBroker
 from src.messaging.protocol.message import Message
+from src.server.leader_election import FinalizationTimeoutError
 
 
 class Consumer(ABC):
@@ -53,10 +54,20 @@ class Consumer(ABC):
         ):
             delivery_tag = method.delivery_tag if method else None
             processed_successfully = False
+            should_requeue = requeue
+
             try:
                 message = Message.from_bytes(body)
                 callback(message)
                 processed_successfully = True
+
+            except FinalizationTimeoutError as e:
+                logging.error(
+                    f'Leader/Follower timeout error (tag: {delivery_tag}): {e}',
+                    exc_info=False,
+                )
+                processed_successfully = False
+                should_requeue = True
 
             except Exception as e:
                 logging.error(
@@ -64,6 +75,7 @@ class Consumer(ABC):
                     exc_info=True,
                 )
                 processed_successfully = False
+                should_requeue = requeue
 
             try:
                 if not ch.is_open:
@@ -77,9 +89,9 @@ class Consumer(ABC):
                     ch.basic_ack(delivery_tag=delivery_tag)
                 else:
                     logging.warning(
-                        f'Sending NACK (requeue={requeue}) for delivery_tag={delivery_tag} due to processing error.'
+                        f'Sending NACK (requeue={should_requeue}) for delivery_tag={delivery_tag} due to processing error.'
                     )
-                    ch.basic_nack(delivery_tag=delivery_tag, requeue=requeue)
+                    ch.basic_nack(delivery_tag=delivery_tag, requeue=should_requeue)
 
             except pika.exceptions.ChannelWrongStateError:
                 logging.warning(

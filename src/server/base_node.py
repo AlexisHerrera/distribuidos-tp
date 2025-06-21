@@ -32,9 +32,6 @@ class BaseNode(ABC):
         self.leader = None
         self.in_flight_tracker = InFlightTracker()
 
-        # Checks if it should continue processing messages
-        self.completed_user_ids = set()
-        self.completed_user_ids_lock = threading.Lock()
         # sent results before eof
         self.should_send_results_before_eof = False
         # Threads executor (should be instantiated on node)
@@ -124,17 +121,9 @@ class BaseNode(ABC):
 
     def process_message(self, message: Message):
         user_id = message.user_id
-        with self.completed_user_ids_lock:
-            if message.user_id in self.completed_user_ids:
-                logger.warning(
-                    f'Ignoring message for completed user_id: {message.user_id}'
-                )
-                return
 
         if message.message_type == MessageType.EOF:
             logger.info(f'RECEIVED EOF FROM QUEUE for user_id: {message.user_id}')
-            with self.completed_user_ids_lock:
-                self.completed_user_ids.add(message.user_id)
             if self.leader:
                 # Multi-node
                 logger.debug(

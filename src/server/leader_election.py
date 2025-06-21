@@ -4,6 +4,9 @@ import socket
 import threading
 import time
 import uuid
+import random
+import os
+
 from typing import Any, Callable
 
 from src.utils.config import Config
@@ -16,6 +19,13 @@ class FinalizationTimeoutError(Exception):
     """Leader Timeout"""
 
     pass
+
+
+def chaos_test(probability: float, crash_message: str):
+    if random.random() < probability:
+        logger.critical(f'--- CHAOS TEST ACTIVATED --- {crash_message}')
+        logger.critical('--- SIMULATING ABRUPT CRASH NOW ---')
+        os._exit(1)
 
 
 class LeaderElection:
@@ -135,6 +145,18 @@ class LeaderElection:
         """EOF from data queue"""
         user_id_str = str(user_id)
 
+        with self.state_lock:
+            current_state = self.persisted_states.get(user_id_str, {})
+
+        if current_state.get('role') == 'follower':
+            logger.error(
+                f'STATE CONFLICT: Received master EOF from queue for user {user_id}, '
+                f'but this node is already a follower. NACKing message to force retry.'
+            )
+            raise FinalizationTimeoutError(
+                'State conflict: Follower received master EOF'
+            )
+
         def create_leader_state(state):
             if 'role' not in state:
                 current_in_flight = self.node.get_in_flight_count(user_id)
@@ -232,11 +254,18 @@ class LeaderElection:
     def _wait_for_local_in_flight_messages(
         self, user_id: uuid.UUID, initial_snapshot: int
     ):
+        live_in_flight_count = self.node.get_in_flight_count(user_id)
+
         logger.info(
             f'User {user_id}: Waiting for in-flight messages. '
             f'Snapshot count: {initial_snapshot}, '
-            f'Current live count: {self.node.get_in_flight_count(user_id)}'
+            f'Current live count: {live_in_flight_count}'
         )
+
+        # Matar 2 nodos filtros con lideres y peers entre si.
+        # if self.node_id in ['filter_single_country-1', 'filter_single_country-2', 'filter_single_country-3' ]:
+        #     chaos_test(0.5,
+        #                f"Crashing node with {live_in_flight_count} in-flight message(s).")
 
         # Esperar hasta que el conteo en vivo sea cero
         while self.node.get_in_flight_count(user_id) > 0:
@@ -277,7 +306,7 @@ class LeaderElection:
                         f'Leader for {user_id} waiting for DONEs from {pending_list}...'
                     )
 
-                    if not cond.wait(timeout=60.0):  # Timeout de 60 segundos
+                    if not cond.wait(timeout=60.0):
                         logger.error(
                             f'Timed out waiting for DONEs for user {user_id} from {pending_list}. '
                             'EOF will NOT be propagated to ensure safety'
