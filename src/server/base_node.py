@@ -9,6 +9,7 @@ from typing import Any, Dict, Type
 
 from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
+from src.server.heartbeat import Heartbeat
 from src.server.leader_election import LeaderElection
 from src.utils.config import Config
 from src.utils.in_flight_tracker import InFlightTracker
@@ -36,6 +37,7 @@ class BaseNode(ABC):
         self.should_send_results_before_eof = False
         # Threads executor (should be instantiated on node)
         self._executor = None
+        self.heartbeat = Heartbeat(config)
         try:
             peers = getattr(config, 'peers', [])
             port_str = getattr(config, 'port', None)
@@ -190,6 +192,7 @@ class BaseNode(ABC):
                 logger.info('Stopping leader election...')
                 self.leader.stop()
                 logger.info('Leader election stopped')
+                self.heartbeat.stop()
             except Exception as e:
                 logger.error(f'Stopping or closing error: {e}')
 

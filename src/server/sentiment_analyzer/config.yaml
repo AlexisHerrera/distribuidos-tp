@@ -7,5 +7,7 @@ connection:
   publisher:
     - type: direct
       queue: sentiment_analyzed
+heartbeat:
+  port: 13434
 log:
   level: INFO

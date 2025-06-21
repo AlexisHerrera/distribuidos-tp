@@ -8,6 +8,8 @@ BASE_PORT = 6000
 SMALL_DATASET_PATH = './.data-small'
 DATASET_PATH = './.data'
 RESULTS_PATH = './.results'
+WATCHER_NODES = []
+WATCHER_CONFIG_PATH = './src/server/watcher/config.yaml'
 
 
 class ScalableService:
@@ -98,6 +100,7 @@ def create_client(client_id: int, dataset_path: str):
 
 
 def create_cleaner():
+    WATCHER_NODES.append('cleaner')
     return f"""cleaner:
     container_name: cleaner
     build:
@@ -121,6 +124,7 @@ def create_cleaner():
 
 
 def create_sink(n: int):
+    WATCHER_NODES.append(f'q{n}_sink')
     return f"""
   q{n}_sink:
     container_name: q{n}_sink
@@ -139,6 +143,7 @@ def create_sink(n: int):
 
 
 def create_joiner(joiner_type: str) -> str:
+    WATCHER_NODES.append(joiner_type)
     return f"""
   {joiner_type}:
     container_name: {joiner_type}
@@ -158,11 +163,15 @@ def create_joiner(joiner_type: str) -> str:
 
 def create_node(service: ScalableService, index: int):
     container = f'{service.name}-{index}'
+
+    WATCHER_NODES.append(container)
+
     peers = [
         f'{service.name}-{i}:{service.port}'
         for i in range(1, service.nodes + 1)
         if i != index
     ]
+
     peers_env = ','.join(peers)
     state_volume_path = f'./.state/{container}'
 
@@ -195,6 +204,33 @@ def create_scalable(service: ScalableService):
     return nodes
 
 
+def create_watcher():
+    # Create config file
+    data = {}
+    with open(WATCHER_CONFIG_PATH, 'r', encoding='utf-8') as f:
+        data = yaml.safe_load(f)
+
+    with open(WATCHER_CONFIG_PATH, 'w', encoding='utf-8') as f:
+        data['nodes'] = WATCHER_NODES
+        yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
+
+    return f"""watcher:
+    container_name: watcher
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/watcher/main.py"]
+    networks:
+      - {NETWORK_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/watcher/config.yaml:/app/config.yaml
+      - /var/run/docker.sock:/var/run/docker.sock
+  """
+
+
 def create_services(
     scalable_services: list[ScalableService], config: Config, dataset_path: str
 ):
@@ -213,6 +249,8 @@ def create_services(
     for service in scalable_services:
         services += create_scalable(service)
 
+    watcher = create_watcher()
+
     return f"""
 services:
   {rabbitmq}
@@ -221,6 +259,7 @@ services:
   {services}
   {sinks}
   {joiners}
+  {watcher}
 """
 
 
@@ -387,6 +426,13 @@ def main():
 
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.write(content)
+
+    with open(WATCHER_CONFIG_PATH, 'r+', encoding='utf-8') as f:
+        data = yaml.safe_load(f)
+
+        data['nodes'] = WATCHER_NODES
+        f.seek(0)
+        yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
 
 
 if __name__ == '__main__':

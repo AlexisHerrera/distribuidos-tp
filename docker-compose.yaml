@@ -591,6 +591,21 @@ services:
     volumes:
       - ./src/server/joiners/cast_joiner_config.yaml:/app/config.yaml
     
+  watcher:
+    container_name: watcher
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "src/server/watcher/main.py"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/watcher/config.yaml:/app/config.yaml
+      - /var/run/docker.sock:/var/run/docker.sock
+  
 networks:
   testing_net:
     ipam:

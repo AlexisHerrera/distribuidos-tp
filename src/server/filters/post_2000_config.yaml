@@ -8,5 +8,7 @@ connection:
   publisher:
     - type: broadcast
       exchange: post_2000
+heartbeat:
+  port: 13434
 log:
   level: INFO
