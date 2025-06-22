@@ -1,5 +1,6 @@
 import logging
 import os
+import csv
 import queue
 import signal
 import socket
@@ -52,6 +53,8 @@ class Cleaner:
             target=self._receive_results_loop, name='ResultsQueueThread', daemon=True
         )
 
+        self.clients_uuids = self._load_clients_uuids('clients_uuids.csv')
+
         try:
             self.port = int(os.getenv('SERVER_PORT', '12345'))
             self.backlog = int(os.getenv('LISTENING_BACKLOG', '3'))
@@ -64,6 +67,17 @@ class Cleaner:
             raise ValueError(f'Configuration error: {e}') from e
 
         logger.info('Cleaner initialized.')
+
+    def _load_clients_uuids(self, filepath: str) -> list[str]:
+        uuids = []
+        try:
+            with open(filepath, mode='r', newline='') as csvfile:
+                reader = csv.reader(csvfile)
+                for row in reader:
+                    uuids.extend(uuid.strip() for uuid in row if uuid.strip())
+        except Exception as e:
+            logger.error(f'Failed to read UUIDs from {filepath}: {e}', exc_info=True)
+        return uuids
 
     def _setup_signal_handlers(self):
         def signal_handler(signum, frame):

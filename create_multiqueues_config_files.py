@@ -23,7 +23,7 @@ def read_uuids_from_csv(csv_path: str) -> list[str]:
         raise
 
 
-def create_config(client_uuids: list[str]) -> dict:
+def create_config(clients_uuids: list[str]) -> dict:
     config = {
         'rabbit': {
             'host': 'rabbitmq'
@@ -51,7 +51,7 @@ def create_config(client_uuids: list[str]) -> dict:
         }
     }
 
-    for client_id in client_uuids:
+    for client_id in clients_uuids:
         config['connection']['publisher'].append({
             'type': 'direct',
             'queue': f'ratings_clean_{client_id}',
@@ -67,17 +67,17 @@ def create_config(client_uuids: list[str]) -> dict:
 
 
 def main():
-    uuid_csv_path = 'client_uuids.csv'
+    uuid_csv_path = 'clients_uuids.csv'
     output_config_path = 'src/server/cleaner/config.yaml'
 
     try:
-        client_uuids = read_uuids_from_csv(uuid_csv_path)
-        config = create_config(client_uuids)
+        clients_uuids = read_uuids_from_csv(uuid_csv_path)
+        config = create_config(clients_uuids)
 
         with open(output_config_path, 'w') as file:
             yaml.dump(config, file, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
 
-        print(f"Configuration file '{output_config_path}' created successfully with {len(client_uuids)} UUID-based queues.")
+        print(f"Configuration file '{output_config_path}' created successfully with {len(clients_uuids)} UUID-based queues.")
     except Exception as e:
         print(f"Error: {e}")
 

@@ -35,7 +35,7 @@ def generate_uuids_csv(num_clients: int, output_path: str):
 
 def main():
     scaling_config_path = 'nodes-config.yaml'
-    output_csv_path = 'client_uuids.csv'
+    output_csv_path = 'clients_uuids.csv'
 
     try:
         num_clients = read_num_clients(scaling_config_path)
