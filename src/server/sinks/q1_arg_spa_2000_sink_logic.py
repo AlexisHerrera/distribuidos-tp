@@ -1,6 +1,7 @@
 import logging
 import uuid
 from collections import defaultdict
+from typing import Any
 
 from src.messaging.protocol.message import Message, MessageType
 from src.utils.safe_dict import SafeDict
@@ -35,5 +36,20 @@ class Q1ArgSpa2000(BaseSinkLogic):
         logger.info(f'Final Movie Genre for user {user_id}: count {len(result)}')
         for movies_genre in result:
             logger.info(f'Movie: {movies_genre.title}, Genres: {movies_genre.genres}')
+        # In case of duplicates, Cleaner should ignore if sink has already given results for the client
+        return Message(user_id, MessageType.Movie, result, message_id=None)
 
-        return Message(user_id, MessageType.Movie, result)
+    def get_application_state(self) -> dict[str, Any]:
+        serializable_state = {}
+        for user_id, movie_list in self.final_movies_and_genres.to_dict().items():
+            serializable_state[str(user_id)] = [movie.to_dict() for movie in movie_list]
+        return serializable_state
+
+    def load_application_state(self, state: dict[str, Any]) -> None:
+        logger.info('Loading application state for Q1ArgSpa2000...')
+        deserialized_state = {}
+        for user_id, movie_list in state.items():
+            deserialized_state[uuid.UUID(user_id)] = [
+                Movie.from_dict(movie_dict) for movie_dict in movie_list
+            ]
+        self.final_movies_and_genres = SafeDict(initial_dict=deserialized_state)

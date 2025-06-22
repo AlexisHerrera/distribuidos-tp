@@ -26,10 +26,9 @@ AVAILABLE_SINK_LOGICS = {
 
 class SinkNode(BaseNode):
     def __init__(self, config: Config, sink_type: str):
-        super().__init__(config, sink_type)
+        super().__init__(config, sink_type, has_result_persisted=True)
         self.logic: BaseSinkLogic
         logger.info(f"SinkNode '{sink_type}' initialized.")
-        self.should_send_results_before_eof = True
 
     def _get_logic_registry(self) -> Dict[str, Type]:
         return AVAILABLE_SINK_LOGICS

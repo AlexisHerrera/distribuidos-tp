@@ -35,4 +35,6 @@ class RatingCounterLogic(BaseCounterLogic):
         result_list = list(batch_result.values())
 
         logger.info(f'[{user_id}] Sending {len(result_list)} partial rating counts.')
-        return Message(user_id, MessageType.MovieRatingCounter, result_list)
+        return Message(
+            user_id, MessageType.MovieRatingCounter, result_list, message.message_id
+        )

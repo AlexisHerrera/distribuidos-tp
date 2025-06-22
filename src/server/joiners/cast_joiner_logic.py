@@ -27,4 +27,6 @@ class CastJoinerLogic(BaseJoinerLogic):
             )
         if len(joined) > 0:
             logger.info(f'Joining {len(joined)} MovieCast')
-        return Message(message.user_id, MessageType.MovieCast, joined)
+        return Message(
+            message.user_id, MessageType.MovieCast, joined, message.message_id
+        )

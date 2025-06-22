@@ -200,7 +200,10 @@ class Cleaner:
 
                 if model_object_list:
                     output_message = Message(
-                        user_id, associated_message_type, model_object_list
+                        user_id,
+                        associated_message_type,
+                        model_object_list,
+                        message_id=None,
                     )
 
                     self.connection.send(output_message)
@@ -208,6 +211,14 @@ class Cleaner:
                     logger.debug(
                         f'[{user_id}] Published {len(model_object_list)} objects of type {batch.type.name} from Batch #{total_batches}'
                     )
+                    # if associated_message_type == MessageType.Rating:
+                    #     # Con una probabilidad baja (ej. 2%), duplicamos el mensaje
+                    #     if random.random() < 0.02:
+                    #         logger.warning(
+                    #             f'[{user_id}] DUPLICATING MESSAGE: Intentionally resending '
+                    #             f'rating message with id {output_message.message_id}'
+                    #         )
+                    #         self.connection.send(output_message)
 
             except ConnectionResetError:
                 logger.warning(
