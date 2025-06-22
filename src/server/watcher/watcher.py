@@ -43,6 +43,7 @@ class Watcher:
             port=config.bully_port,
             peers=config.peers,
             node_id=config.node_id,
+            connection_timeout=config.timeout,
             as_leader=self._run_as_leader,
             as_follower=self._run_as_follower,
         )
@@ -80,6 +81,7 @@ class Watcher:
         # self._initialize_heartbeaters(self.nodes)
 
         change_leader.wait()
+        change_leader.clear()
         # Stop heartbeaters
         self._stop_heartbeaters()
 
@@ -88,7 +90,8 @@ class Watcher:
 
         while self._is_running():
             callback()
-            # change_leader.wait()
+            change_leader.wait()
+            change_leader.clear()
             if self.bully.am_i_leader():
                 # Stop heartbeaters
                 self._stop_heartbeaters()

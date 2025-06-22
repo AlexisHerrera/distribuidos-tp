@@ -3,7 +3,7 @@ import subprocess
 import time
 from threading import Lock
 
-from src.messaging.tcp_socket import TCPSocket
+from src.messaging.tcp_socket import SocketDisconnected, TCPSocket
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +43,6 @@ class Heartbeater:
                     logger.debug(f'[HEARTBEATER] Waiting heartbeat of {self.node_name}')
                     message = self.socket.recv(RECV_BYTES_AMOUNT)
 
-                    if message is None:
-                        raise ConnectionError
-
                     if message == EXPECTED_REPLY_MESSAGE:
                         logger.debug(
                             f'[HEARTBEATER] Received heartbeat from {self.node_name}. Sleeping...'
@@ -57,10 +54,15 @@ class Heartbeater:
                     logger.debug(
                         f'[HEARTBEATER] {self.node_name} has {heartbeats} unreplied heartbeats'
                     )
-                except ConnectionError:
+                except SocketDisconnected:
                     heartbeats = MAX_MISSING_HEARTBEATS
                     logger.warning(
-                        f'[HEARTBEATER] {self.node_name} with connection error'
+                        f'[HEARTBEATER] {self.node_name} socket disconnected'
+                    )
+                except ConnectionError as e:
+                    heartbeats = MAX_MISSING_HEARTBEATS
+                    logger.warning(
+                        f'[HEARTBEATER] {self.node_name} connection error: {e}'
                     )
 
                 if heartbeats >= MAX_MISSING_HEARTBEATS:

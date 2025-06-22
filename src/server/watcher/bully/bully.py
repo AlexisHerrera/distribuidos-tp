@@ -1,6 +1,7 @@
 import logging
+import time
 from queue import SimpleQueue
-from threading import Event, Lock, Thread
+from threading import Event, Lock, Thread, Timer
 from typing import Callable
 
 from src.messaging.server_socket import ServerSocket
@@ -21,10 +22,12 @@ class Bully:
         port: int,
         peers: dict[str, int],
         node_id: int,
+        connection_timeout: int,
         as_leader: Callable[[Event], None],
         as_follower: Callable[[Event], None],
     ):
         self.bully_port = port
+        self.timeout = connection_timeout
         self.socket: ServerSocket = ServerSocket(
             self.bully_port, backlog=len(peers) + 1
         )
@@ -50,9 +53,10 @@ class Bully:
         self.is_running_lock = Lock()
         self.is_running = True
 
-        initial_state = (
-            BullyState.RUNNING if self.am_i_leader() else BullyState.WAITING_COORDINATOR
-        )
+        # initial_state = (
+        #     BullyState.RUNNING if self.am_i_leader() else BullyState.WAITING_COORDINATOR
+        # )
+        initial_state = BullyState.RUNNING
         self.state: BullyStateManager = BullyStateManager(initial_state, self.node_id)
 
         self.message_queue: SimpleQueue = SimpleQueue()
@@ -74,6 +78,10 @@ class Bully:
 
         self.change_leader.set()
 
+    def _get_leader_node_id(self) -> int:
+        with self.leader_lock:
+            return self.leader
+
     def _add_node(self, socket: TCPSocket, node_name: str, node_id: int):
         with self.nodes_lock:
             if node_name in self.nodes:
@@ -85,6 +93,7 @@ class Bully:
                 node_id,
                 self.message_queue,
                 self.node_id,
+                self._get_leader_node_id,
             )
 
             self.nodes[node_name] = node
@@ -102,6 +111,8 @@ class Bully:
 
     def _listener(self):
         try:
+            self._connect_to_peers()
+
             while self._is_running():
                 try:
                     client_socket, addr = self.socket.accept()
@@ -136,11 +147,14 @@ class Bully:
 
         for node_name, node_id in sorted_peers:
             # Check if node has already connected
-            if node_id > self.node_id:
+            if self.node_id > node_id:
                 continue
 
             socket = TCPSocket.connect_while_condition(
-                node_name, self.bully_port, condition=self._is_running
+                node_name,
+                self.bully_port,
+                condition=self._is_running,
+                timeout=self.timeout,
             )
 
             logger.debug(f'[BULLY] Connected to {node_name}')
@@ -152,9 +166,11 @@ class Bully:
 
         while self._is_running():
             if self.am_i_leader():
+                logger.info('[BULLY] Beginning leader tasks...')
                 # self._send_coordinator()
                 self.as_leader(self.change_leader)
             else:
+                logger.info('[BULLY] Beginning follower tasks...')
                 self.as_follower(self.change_leader, self._send_alive)
 
     def _send_alive(self):
@@ -166,9 +182,7 @@ class Bully:
                         self.nodes[node_name].send(BullyProtocol.ALIVE)
             except Exception as e:
                 logger.warning(f'[BULLY] Could not send ALIVE to leader: {e}')
-            # time.sleep(2)
-            if self.change_leader.wait(2):
-                break
+            time.sleep(2)
 
     def _send_coordinator(self):
         with self.nodes_lock:
@@ -190,6 +204,13 @@ class Bully:
                     node.send(BullyProtocol.ELECTION)
 
         logger.info(f'[BULLY] Sending ELECTION from {self.node_id}')
+        kwargs = {
+            'init_election': self._init_election,
+            'set_leader': self._set_leader,
+            'send_coordinator': self._send_coordinator,
+        }
+        t = Timer(10.0, self.state.timeout_reply, kwargs=kwargs)
+        t.start()
 
     def _send_answer(self, node_name: str):
         with self.nodes_lock:
@@ -241,6 +262,8 @@ class Bully:
     def stop(self):
         with self.is_running_lock:
             self.is_running = False
+
+        self.state.set_state(BullyState.END)
 
         # Unlock threads that are waiting for leader change
         self.change_leader.set()

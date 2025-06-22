@@ -7,6 +7,7 @@ class BullyState(Enum):
     RUNNING = 1
     WAITING_COORDINATOR = 2
     ELECTION = 3
+    END = 4
 
 
 class BullyStateManager:
@@ -18,10 +19,6 @@ class BullyStateManager:
     def set_state(self, state: BullyState):
         with self.lock:
             self.state = state
-
-    def get_state(self) -> BullyState:
-        with self.lock:
-            return self.state
 
     def is_in_state(self, state):
         with self.lock:
@@ -40,10 +37,7 @@ class BullyStateManager:
 
     def coordinator(self, new_leader_node_id: int, set_leader: Callable[[int], None]):
         with self.lock:
-            if (
-                self.state == BullyState.WAITING_COORDINATOR
-                and self.node_id < new_leader_node_id
-            ):
+            if self.node_id < new_leader_node_id:
                 self.state = BullyState.RUNNING
                 set_leader(new_leader_node_id)
 
@@ -58,7 +52,7 @@ class BullyStateManager:
                 case BullyState.RUNNING:
                     self.state = BullyState.ELECTION
                     init_election()
-                case BullyState.ELECTION:
+                case BullyState.ELECTION | BullyState.WAITING_COORDINATOR:
                     self.state = BullyState.RUNNING
                     set_leader(self.node_id)
                     send_coordinator()
