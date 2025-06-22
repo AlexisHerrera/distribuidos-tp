@@ -1,5 +1,7 @@
 heartbeat_port: 13434
 timeout: 5
+reconnection_timeout: 1
+bully_port: 25117
 log_level: DEBUG
 nodes:
 - cleaner

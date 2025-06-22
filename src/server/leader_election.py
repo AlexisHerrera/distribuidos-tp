@@ -1,12 +1,11 @@
 import json
 import logging
+import os
+import random
 import socket
 import threading
 import time
 import uuid
-import random
-import os
-
 from typing import Any, Callable
 
 from src.utils.config import Config
@@ -264,9 +263,14 @@ class LeaderElection:
         )
 
         # Matar 2 nodos filtros con lideres y peers entre si.
-        # if self.node_id in ['filter_single_country-1', 'filter_single_country-2', 'filter_single_country-3' ]:
-        #     chaos_test(0.5,
-        #                f"Crashing node with {live_in_flight_count} in-flight message(s).")
+        if self.node_id in [
+            'filter_single_country-1',
+            'filter_single_country-2',
+            'filter_single_country-3',
+        ]:
+            chaos_test(
+                0.7, f'Crashing node with {live_in_flight_count} in-flight message(s).'
+            )
 
         # Esperar hasta que el conteo en vivo sea cero
         while self.node.get_in_flight_count(user_id) > 0:

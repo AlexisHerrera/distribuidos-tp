@@ -48,11 +48,21 @@ class WatcherConfig:
         with open(filename, 'r') as f:
             config = yaml.safe_load(f)
 
-        self.heartbeat_port = config.get('heartbeat_port', 13434)
-        self.log_level = config.get('log_level', 'INFO')
-        self.nodes = config.get('nodes', [])
+        self.heartbeat_port: int = config.get('heartbeat_port', 13434)
+        self.log_level: str = config.get('log_level', 'INFO')
+        self.nodes: list[str] = config.get('nodes', [])
         # Timeout between heartbeats, in seconds
-        self.timeout = config.get('timeout', 2)
+        self.timeout: int = config.get('timeout', 2)
+        self.reconnection_timeout: int = config.get('reconnection_timeout', 1)
+        self.bully_port: int = config.get('bully_port', 25117)
+        self.node_id: int = int(os.getenv('NODE_ID', ''))
+
+        peers: str = os.getenv('PEERS', '')
+        self.peers: dict[str, int] = {}
+        if peers != '':
+            for p in peers.split(','):
+                node_id, node_name = p.split(':')
+                self.peers[node_name] = int(node_id)
 
 
 def print_config(config: Config):

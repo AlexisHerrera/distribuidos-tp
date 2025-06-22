@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def main():
     config = WatcherConfig()
     initialize_log(config.log_level)
-    watcher = Watcher(config.heartbeat_port, config.nodes, config.timeout)
+    watcher = Watcher(config)
 
     try:
         watcher.run()

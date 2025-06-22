@@ -6,16 +6,11 @@ from src.server.heartbeat import Heartbeat
 
 
 class TestHeartbeat:
-    class Config:
-        def __init__(self):
-            self.heartbeat_port = 13434
-            self.heartbeat_watcher_port = 13435
-
     def test_heartbeat(self):
-        config = TestHeartbeat.Config()
-        heartbeat = Heartbeat(config)
+        heartbeat_port = 13434
+        heartbeat = Heartbeat(heartbeat_port)
         watcher = None
-        addr = ('127.0.0.1', config.heartbeat_port)
+        addr = ('127.0.0.1', heartbeat_port)
         tries = 0
         while tries < 3:
             try:

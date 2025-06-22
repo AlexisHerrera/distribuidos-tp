@@ -37,7 +37,7 @@ class BaseNode(ABC):
         self.should_send_results_before_eof = False
         # Threads executor (should be instantiated on node)
         self._executor = None
-        self.heartbeat = Heartbeat(config)
+        self.heartbeat = Heartbeat(config.heartbeat_port)
         try:
             peers = getattr(config, 'peers', [])
             port_str = getattr(config, 'port', None)

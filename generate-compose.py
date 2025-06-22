@@ -19,7 +19,7 @@ class ScalableService:
         nodes: int,
         command: str,
         config_file: str,
-        port: int,
+        port: int = BASE_PORT,
         dockerfile: str = 'src/server/Dockerfile',
     ):
         self.name = name
@@ -37,7 +37,7 @@ class Config:
 
         if 'all' in self.__dict__ and self.all is not None and self.all > 0:
             for k in self.__dict__.keys():
-                if k == 'clients':
+                if k == 'clients' or k == 'watcher':
                     continue
                 self.__dict__[k] = self.all
 
@@ -204,7 +204,7 @@ def create_scalable(service: ScalableService):
     return nodes
 
 
-def create_watcher():
+def create_watcher(watcher: ScalableService):
     # Create config file
     data = {}
     with open(WATCHER_CONFIG_PATH, 'r', encoding='utf-8') as f:
@@ -214,25 +214,41 @@ def create_watcher():
         data['nodes'] = WATCHER_NODES
         yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
 
-    return f"""watcher:
-    container_name: watcher
+    watchers = ''
+    for i in range(1, watcher.nodes + 1):
+        container_name = f'{watcher.name}-{i}'
+
+        peers = [
+            f'{j}:{watcher.name}-{j}' for j in range(1, watcher.nodes + 1) if j != i
+        ]
+        peers_env = ','.join(peers)
+
+        watchers += f"""{container_name}:
+    container_name: {container_name}
     build:
       context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/watcher/main.py"]
+      dockerfile: {watcher.dockerfile}
+    command: {watcher.command}
     networks:
       - {NETWORK_NAME}
+    environment:
+      - NODE_ID={i}
+      - PEERS={peers_env}
     depends_on:
       rabbitmq:
         condition: service_healthy
     volumes:
-      - ./src/server/watcher/config.yaml:/app/config.yaml
+      - ./src/server/watcher/config.yaml:/app/config.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock
   """
+    return watchers
 
 
 def create_services(
-    scalable_services: list[ScalableService], config: Config, dataset_path: str
+    scalable_services: list[ScalableService],
+    config: Config,
+    dataset_path: str,
+    watcher: ScalableService,
 ):
     rabbitmq = create_rabbitmq()
     clients = ''
@@ -249,7 +265,7 @@ def create_services(
     for service in scalable_services:
         services += create_scalable(service)
 
-    watcher = create_watcher()
+    watchers = create_watcher(watcher)
 
     return f"""
 services:
@@ -259,7 +275,7 @@ services:
   {services}
   {sinks}
   {joiners}
-  {watcher}
+  {watchers}
 """
 
 
@@ -290,10 +306,13 @@ def parse_args():
 
 
 def create_docker_compose_data(
-    scalable_services: list[ScalableService], config: Config, dataset_path: str
+    scalable_services: list[ScalableService],
+    config: Config,
+    dataset_path: str,
+    watcher: ScalableService,
 ):
     base = create_docker_compose_base()
-    services = create_services(scalable_services, config, dataset_path)
+    services = create_services(scalable_services, config, dataset_path, watcher)
     networks = create_networks()
 
     return base + services + networks
@@ -422,17 +441,18 @@ def main():
 
     dataset_path = SMALL_DATASET_PATH if args.small_dataset else DATASET_PATH
 
-    content = create_docker_compose_data(scalable_services, config, dataset_path)
+    watcher = ScalableService(
+        name='watcher',
+        nodes=config.watcher,
+        command='["python", "./src/server/watcher/main.py"]',
+        config_file='./src/server/watcher/config.yaml',
+    )
+    content = create_docker_compose_data(
+        scalable_services, config, dataset_path, watcher
+    )
 
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.write(content)
-
-    with open(WATCHER_CONFIG_PATH, 'r+', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-
-        data['nodes'] = WATCHER_NODES
-        f.seek(0)
-        yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
 
 
 if __name__ == '__main__':
