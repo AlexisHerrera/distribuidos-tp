@@ -12,7 +12,10 @@ class TCPSocket:
         self.socket: socket = socket
 
     @classmethod
-    def create(cls):
+    def create(cls, timeout: int | None = None):
+        if timeout:
+            socket.setdefaulttimeout(timeout)
+
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         return cls(s)
 
