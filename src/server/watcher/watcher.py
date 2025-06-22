@@ -3,9 +3,10 @@ import signal
 import threading
 from queue import SimpleQueue
 from threading import Event
+from typing import Callable
 
 from src.server.heartbeat import Heartbeat
-from src.server.watcher.bully import Bully
+from src.server.watcher.bully.bully import Bully
 from src.server.watcher.heartbeater import Heartbeater
 from src.utils.config import WatcherConfig
 
@@ -75,27 +76,19 @@ class Watcher:
 
             t.start()
 
-    def _stop_heartbeaters(self):
-        # Stop heartbeaters
-        for _, h in self.heartbeaters.items():
-            h.stop()
-
-        # Stop threads
-        for t in self.heartbeater_threads:
-            t.join()
-
     def _run_as_leader(self, change_leader: Event):
-        self._initialize_heartbeaters(self.nodes)
+        # self._initialize_heartbeaters(self.nodes)
 
         change_leader.wait()
         # Stop heartbeaters
         self._stop_heartbeaters()
 
-    def _run_as_follower(self, change_leader: Event):
-        self._initialize_heartbeaters(self.peers)
+    def _run_as_follower(self, change_leader: Event, callback: Callable[[], None]):
+        # self._initialize_heartbeaters(self.peers)
 
         while self._is_running():
-            change_leader.wait()
+            callback()
+            # change_leader.wait()
             if self.bully.am_i_leader():
                 # Stop heartbeaters
                 self._stop_heartbeaters()
@@ -111,6 +104,15 @@ class Watcher:
             except Exception as e:
                 logger.error(f'{e}')
                 break
+
+    def _stop_heartbeaters(self):
+        # Stop heartbeaters
+        for _, h in self.heartbeaters.items():
+            h.stop()
+
+        # Stop threads
+        for t in self.heartbeater_threads:
+            t.join()
 
     def stop(self):
         with self.is_running_lock:

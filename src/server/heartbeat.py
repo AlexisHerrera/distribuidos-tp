@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 class Heartbeat:
     def __init__(self, heartbeat_port: int):
         self.socket = ServerSocket(heartbeat_port, 5)
+        self.is_running_lock = threading.Lock()
         self.is_running = True
         self.manager_queue: SimpleQueue = SimpleQueue()
         self.clients: dict[tuple, (threading.Thread, TCPSocket)] = {}
@@ -23,7 +24,7 @@ class Heartbeat:
 
     def _manage_client(self, socket: TCPSocket, addr: tuple):
         try:
-            while self.is_running:
+            while self._is_running():
                 message = socket.recv(RECV_BYTES_AMOUNT)
                 logger.debug(f'Received {message}')
 
@@ -47,7 +48,7 @@ class Heartbeat:
 
     def run(self):
         try:
-            while self.is_running:
+            while self._is_running():
                 heartbeater_socket, addr = self.socket.accept()
                 logger.info(
                     f'Received new heartbeater from {TCPSocket.gethostbyaddress(addr)}'
@@ -65,11 +66,18 @@ class Heartbeat:
         except Exception as e:
             logger.error(f'Heartbeat error: {e}')
 
+    def _is_running(self):
+        with self.is_running_lock:
+            return self.is_running
+
     def stop(self):
         logger.info('Stopping heartbeat')
-        self.is_running = False
+        with self.is_running_lock:
+            self.is_running = False
+
         for _, (client, socket) in self.clients.items():
             socket.stop()
             client.join()
+
         self.socket.stop()
         self.heartbeat_thread.join()
