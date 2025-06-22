@@ -560,7 +560,17 @@ class Cleaner:
 
     def generate_user_id(self) -> uuid.UUID:
         with self.user_id_lock:
-            user_id = uuid.uuid4()
+            try:
+                user_id_str = self.clients_uuids.pop()
+                user_id = uuid.UUID(user_id_str)
+                logger.debug(f'Popped user_id from stack: {user_id}')
+            except IndexError:
+                logger.warning('UUID list is empty. Generating a random UUID instead.')
+                user_id = uuid.uuid4()
+            except ValueError as e:
+                logger.error(f'Invalid UUID format popped from list: {e}', exc_info=True)
+                user_id = uuid.uuid4()
+
         return user_id
 
 
