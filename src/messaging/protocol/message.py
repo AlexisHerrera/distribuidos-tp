@@ -43,18 +43,25 @@ class MessageType(Enum):
 
 class Message:
     USER_ID_SIZE = 16
+    MSG_ID_SIZE = 16
     MSG_TYPE_SIZE = 1
     MSG_LEN_SIZE = 2
 
     USER_ID_POS = 0
-    MSG_TYPE_POS = USER_ID_POS + USER_ID_SIZE
+    MSG_ID_POS = USER_ID_POS + USER_ID_SIZE
+    MSG_TYPE_POS = MSG_ID_POS + MSG_ID_SIZE
     MSG_LEN_POS = MSG_TYPE_POS + MSG_TYPE_SIZE
     MSG_DATA_POS = MSG_LEN_POS + MSG_LEN_SIZE
 
     def __init__(
-        self, user_id: uuid.UUID, message_type: MessageType, data: object = None
+        self,
+        user_id: uuid.UUID,
+        message_type: MessageType,
+        data: object = None,
+        message_id: uuid.UUID | None = None,
     ):
         self.user_id = user_id
+        self.message_id = message_id or uuid.uuid4()
         self.message_type = message_type
         self.data = data
 
@@ -65,6 +72,8 @@ class Message:
 
         user_id_encoded = self.user_id.bytes
 
+        msg_id_encoded = self.message_id.bytes
+
         msg_type_encoded = Message.__int_to_bytes(
             self.message_type.value, Message.MSG_TYPE_SIZE
         )
@@ -73,12 +82,22 @@ class Message:
             bytes_amount, Message.MSG_LEN_SIZE
         )
 
-        return user_id_encoded + msg_type_encoded + bytes_amount_encoded + data_encoded
+        return (
+            user_id_encoded
+            + msg_id_encoded
+            + msg_type_encoded
+            + bytes_amount_encoded
+            + data_encoded
+        )
 
     @staticmethod
     def from_bytes(buf: bytes):
         user_id = uuid.UUID(
             bytes=buf[Message.USER_ID_POS : Message.USER_ID_POS + Message.USER_ID_SIZE]
+        )
+
+        message_id = uuid.UUID(
+            bytes=buf[Message.MSG_ID_POS : Message.MSG_ID_POS + Message.MSG_ID_SIZE]
         )
 
         msg_type_from_buf = Message.__int_from_bytes(
@@ -95,7 +114,7 @@ class Message:
             buf[Message.MSG_DATA_POS :], bytes_amount
         )
 
-        return Message(user_id, msg_type, data)
+        return Message(user_id, msg_type, data, message_id)
 
     @staticmethod
     def __int_from_bytes(buf: bytes, bytes_amount: int) -> int:

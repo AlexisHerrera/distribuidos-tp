@@ -35,4 +35,6 @@ class CountryBudgetLogic(BaseCounterLogic):
             f'Processed batch for user {user_id}, sending {len(result_list)} partial budget counts.'
         )
 
-        return Message(user_id, MessageType.MovieBudgetCounter, result_list)
+        return Message(
+            user_id, MessageType.MovieBudgetCounter, result_list, message.message_id
+        )

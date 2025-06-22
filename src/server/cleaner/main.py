@@ -200,7 +200,10 @@ class Cleaner:
 
                 if model_object_list:
                     output_message = Message(
-                        user_id, associated_message_type, model_object_list
+                        user_id,
+                        associated_message_type,
+                        model_object_list,
+                        message_id=None,
                     )
 
                     self.connection.send(output_message)

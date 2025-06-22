@@ -38,7 +38,9 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
 
     def message_result(self, user_id: uuid.UUID) -> Message:
         sorted_countries = self._obtain_sorted_countries(user_id)
-        return Message(user_id, MessageType.MovieBudgetCounter, sorted_countries)
+        return Message(
+            user_id, MessageType.MovieBudgetCounter, sorted_countries, message_id=None
+        )
 
     def _obtain_sorted_countries(self, user_id: uuid.UUID) -> list[MovieBudgetCounter]:
         result: dict[str, MovieBudgetCounter] = self.final_budgets.pop(user_id, {})

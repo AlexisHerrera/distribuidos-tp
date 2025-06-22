@@ -34,7 +34,9 @@ class Q4Top10ActorsSinkLogic(BaseSinkLogic):
     def message_result(self, user_id: uuid.UUID) -> Message:
         sorted_top10_actors = self._obtain_sorted_top10_actors(user_id)
         logger.info(f'TOP 10: {sorted_top10_actors}')
-        return Message(user_id, MessageType.ActorCount, sorted_top10_actors)
+        return Message(
+            user_id, MessageType.ActorCount, sorted_top10_actors, message_id=None
+        )
 
     def _obtain_sorted_top10_actors(self, user_id: uuid.UUID) -> list[ActorCount]:
         logger.info(f'--- Sink: Final Global TOP 10 Actors Counts for {user_id} ---')

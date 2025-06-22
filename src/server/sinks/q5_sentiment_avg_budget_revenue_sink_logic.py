@@ -47,4 +47,4 @@ class Q5SentimentAvgBudgetRevenueSinkLogic(BaseSinkLogic):
         avg_pos, avg_neg = self._obtain_avg_budget_revenue(user_id)
         logger.info(f'Averages by sentiment - POSITIVE: {avg_pos}, NEGATIVE: {avg_neg}')
         result = MovieAvgBudget(positive=avg_pos, negative=avg_neg)
-        return Message(user_id, MessageType.MovieAvgBudget, result)
+        return Message(user_id, MessageType.MovieAvgBudget, result, message_id=None)

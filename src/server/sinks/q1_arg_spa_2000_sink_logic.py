@@ -35,5 +35,5 @@ class Q1ArgSpa2000(BaseSinkLogic):
         logger.info(f'Final Movie Genre for user {user_id}: count {len(result)}')
         for movies_genre in result:
             logger.info(f'Movie: {movies_genre.title}, Genres: {movies_genre.genres}')
-
-        return Message(user_id, MessageType.Movie, result)
+        # In case of duplicates, Cleaner should ignore if sink has already given results for the client
+        return Message(user_id, MessageType.Movie, result, message_id=None)

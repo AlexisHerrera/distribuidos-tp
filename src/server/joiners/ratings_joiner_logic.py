@@ -29,4 +29,6 @@ class RatingsJoinerLogic(BaseJoinerLogic):
                 )
             )
         logger.info(f'Joining {len(joined)}')
-        return Message(message.user_id, MessageType.MovieRating, joined)
+        return Message(
+            message.user_id, MessageType.MovieRating, joined, message.message_id
+        )

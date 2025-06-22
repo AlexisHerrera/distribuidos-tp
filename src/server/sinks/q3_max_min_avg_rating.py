@@ -38,7 +38,7 @@ class Q3MaxMinAvgRatingSinkLogic(BaseSinkLogic):
 
     def message_result(self, user_id: uuid.UUID) -> Message:
         result = self._get_max_min_average_rating(user_id)
-        return Message(user_id, MessageType.MovieRatingAvg, result)
+        return Message(user_id, MessageType.MovieRatingAvg, result, message_id=None)
 
     def _get_max_min_average_rating(self, user_id: uuid.UUID) -> dict:
         logger.info(f'--- Sink: Final Global Q3 Max Min Avg Rating for {user_id} ---')

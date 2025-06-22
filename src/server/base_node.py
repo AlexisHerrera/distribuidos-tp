@@ -199,7 +199,7 @@ class BaseNode(ABC):
     def propagate_eof(self, user_id: uuid.UUID):
         try:
             logger.info('Propagating EOF to next stage...')
-            eof_message = Message(user_id, MessageType.EOF, None)
+            eof_message = Message(user_id, MessageType.EOF, None, message_id=None)
             self.connection.thread_safe_send(eof_message)
 
             logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')
