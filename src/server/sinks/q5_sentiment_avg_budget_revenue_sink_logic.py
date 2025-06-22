@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Tuple
+from typing import Tuple, Any
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_avg_budget import MovieAvgBudget
@@ -48,3 +48,18 @@ class Q5SentimentAvgBudgetRevenueSinkLogic(BaseSinkLogic):
         logger.info(f'Averages by sentiment - POSITIVE: {avg_pos}, NEGATIVE: {avg_neg}')
         result = MovieAvgBudget(positive=avg_pos, negative=avg_neg)
         return Message(user_id, MessageType.MovieAvgBudget, result, message_id=None)
+
+    def get_application_state(self) -> dict[str, Any]:
+        serializable_state = {}
+        for user_id, stats_dict in self._stats.to_dict().items():
+            serializable_state[str(user_id)] = stats_dict
+        return serializable_state
+
+    def load_application_state(self, state: dict[str, Any]) -> None:
+        logger.info(
+            'Loading application state for Q5SentimentAvgBudgetRevenueSinkLogic...'
+        )
+        deserialized_state = {}
+        for user_id_str, stats_dict in state.items():
+            deserialized_state[uuid.UUID(user_id_str)] = stats_dict
+        self._stats = SafeDict(initial_dict=deserialized_state)

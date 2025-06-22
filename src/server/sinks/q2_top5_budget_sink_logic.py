@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Any
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_budget_counter import MovieBudgetCounter
@@ -71,3 +72,21 @@ class Q2Top5BudgetSinkLogic(BaseSinkLogic):
         except Exception as e:
             logger.error(f'Error logging final results: {e}', exc_info=True)
             return None
+
+    def get_application_state(self) -> dict[str, Any]:
+        serializable_state = {}
+        for user_id, budget_dict in self.final_budgets.to_dict().items():
+            serializable_state[str(user_id)] = {
+                country: counter.to_dict() for country, counter in budget_dict.items()
+            }
+        return serializable_state
+
+    def load_application_state(self, state: dict[str, Any]) -> None:
+        logger.info('Loading application state for Q2Top5BudgetSinkLogic...')
+        deserialized_state = {}
+        for user_id, budget_dict in state.items():
+            deserialized_state[uuid.UUID(user_id)] = {
+                country: MovieBudgetCounter.from_dict(counter_dict)
+                for country, counter_dict in budget_dict.items()
+            }
+        self.final_budgets = SafeDict(initial_dict=deserialized_state)

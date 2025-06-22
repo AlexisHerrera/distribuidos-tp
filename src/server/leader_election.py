@@ -12,6 +12,7 @@ from src.utils.config import Config
 from src.utils.state_manager import StateManager
 
 logger = logging.getLogger(__name__)
+LEADER_ELECTION_STATE_NAME = 'leader_election_state.json'
 
 
 class FinalizationTimeoutError(Exception):
@@ -38,7 +39,7 @@ class LeaderElection:
         logger.info(f'Peers: {self.peers}')
         self._total_followers = len(self.peers)
         # Recovering State
-        self.state_manager = StateManager()
+        self.state_manager = StateManager(LEADER_ELECTION_STATE_NAME)
         self.persisted_states: dict[str, dict[str, Any]] = (
             self.state_manager.load_state()
         )

@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Any
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.actor_count import ActorCount
@@ -70,3 +71,22 @@ class Q4Top10ActorsSinkLogic(BaseSinkLogic):
         except Exception as e:
             logger.error(f'Error logging final results: {e}', exc_info=True)
             return None
+
+    def get_application_state(self) -> dict[str, Any]:
+        serializable_state = {}
+        for user_id, actor_dict in self.final_actor_count.to_dict().items():
+            serializable_state[str(user_id)] = {
+                actor_name: counter.to_dict()
+                for actor_name, counter in actor_dict.items()
+            }
+        return serializable_state
+
+    def load_application_state(self, state: dict[str, Any]) -> None:
+        logger.info('Loading application state for Q4Top10ActorsSinkLogic...')
+        deserialized_state = {}
+        for user_id, actor_dict in state.items():
+            deserialized_state[uuid.UUID(user_id)] = {
+                actor_name: ActorCount.from_dict(counter_dict)
+                for actor_name, counter_dict in actor_dict.items()
+            }
+        self.final_actor_count = SafeDict(initial_dict=deserialized_state)

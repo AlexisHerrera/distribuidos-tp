@@ -14,12 +14,16 @@ from src.server.leader_election import LeaderElection
 from src.utils.config import Config
 from src.utils.in_flight_tracker import InFlightTracker
 from src.utils.log import initialize_log
+from src.utils.state_manager import StateManager
 
 logger = logging.getLogger(__name__)
+NODE_STATE_NAME = 'node_state.json'
 
 
 class BaseNode(ABC):
-    def __init__(self, config: Config, node_type_arg: str):
+    def __init__(
+        self, config: Config, node_type_arg: str, has_result_persisted: bool = False
+    ):
         self.config = config
         self.node_type = node_type_arg
         # Eg: single_country_logic
@@ -34,13 +38,17 @@ class BaseNode(ABC):
         self.in_flight_tracker = InFlightTracker()
 
         # sent results before eof
-        self.should_send_results_before_eof = False
+        self.has_results_persisted = has_result_persisted
         # Threads executor (should be instantiated on node)
         self._executor = None
         self.heartbeat = Heartbeat(config.heartbeat_port)
+
+        self.node_state_manager: StateManager | None = None
+        self.processed_message_ids: set[str] = set()
         try:
             peers = getattr(config, 'peers', [])
             port_str = getattr(config, 'port', None)
+            self._load_logic()
 
             if isinstance(peers, list) and peers and port_str is not None:
                 self.leader = LeaderElection(config, self)
@@ -49,7 +57,11 @@ class BaseNode(ABC):
                     'Single-node configuration detected (peers list empty/missing or port missing). LeaderElection component will not be used.'
                 )
                 self.leader = None
-            self._load_logic()
+
+            if self.has_results_persisted:
+                self.node_state_manager = StateManager(NODE_STATE_NAME)
+                self._load_node_state()
+
             self._setup_signal_handlers()
             logger.info(f"BaseNode for '{self.node_type}' initialized.")
         except Exception as e:
@@ -58,6 +70,30 @@ class BaseNode(ABC):
             )
             self._is_running = False
             raise
+
+    def _load_node_state(self):
+        if not self.node_state_manager:
+            return
+
+        logger.info(
+            f'Loading node state from {self.node_state_manager.state_file_path}...'
+        )
+        persisted_data = self.node_state_manager.load_state()
+
+        if not persisted_data:
+            logger.info('No previous state found or file is empty.')
+            return
+
+        processed_ids = persisted_data.get('processed_message_ids', [])
+        self.processed_message_ids = set(processed_ids)
+        logger.info(
+            f'Restored {len(self.processed_message_ids)} processed message IDs.'
+        )
+
+        app_state = persisted_data.get('application_state')
+        if app_state and hasattr(self.logic, 'load_application_state'):
+            self.logic.load_application_state(app_state)
+            logger.info('Application state restored successfully.')
 
     @abstractmethod
     def _get_logic_registry(self) -> Dict[str, Type]:
@@ -112,7 +148,7 @@ class BaseNode(ABC):
         pass
 
     def send_final_results(self, user_id: uuid.UUID):
-        if not self.should_send_results_before_eof:
+        if not self.has_results_persisted:
             return
         try:
             out_msg = self.logic.message_result(user_id)
@@ -123,6 +159,15 @@ class BaseNode(ABC):
 
     def process_message(self, message: Message):
         user_id = message.user_id
+
+        if (
+            self.has_results_persisted
+            and str(message.message_id) in self.processed_message_ids
+        ):
+            logger.warning(
+                f'Ignoring duplicate message with id {message.message_id} for user {user_id}'
+            )
+            return
 
         if message.message_type == MessageType.EOF:
             logger.info(f'RECEIVED EOF FROM QUEUE for user_id: {message.user_id}')
@@ -140,6 +185,18 @@ class BaseNode(ABC):
             if self.leader:
                 self.in_flight_tracker.increment(user_id)
             self.handle_message(message)
+            if self.has_results_persisted:
+                # chaos_test(0.01, f"Sink crashes processing: {message.message_id}")
+                self.processed_message_ids.add(str(message.message_id))
+                if hasattr(self.logic, 'get_application_state'):
+                    app_state = self.logic.get_application_state()
+                    state_to_persist = {
+                        'processed_message_ids': list(self.processed_message_ids),
+                        'application_state': app_state,
+                    }
+                    self.node_state_manager.save_state(state_to_persist)
+                    # logger.info(f"Saving state: Msgs id: {len(list(self.processed_message_ids))}, app state: {len(app_state)}" )
+
         except Exception as e:
             logger.error(f'Error en handle_message: {e}', exc_info=True)
             raise
