@@ -1,6 +1,9 @@
+import logging
 from enum import Enum
 from threading import Lock
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 
 class BullyState(Enum):
@@ -27,32 +30,57 @@ class BullyStateManager:
     def election(self, init_election: Callable[[], None]):
         with self.lock:
             if self.state != BullyState.ELECTION:
+                old_state = self.state
                 self.state = BullyState.ELECTION
                 init_election()
+                logger.debug(
+                    f'[BULLY] Election from {old_state.name} to {self.state.name}'
+                )
 
     def answer(self):
         with self.lock:
             if self.state == BullyState.ELECTION:
+                old_state = self.state
                 self.state = BullyState.WAITING_COORDINATOR
+                logger.debug(
+                    f'[BULLY] Answer from {old_state.name} to {self.state.name}'
+                )
 
-    def coordinator(self, new_leader_node_id: int, set_leader: Callable[[int], None]):
+    def coordinator(
+        self,
+        new_leader_node_id: int,
+        set_leader: Callable[[int], None],
+        send_coordinator: Callable[[], None],
+    ):
         with self.lock:
             if self.node_id < new_leader_node_id:
+                old_state = self.state
                 self.state = BullyState.RUNNING
                 set_leader(new_leader_node_id)
+                logger.debug(
+                    f'[BULLY] Coordinator from {old_state.name} to {self.state.name}'
+                )
+            else:
+                send_coordinator()
 
     def timeout_reply(
         self,
+        is_leader: bool,
         init_election: Callable[[], None],
         set_leader: Callable[[int], None],
         send_coordinator: Callable[[], None],
     ):
         with self.lock:
+            old_state = self.state
             match self.state:
                 case BullyState.RUNNING:
-                    self.state = BullyState.ELECTION
-                    init_election()
-                case BullyState.ELECTION | BullyState.WAITING_COORDINATOR:
+                    if is_leader:
+                        self.state = BullyState.ELECTION
+                        init_election()
+                case BullyState.ELECTION:
                     self.state = BullyState.RUNNING
                     set_leader(self.node_id)
                     send_coordinator()
+            logger.debug(
+                f'[BULLY] TimeoutReply from {old_state.name} to {self.state.name}'
+            )

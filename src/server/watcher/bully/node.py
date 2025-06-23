@@ -19,7 +19,8 @@ class BullyNode:
         node_id: int,
         message_queue: SimpleQueue,
         bully_node_id: int,
-        get_leader_node_id: Callable[[], int],
+        reconnect: Callable[[str], TCPSocket],
+        is_leader: Callable[[int], bool],
     ):
         self.is_running_lock = Lock()
         self.is_running = True
@@ -28,7 +29,8 @@ class BullyNode:
         self.node_id = node_id
         self.message_queue = message_queue
         self.bully_node_id = bully_node_id
-        self.get_leader_node_id = get_leader_node_id
+        self.reconnect = reconnect
+        self.is_leader = is_leader
         self.recv_thread = Thread(target=self._manage_recv)
         self.recv_thread.start()
 
@@ -36,37 +38,49 @@ class BullyNode:
         logger.info(f'[BULLY] Begin recv of node id {self.node_id}')
 
         times = 0
+        reconnect = True if self.socket is None else False
         try:
             while self._is_running():
                 try:
+                    if reconnect:
+                        self.socket = self.reconnect(self.node_name)
+                        reconnect = False
+
                     message = self.socket.recv(MESSAGE_BYTES_AMOUNT)
 
                     self.message_queue.put((message, self.node_id, self.node_name))
                     times = 0
-                except TimeoutError:
+                except TimeoutError as e:
+                    logger.warning(
+                        f'[BULLY] Got timeout error from {self.node_name}: {e}'
+                    )
                     times += 1
-                except SocketDisconnected:
+                except SocketDisconnected as e:
+                    logger.warning(
+                        f'[BULLY] Got socket disconnected error from {self.node_name}: {e}'
+                    )
                     times = MAX_MISSED_MESSAGE
-                except ConnectionError:
+                    reconnect = True
+                except ConnectionError as e:
+                    logger.warning(
+                        f'[BULLY] Got connection error from {self.node_name}: {e}'
+                    )
                     times = MAX_MISSED_MESSAGE
+                    reconnect = True
 
-                if times >= MAX_MISSED_MESSAGE and self.node_id > self.bully_node_id:
+                if times >= MAX_MISSED_MESSAGE and self.is_leader(self.node_id):
                     self.message_queue.put(
                         (BullyProtocol.TIMEOUT_REPLY, self.node_id, self.node_name)
                     )
-                    self._reconnect()
-                    break
+                    times = 0
+
         except Exception as e:
             logger.error(
                 f'[BULLY] Error ocurred while recv message from {self.node_name} ID {self.node_id}: {e}'
             )
 
-    def _reconnect(self):
-        pass
-
     def send(self, message: BullyProtocol):
         try:
-            # time.sleep(2)  # TODO: remove sleep once finished with tests
             self.socket.send(message, MESSAGE_BYTES_AMOUNT)
         except Exception as e:
             logger.error(
