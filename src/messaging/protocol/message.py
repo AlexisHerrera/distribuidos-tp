@@ -31,6 +31,8 @@ class MessageType(Enum):
     ActorCount = 10
     MovieRatingAvg = 11
     EOF = 100
+    ACK = 101
+    HANDSHAKE_SESSION = 102
 
     @classmethod
     def _missing_(cls, value):

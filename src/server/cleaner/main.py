@@ -20,7 +20,7 @@ from src.messaging.protocol.message import Message, MessageType
 from src.server.cleaner.SessionStateMachine import SessionStateMachine
 from src.server.heartbeat import Heartbeat
 
-# from src.server.leader_election import chaos_test
+from src.server.leader_election import chaos_test
 from src.utils.config import Config
 from src.utils.log import initialize_log
 from src.utils.state_manager import StateManager
@@ -50,7 +50,6 @@ class Cleaner:
 
         # clients = { "user_id" : { 'socket': client_socket, 'queries_received': number, 'lock': threading.Lock()}}
         self.clients = {}
-        self.address_to_user_id = {}
         self.clients_lock = threading.Lock()
         self._load_clients()
         # Sender Thread
@@ -112,27 +111,49 @@ class Cleaner:
         user_id = None
 
         try:
-            with self.clients_lock:
-                user_id = self.address_to_user_id.get(address)
+            # Handshake
+            raw_handshake = receive_message(client_socket)
+            handshake_msg = Message.from_bytes(raw_handshake)
 
-            if user_id:
-                logger.warning(
-                    f'Client reconnected from {address}. Resuming session for user {user_id}.'
+            if handshake_msg.message_type != MessageType.HANDSHAKE_SESSION:
+                logger.error(
+                    f'Connection from {address} did not start with a handshake. Closing.'
                 )
-                with self.clients_lock:
-                    self.clients[user_id]['socket'] = client_socket
-            else:
+                return
+
+            client_provided_id = handshake_msg.user_id
+            is_new_client = client_provided_id == uuid.UUID(int=0)
+
+            if is_new_client:
                 user_id = self.generate_user_id()
                 logger.info(
-                    f'New connection from {address}. Assigned new user_id: {user_id}.'
+                    f'New client from {address}. Assigned new session ID: {user_id}'
                 )
 
-                def create_new_client(state):
-                    state['address'] = address
+                def create_session(state):
                     state['socket'] = client_socket
 
-                self._update_client_state(user_id, create_new_client)
+                self._update_client_state(user_id, create_session)
+            else:
+                user_id = client_provided_id
+                logger.info(
+                    f'Client reconnected from {address}. Resuming session ID: {user_id}'
+                )
 
+                def resume_session(state):
+                    state['socket'] = client_socket
+
+                self._update_client_state(user_id, resume_session)
+
+            # Confirm handshake
+            response_msg = Message(user_id, MessageType.HANDSHAKE_SESSION)
+            send_message(client_socket, response_msg.to_bytes())
+
+            # Get client lock
+            with self.clients_lock:
+                client_lock = self.clients[user_id]['lock']
+
+            # Loop after handshake
             while self.is_running:
                 with self.clients_lock:
                     client_state = self.clients.get(user_id)
@@ -153,7 +174,7 @@ class Cleaner:
                 logger.info(f'[{user_id}] Executing stage: {client_state["stage"]}')
 
                 success = self._process_client_data(
-                    user_id, client_socket, stage_config
+                    user_id, client_socket, stage_config, client_lock
                 )
                 if not success:
                     raise ConnectionError(
@@ -193,27 +214,13 @@ class Cleaner:
                 user_id,
                 {
                     'user_id': user_id,
-                    'address': None,
                     'stage': SessionStateMachine.STAGES[0],
                     'queries_received': 0,
                     'socket': None,
                     'lock': threading.Lock(),
                 },
             )
-
-            # Saves old address to update index
-            old_address = client_state.get('address')
-            # This may change index. But surely changes state
             update_func(client_state)
-
-            # Updates index
-            new_address = client_state.get('address')
-            if old_address != new_address:
-                if old_address:
-                    self.address_to_user_id.pop(old_address, None)
-                if new_address:
-                    self.address_to_user_id[new_address] = user_id
-
             self._save_all_clients_state()
 
     def _save_all_clients_state(self):
@@ -221,7 +228,6 @@ class Cleaner:
         for user_id, data in self.clients.items():
             state_to_persist[str(user_id)] = {
                 'stage': data['stage'],
-                'address': data['address'],
                 'queries_received': data['queries_received'],
             }
         self.state_manager.save_state(state_to_persist)
@@ -233,19 +239,13 @@ class Cleaner:
         with self.clients_lock:
             for user_id_str, data in persisted_states.items():
                 user_id = uuid.UUID(user_id_str)
-                address = data.get('address')
-
                 self.clients[user_id] = {
                     'user_id': user_id,
-                    'address': address,
                     'stage': data.get('stage', SessionStateMachine.STAGES[0]),
                     'queries_received': data.get('queries_received', 0),
                     'socket': None,
                     'lock': threading.Lock(),
                 }
-
-                if address:
-                    self.address_to_user_id[address] = user_id
 
         logger.info(f'Restored {len(self.clients)} client states into memory.')
 
@@ -265,12 +265,7 @@ class Cleaner:
         with self.clients_lock:
             client_info = self.clients.pop(user_id, None)
             if client_info:
-                address = client_info.get('address')
-                if address:
-                    self.address_to_user_id.pop(address, None)
-                self._save_all_clients_state()  # Persistir la eliminación
-
-                # Cierra el socket si todavía está activo
+                self._save_all_clients_state()
                 sock = client_info.get('socket')
                 if sock:
                     try:
@@ -279,7 +274,7 @@ class Cleaner:
                         pass
 
     def _process_and_send_batch(self, user_id: uuid.UUID, raw_batch_bytes: bytes):
-        # chaos_test(0.001, "Crash 0.1% before reading from TCP")
+        chaos_test(0.001, 'Crash 0.1% before reading from TCP')
         batch = Batch.from_bytes(raw_batch_bytes)
         if not batch:
             raise ValueError(f'[{user_id}] Failed to decode batch during processing.')
@@ -324,7 +319,11 @@ class Cleaner:
             )
 
     def _process_client_data(
-        self, user_id: uuid.UUID, client_socket, stage_config: dict
+        self,
+        user_id: uuid.UUID,
+        client_socket,
+        stage_config: dict,
+        client_lock: threading.Lock,
     ):
         data_type_label = stage_config['label']
         if not self.is_running or not client_socket:
@@ -350,6 +349,16 @@ class Cleaner:
                 wal_filepath = self.wal_manager.write_entry(
                     user_id, batch.type.name, raw_batch_bytes
                 )
+                try:
+                    ack_message = Message(user_id, MessageType.ACK, None)
+                    with client_lock:
+                        send_message(client_socket, ack_message.to_bytes())
+                    logger.debug(f'[{user_id}] Sent ACK to client for batch.')
+                except Exception as ack_e:
+                    logger.error(
+                        f'[{user_id}] Failed to send ACK to client: {ack_e}. Client will likely resend.'
+                    )
+                    return False
 
                 self._process_and_send_batch(user_id, raw_batch_bytes)
                 # Remove because is already saved
