@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Any
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.movie_rating_avg import MovieRatingAvg
@@ -38,7 +39,7 @@ class Q3MaxMinAvgRatingSinkLogic(BaseSinkLogic):
 
     def message_result(self, user_id: uuid.UUID) -> Message:
         result = self._get_max_min_average_rating(user_id)
-        return Message(user_id, MessageType.MovieRatingAvg, result)
+        return Message(user_id, MessageType.MovieRatingAvg, result, message_id=None)
 
     def _get_max_min_average_rating(self, user_id: uuid.UUID) -> dict:
         logger.info(f'--- Sink: Final Global Q3 Max Min Avg Rating for {user_id} ---')
@@ -83,3 +84,21 @@ class Q3MaxMinAvgRatingSinkLogic(BaseSinkLogic):
             return final_result
         except Exception as e:
             logger.error(f'Error logging final results: {e}', exc_info=True)
+
+    def get_application_state(self) -> dict[str, Any]:
+        serializable_state = {}
+        for user_id, rating_dict in self.rating_counts.to_dict().items():
+            serializable_state[str(user_id)] = {
+                movie_id: counter.to_dict() for movie_id, counter in rating_dict.items()
+            }
+        return serializable_state
+
+    def load_application_state(self, state: dict[str, Any]) -> None:
+        logger.info('Loading application state for Q3MaxMinAvgRatingSinkLogic...')
+        deserialized_state = {}
+        for user_id, rating_dict in state.items():
+            deserialized_state[uuid.UUID(user_id)] = {
+                int(movie_id): MovieRatingCount.from_dict(counter_dict)
+                for movie_id, counter_dict in rating_dict.items()
+            }
+        self.rating_counts = SafeDict(initial_dict=deserialized_state)

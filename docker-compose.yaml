@@ -307,6 +307,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q1_config.yaml:/app/config.yaml
+      - ./.state/q1_sink:/app/state
 
   q2_sink:
     container_name: q2_sink
@@ -321,6 +322,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q2_config.yaml:/app/config.yaml
+      - ./.state/q2_sink:/app/state
 
   q3_sink:
     container_name: q3_sink
@@ -335,6 +337,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q3_config.yaml:/app/config.yaml
+      - ./.state/q3_sink:/app/state
 
   q4_sink:
     container_name: q4_sink
@@ -349,6 +352,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q4_config.yaml:/app/config.yaml
+      - ./.state/q4_sink:/app/state
 
   q5_sink:
     container_name: q5_sink
@@ -363,6 +367,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q5_config.yaml:/app/config.yaml
+      - ./.state/q5_sink:/app/state
 
   
   ratings_joiner:

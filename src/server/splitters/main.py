@@ -46,7 +46,12 @@ class SplitterNode(BaseNode):
             if len(list_to_send) > 0:
                 try:
                     self.connection.send(
-                        Message(message.user_id, MessageType.ActorCount, list_to_send)
+                        Message(
+                            message.user_id,
+                            MessageType.ActorCount,
+                            list_to_send,
+                            message_id=None,
+                        )
                     )
                     logger.info(f'Se enviaron {len(list_to_send)}')
                 except Exception as e:

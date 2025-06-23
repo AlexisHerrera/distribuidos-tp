@@ -124,10 +124,12 @@ def create_cleaner():
 
 
 def create_sink(n: int):
-    WATCHER_NODES.append(f'q{n}_sink')
+    container = f'q{n}_sink'
+    WATCHER_NODES.append(container)
+    state_volume_path = f'./.state/{container}'
     return f"""
-  q{n}_sink:
-    container_name: q{n}_sink
+  {container}:
+    container_name: {container}
     build:
       context: .
       dockerfile: src/server/Dockerfile
@@ -139,6 +141,7 @@ def create_sink(n: int):
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q{n}_config.yaml:/app/config.yaml
+      - {state_volume_path}:/app/state
 """
 
 

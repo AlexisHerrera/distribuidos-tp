@@ -12,6 +12,7 @@ from src.utils.config import Config
 from src.utils.state_manager import StateManager
 
 logger = logging.getLogger(__name__)
+LEADER_ELECTION_STATE_NAME = 'leader_election_state.json'
 
 
 class FinalizationTimeoutError(Exception):
@@ -38,7 +39,7 @@ class LeaderElection:
         logger.info(f'Peers: {self.peers}')
         self._total_followers = len(self.peers)
         # Recovering State
-        self.state_manager = StateManager()
+        self.state_manager = StateManager(LEADER_ELECTION_STATE_NAME)
         self.persisted_states: dict[str, dict[str, Any]] = (
             self.state_manager.load_state()
         )
@@ -263,14 +264,14 @@ class LeaderElection:
         )
 
         # Matar 2 nodos filtros con lideres y peers entre si.
-        if self.node_id in [
-            'filter_single_country-1',
-            'filter_single_country-2',
-            'filter_single_country-3',
-        ]:
-            chaos_test(
-                0.7, f'Crashing node with {live_in_flight_count} in-flight message(s).'
-            )
+        # if self.node_id in [
+        #     'filter_single_country-1',
+        #     'filter_single_country-2',
+        #     'filter_single_country-3',
+        # ]:
+        #     chaos_test(
+        #         0.5, f'Crashing node with {live_in_flight_count} in-flight message(s).'
+        #     )
 
         # Esperar hasta que el conteo en vivo sea cero
         while self.node.get_in_flight_count(user_id) > 0:
