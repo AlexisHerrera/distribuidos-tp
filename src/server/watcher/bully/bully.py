@@ -92,6 +92,7 @@ class Bully:
         # to stablish connection.
         initial_waiting_time = (len(self.peers) + 1) * self.timeout
         self.all_peers_connected.wait(initial_waiting_time)
+
         self._init_election()
         self.change_leader.wait()
         self.change_leader.clear()
