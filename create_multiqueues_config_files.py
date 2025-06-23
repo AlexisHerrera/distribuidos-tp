@@ -1,5 +1,6 @@
 import yaml
 import csv
+import os
 
 
 class IndentDumper(yaml.Dumper):
@@ -66,18 +67,73 @@ def create_config(clients_uuids: list[str]) -> dict:
     return config
 
 
+def create_config_file_cleaner(clients_uuids: list[str], output_config_path: str):
+    config = create_config(clients_uuids)
+
+    os.makedirs(os.path.dirname(output_config_path), exist_ok=True)
+
+    with open(output_config_path, 'w') as file:
+        yaml.dump(config, file, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
+
+    print(f"Cleaner configuration file '{output_config_path}' created successfully with {len(clients_uuids)} UUID-based queues.")
+
+
+def create_config_files_ratings_joiner(clients_uuids: list[str], output_directory: str):
+    os.makedirs(output_directory, exist_ok=True)
+
+    for client_id in clients_uuids:
+        joiner_config = {
+            'rabbit': {
+                'host': 'rabbitmq'
+            },
+            'connection': {
+                'consumer': [
+                    {
+                        'type': 'direct',
+                        'queue': f'ratings_clean_{client_id}'
+                    }
+                ],
+                'publisher': [
+                    {
+                        'type': 'direct',
+                        'queue': 'movies_rating_joined'
+                    }
+                ],
+                'base_db': [
+                    {
+                        'type': 'broadcast',
+                        'queue': 'argentina_post_2000_ratings',
+                        'exchange': 'argentina_post_2000'
+                    }
+                ]
+            },
+            'heartbeat': {
+                'port': 13434
+            },
+            'log': {
+                'level': 'INFO'
+            }
+        }
+
+        joiner_config_filename = os.path.join(output_directory, f'ratings_joiner_config_{client_id}.yaml')
+
+        with open(joiner_config_filename, 'w') as file:
+            yaml.dump(joiner_config, file, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
+
+        print(f"Ratings joiner configuration file created: {joiner_config_filename}")
+
+
 def main():
     uuid_csv_path = 'clients_uuids.csv'
-    output_config_path = 'src/server/cleaner/config.yaml'
+    cleaner_config_path = 'src/server/cleaner/config.yaml'
+    joiner_config_dir = 'src/server/joiners/'
 
     try:
         clients_uuids = read_uuids_from_csv(uuid_csv_path)
-        config = create_config(clients_uuids)
 
-        with open(output_config_path, 'w') as file:
-            yaml.dump(config, file, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
+        create_config_file_cleaner(clients_uuids, cleaner_config_path)
+        create_config_files_ratings_joiner(clients_uuids, joiner_config_dir)
 
-        print(f"Configuration file '{output_config_path}' created successfully with {len(clients_uuids)} UUID-based queues.")
     except Exception as e:
         print(f"Error: {e}")
 

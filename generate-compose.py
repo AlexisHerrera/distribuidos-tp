@@ -37,7 +37,7 @@ class Config:
 
         if 'all' in self.__dict__ and self.all is not None and self.all > 0:
             for k in self.__dict__.keys():
-                if k == 'clients':
+                if k == 'clients' or k == 'ratings_joiner' or k == 'cast_joiner':
                     continue
                 self.__dict__[k] = self.all
 
