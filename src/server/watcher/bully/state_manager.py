@@ -29,13 +29,14 @@ class BullyStateManager:
 
     def election(self, init_election: Callable[[], None]):
         with self.lock:
-            if self.state != BullyState.ELECTION:
-                old_state = self.state
-                self.state = BullyState.ELECTION
-                init_election()
-                logger.debug(
-                    f'[BULLY] Election from {old_state.name} to {self.state.name}'
-                )
+            old_state = self.state
+            match self.state:
+                case BullyState.RUNNING:
+                    self.state = BullyState.ELECTION
+                    init_election()
+                    logger.debug(
+                        f'[BULLY] Election from {old_state.name} to {self.state.name}'
+                    )
 
     def answer(self):
         with self.lock:

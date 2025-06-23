@@ -10,7 +10,8 @@ DEFAULT_RETRY_TIMEOUT = 2  # seconds
 class SocketDisconnected(Exception):
     "Raised when received 0 bytes from socket"
 
-    pass
+    def __init__(self):
+        super().__init__('Socket disconnected')
 
 
 class TCPSocket:

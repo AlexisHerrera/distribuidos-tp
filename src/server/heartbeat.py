@@ -2,12 +2,9 @@ import logging
 import threading
 from queue import Empty, SimpleQueue
 
+from src.messaging.protocol.heartbeat import HeartbeatProtocol
 from src.messaging.server_socket import ServerSocket
 from src.messaging.tcp_socket import TCPSocket
-
-RECV_BYTES_AMOUNT = 1
-MESSAGE_TO_SEND = b'B'  # Beat
-SEND_BYTES_AMOUNT = len(MESSAGE_TO_SEND)
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +23,13 @@ class Heartbeat:
     def _manage_client(self, socket: TCPSocket, addr: tuple):
         try:
             while self._is_running():
-                message = socket.recv(RECV_BYTES_AMOUNT)
-                logger.debug(f'[HEARTBEAT] Received {message}')
+                message = socket.recv(HeartbeatProtocol.MESSAGE_BYTES_AMOUNT)
+                logger.debug(f'[HEARTBEAT] Received {message} from {addr}')
 
-                socket.send(MESSAGE_TO_SEND, SEND_BYTES_AMOUNT)
-                logger.debug(f'[HEARTBEAT] Sent {MESSAGE_TO_SEND}')
+                socket.send(
+                    HeartbeatProtocol.PONG, HeartbeatProtocol.MESSAGE_BYTES_AMOUNT
+                )
+                logger.debug(f'[HEARTBEAT] Sent {HeartbeatProtocol.PONG} to {addr}')
         except Exception as e:
             logger.error(f'[HEARTBEAT] Error while managing client in heartbeat: {e}')
         finally:

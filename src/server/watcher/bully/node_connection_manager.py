@@ -3,10 +3,10 @@ from queue import SimpleQueue
 from threading import Event, Lock, Thread
 from typing import Callable
 
+from src.messaging.protocol.bully import BullyProtocol
 from src.messaging.server_socket import ServerSocket
 from src.messaging.tcp_socket import TCPSocket
 from src.server.watcher.bully.node import BullyNode
-from src.server.watcher.bully.protocol import BullyProtocol
 from src.utils.util import IncrementerStop
 
 logger = logging.getLogger(__name__)

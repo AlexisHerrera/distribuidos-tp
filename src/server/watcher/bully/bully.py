@@ -4,8 +4,8 @@ from queue import SimpleQueue
 from threading import Event, Lock, Thread, Timer
 from typing import Callable
 
+from src.messaging.protocol.bully import BullyProtocol
 from src.server.watcher.bully.node_connection_manager import NodeConnectionManager
-from src.server.watcher.bully.protocol import BullyProtocol
 from src.server.watcher.bully.state_manager import BullyState, BullyStateManager
 
 logger = logging.getLogger(__name__)

@@ -73,10 +73,11 @@ class NodesList:
         self.nodes: list[str] = []
         with open(filename, 'r', encoding='utf-8') as f:
             for line in f:
+                node_name = line.strip('\n ')
                 for filter in filters:
-                    if line.startswith(filter):
+                    if node_name.startswith(filter):
                         continue
-                    self.nodes.append(line)
+                    self.nodes.append(node_name)
 
 
 def print_config(config: Config):

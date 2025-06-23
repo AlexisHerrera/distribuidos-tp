@@ -3,15 +3,12 @@ import subprocess
 import time
 from threading import Lock
 
+from src.messaging.protocol.heartbeat import HeartbeatProtocol
 from src.messaging.tcp_socket import SocketDisconnected, TCPSocket
 
 logger = logging.getLogger(__name__)
 
 MAX_MISSING_HEARTBEATS = 3
-MESSAGE_TO_SEND = b'H'  # Heart
-SEND_BYTES_AMOUNT = len(MESSAGE_TO_SEND)
-EXPECTED_REPLY_MESSAGE = b'B'  # Beat
-RECV_BYTES_AMOUNT = len(EXPECTED_REPLY_MESSAGE)
 
 
 class Heartbeater:
@@ -38,12 +35,14 @@ class Heartbeater:
             while self._is_running():
                 try:
                     logger.debug(f'[HEARTBEATER] Sending heartbeat to {self.node_name}')
-                    self.socket.send(MESSAGE_TO_SEND, SEND_BYTES_AMOUNT)
+                    self.socket.send(
+                        HeartbeatProtocol.PING, HeartbeatProtocol.MESSAGE_BYTES_AMOUNT
+                    )
 
                     logger.debug(f'[HEARTBEATER] Waiting heartbeat of {self.node_name}')
-                    message = self.socket.recv(RECV_BYTES_AMOUNT)
+                    message = self.socket.recv(HeartbeatProtocol.MESSAGE_BYTES_AMOUNT)
 
-                    if message == EXPECTED_REPLY_MESSAGE:
+                    if message == HeartbeatProtocol.PONG:
                         logger.debug(
                             f'[HEARTBEATER] Received heartbeat from {self.node_name}. Sleeping...'
                         )

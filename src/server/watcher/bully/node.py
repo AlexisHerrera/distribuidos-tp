@@ -3,8 +3,8 @@ from queue import SimpleQueue
 from threading import Lock, Thread
 from typing import Callable
 
+from src.messaging.protocol.bully import BullyProtocol
 from src.messaging.tcp_socket import SocketDisconnected, TCPSocket
-from src.server.watcher.bully.protocol import MESSAGE_BYTES_AMOUNT, BullyProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class BullyNode:
                         self.socket = self.reconnect(self.node_name)
                         reconnect = False
 
-                    message = self.socket.recv(MESSAGE_BYTES_AMOUNT)
+                    message = self.socket.recv(BullyProtocol.MESSAGE_BYTES_AMOUNT)
 
                     self.message_queue.put((message, self.node_id, self.node_name))
                     times = 0
@@ -82,7 +82,7 @@ class BullyNode:
 
     def send(self, message: BullyProtocol):
         try:
-            self.socket.send(message, MESSAGE_BYTES_AMOUNT)
+            self.socket.send(message, BullyProtocol.MESSAGE_BYTES_AMOUNT)
         except Exception as e:
             logger.error(
                 f'[BULLY] Error ocurred while sending message to {self.node_name} ID {self.node_id}: {e}'
