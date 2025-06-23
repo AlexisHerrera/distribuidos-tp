@@ -206,13 +206,13 @@ def create_scalable(service: ScalableService):
 
 def create_watcher(watcher: ScalableService):
     # Create config file
-    data = {}
-    with open(WATCHER_CONFIG_PATH, 'r', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-
-    with open(WATCHER_CONFIG_PATH, 'w', encoding='utf-8') as f:
-        data['nodes'] = WATCHER_NODES
-        yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
+    # data = {}
+    # with open(WATCHER_CONFIG_PATH, 'r', encoding='utf-8') as f:
+    #     data = yaml.safe_load(f)
+    #
+    # with open(WATCHER_CONFIG_PATH, 'w', encoding='utf-8') as f:
+    #     data['nodes'] = WATCHER_NODES
+    #     yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
 
     watchers = ''
     for i in range(1, watcher.nodes + 1):
@@ -239,6 +239,7 @@ def create_watcher(watcher: ScalableService):
         condition: service_healthy
     volumes:
       - ./src/server/watcher/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
       - /var/run/docker.sock:/var/run/docker.sock
   """
     return watchers

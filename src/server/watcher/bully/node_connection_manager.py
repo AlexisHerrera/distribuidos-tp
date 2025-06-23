@@ -66,7 +66,12 @@ class NodeConnectionManager:
                         f'[BULLY] Node {node_id} ({node_name}) connected to node {self.node_id}'
                     )
 
-                    self._add_node(client_socket, node_name, node_id)
+                    def _raise():
+                        raise Exception
+
+                    self._add_node(
+                        client_socket, node_name, node_id, reconnect=lambda _: _raise()
+                    )
                 except ConnectionAbortedError as e:
                     logger.error(f'[BULLY] Error while accepting client: {e}')
                 except TimeoutError:
@@ -76,7 +81,13 @@ class NodeConnectionManager:
                 f'[BULLY] Error while listening for connections in node_id {self.node_id}: {e}'
             )
 
-    def _add_node(self, socket: TCPSocket, node_name: str, node_id: int):
+    def _add_node(
+        self,
+        socket: TCPSocket,
+        node_name: str,
+        node_id: int,
+        reconnect: Callable[[], None],
+    ):
         with self.nodes_lock:
             if node_name in self.nodes:
                 self.nodes[node_name].stop()
@@ -87,7 +98,7 @@ class NodeConnectionManager:
                 node_id,
                 self.message_queue,
                 self.node_id,
-                self.reconnect,
+                reconnect,
                 self.is_leader,
             )
 
@@ -125,7 +136,7 @@ class NodeConnectionManager:
 
             logger.debug(f'[BULLY] Connected to {node_name}')
 
-            self._add_node(socket, node_name, node_id)
+            self._add_node(socket, node_name, node_id, self.reconnect)
 
     def reconnect(self, node_name: int) -> TCPSocket:
         return TCPSocket.connect_while_condition(
@@ -169,6 +180,7 @@ class NodeConnectionManager:
             return self.is_running
 
     def stop(self):
+        logger.info(f'[BULLY] Stopping connection manager {self.node_id}')
         with self.is_running_lock:
             self.is_running = False
 
@@ -179,3 +191,4 @@ class NodeConnectionManager:
                 node.stop()
 
         self.listener.join()
+        logger.info(f'[BULLY] Stopped connection manager {self.node_id}')

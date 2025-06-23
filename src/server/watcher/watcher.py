@@ -78,7 +78,7 @@ class Watcher:
             t.start()
 
     def _run_as_leader(self, change_leader: Event):
-        # self._initialize_heartbeaters(self.nodes)
+        self._initialize_heartbeaters(self.nodes)
 
         change_leader.wait()
         change_leader.clear()
@@ -86,7 +86,7 @@ class Watcher:
         self._stop_heartbeaters()
 
     def _run_as_follower(self, change_leader: Event, callback: Callable[[], None]):
-        # self._initialize_heartbeaters(self.peers)
+        self._initialize_heartbeaters(self.peers)
 
         while self._is_running():
             callback()
@@ -118,9 +118,11 @@ class Watcher:
             t.join()
 
     def stop(self):
+        logger.info('[WATCHER] Stopping')
         with self.is_running_lock:
             self.is_running = False
 
         self.bully.stop()
 
         self.heartbeat.stop()
+        logger.info('[WATCHER] Stopped')

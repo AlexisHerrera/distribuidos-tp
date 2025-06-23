@@ -19,6 +19,7 @@ class Heartbeat:
         self.is_running = True
         self.manager_queue: SimpleQueue = SimpleQueue()
         self.clients: dict[tuple, (threading.Thread, TCPSocket)] = {}
+        logger.info('[HEARTBEAT] Initiated heartbeat')
         self.heartbeat_thread = threading.Thread(target=self.run)
         self.heartbeat_thread.start()
 
@@ -26,12 +27,12 @@ class Heartbeat:
         try:
             while self._is_running():
                 message = socket.recv(RECV_BYTES_AMOUNT)
-                logger.debug(f'Received {message}')
+                logger.debug(f'[HEARTBEAT] Received {message}')
 
                 socket.send(MESSAGE_TO_SEND, SEND_BYTES_AMOUNT)
-                logger.debug(f'Sent {MESSAGE_TO_SEND}')
+                logger.debug(f'[HEARTBEAT] Sent {MESSAGE_TO_SEND}')
         except Exception as e:
-            logger.error(f'Error while managing client in heartbeat: {e}')
+            logger.error(f'[HEARTBEAT] Error while managing client in heartbeat: {e}')
         finally:
             self.manager_queue.put(addr)
 
@@ -51,7 +52,7 @@ class Heartbeat:
             while self._is_running():
                 heartbeater_socket, addr = self.socket.accept()
                 logger.info(
-                    f'Received new heartbeater from {TCPSocket.gethostbyaddress(addr)}'
+                    f'[HEARTBEAT] Received new heartbeater from {TCPSocket.gethostbyaddress(addr)}'
                 )
 
                 client = threading.Thread(
@@ -64,14 +65,14 @@ class Heartbeat:
 
                 self._clean_clients()
         except Exception as e:
-            logger.error(f'Heartbeat error: {e}')
+            logger.error(f'[HEARTBEAT] Heartbeat error: {e}')
 
     def _is_running(self):
         with self.is_running_lock:
             return self.is_running
 
     def stop(self):
-        logger.info('Stopping heartbeat')
+        logger.info('[HEARTBEAT] Stopping heartbeat')
         with self.is_running_lock:
             self.is_running = False
 

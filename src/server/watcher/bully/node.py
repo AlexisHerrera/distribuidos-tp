@@ -38,6 +38,7 @@ class BullyNode:
         logger.info(f'[BULLY] Begin recv of node id {self.node_id}')
 
         times = 0
+        # TODO: DONT TRY TO RECONNECT IF SOCKET COMES FROM ACCEPT
         reconnect = True if self.socket is None else False
         try:
             while self._is_running():
@@ -92,6 +93,7 @@ class BullyNode:
             return self.is_running
 
     def stop(self):
+        logger.info(f'[BULLY] Stopping node {self.node_name}')
         with self.is_running_lock:
             self.is_running = False
 
@@ -99,3 +101,4 @@ class BullyNode:
             self.socket.stop()
 
         self.recv_thread.join()
+        logger.info(f'[BULLY] Stopped node {self.node_name}')

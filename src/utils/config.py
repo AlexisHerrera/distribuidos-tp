@@ -50,7 +50,10 @@ class WatcherConfig:
 
         self.heartbeat_port: int = config.get('heartbeat_port', 13434)
         self.log_level: str = config.get('log_level', 'INFO')
-        self.nodes: list[str] = config.get('nodes', [])
+
+        filters = ['watcher']
+        self.nodes: list[str] = NodesList(filters=filters).nodes
+
         # Timeout between heartbeats, in seconds
         self.timeout: int = config.get('timeout', 2)
         self.reconnection_timeout: int = config.get('reconnection_timeout', 1)
@@ -63,6 +66,17 @@ class WatcherConfig:
             for p in peers.split(','):
                 node_id, node_name = p.split(':')
                 self.peers[node_name] = int(node_id)
+
+
+class NodesList:
+    def __init__(self, filename: str = 'running_nodes', filters: list[str] = None):
+        self.nodes: list[str] = []
+        with open(filename, 'r', encoding='utf-8') as f:
+            for line in f:
+                for filter in filters:
+                    if line.startswith(filter):
+                        continue
+                    self.nodes.append(line)
 
 
 def print_config(config: Config):

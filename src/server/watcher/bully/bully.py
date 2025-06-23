@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 EXIT_MESSAGE_HANDLER = b'Q'
-INITIAL_WAITING = 10
 
 
 class Bully:
@@ -44,6 +43,7 @@ class Bully:
 
         self.message_queue: SimpleQueue = SimpleQueue()
         self.all_peers_connected: Event = Event()
+        self.timeout = connection_timeout
 
         self.nodes: NodeConnectionManager = NodeConnectionManager(
             port=port,
@@ -61,6 +61,9 @@ class Bully:
         self.state: BullyStateManager = BullyStateManager(
             BullyState.ELECTION, self.node_id
         )
+
+        self.timer_lock = Lock()
+        self.timer = None
 
         self.runner_thread = Thread(target=self.run)
         self.message_handler = Thread(target=self._manage_recv)
@@ -82,7 +85,13 @@ class Bully:
             return self.leader == node_id
 
     def run(self):
-        self.all_peers_connected.wait(INITIAL_WAITING)
+        # We wait `initial_waiting_time` in case the other peers are
+        # not alive (they will not connect) and we have to keep server
+        # nodes alive. (so we hurry to make the election and chose a leader ASAP)
+        # Also, the first time watchers initiate they might take some time
+        # to stablish connection.
+        initial_waiting_time = (len(self.peers) + 1) * self.timeout
+        self.all_peers_connected.wait(initial_waiting_time)
         self._init_election()
         self.change_leader.wait()
         self.change_leader.clear()
@@ -117,18 +126,27 @@ class Bully:
         self.nodes.send(node_name, BullyProtocol.REPLY_ALIVE)
         logger.debug(f'[BULLY] Sending REPLY_ALIVE to {node_name}')
 
-    def _init_election(self):
-        self.nodes.send_higher(BullyProtocol.ELECTION)
-
-        logger.info(f'[BULLY] Sending ELECTION from {self.node_id}')
+    def _set_timer(self):
         kwargs = {
             'is_leader': False,
             'init_election': self._init_election,
             'set_leader': self._set_leader,
             'send_coordinator': self._send_coordinator,
         }
-        t = Timer(10.0, self.state.timeout_reply, kwargs=kwargs)
-        t.start()
+
+        with self.timer_lock:
+            if self.timer:
+                self.timer.cancel()
+                self.timer.join()
+
+            self.timer = Timer(self.timeout, self.state.timeout_reply, kwargs=kwargs)
+            self.timer.start()
+
+    def _init_election(self):
+        self.nodes.send_higher(BullyProtocol.ELECTION)
+
+        logger.info(f'[BULLY] Sending ELECTION from {self.node_id}')
+        self._set_timer()
 
     def _send_answer(self, node_name: str):
         self.nodes.send(node_name, BullyProtocol.ANSWER)
@@ -178,11 +196,20 @@ class Bully:
         with self.is_running_lock:
             return self.is_running
 
+    def _stop_timer(self):
+        with self.timer_lock:
+            if self.timer:
+                self.timer.cancel()
+                self.timer.join()
+
     def stop(self):
+        logger.info('[BULLY] Stopping')
         with self.is_running_lock:
             self.is_running = False
 
         self.state.set_state(BullyState.END)
+
+        self._stop_timer()
 
         # Unlock threads that are waiting for leader change
         self.change_leader.set()
@@ -194,3 +221,4 @@ class Bully:
         # Stop main threads
         self.runner_thread.join()
         self.message_handler.join()
+        logger.info('[BULLY] Stopped')
