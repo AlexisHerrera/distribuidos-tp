@@ -13,6 +13,7 @@ class RatingsJoinerLogic(BaseJoinerLogic):
     def __init__(self):
         # se inyecta desde GenericJoinerNode._thread_load_base
         self.base_data: dict[int, dict[int, Movie]] = {}
+        self.batch_count = 0
         logger.info('RatingsJoinerLogic initialized.')
 
     def merge(self, message: Message) -> Message:
@@ -28,7 +29,9 @@ class RatingsJoinerLogic(BaseJoinerLogic):
                     movie_id=rating.movie_id, title=movie.title, rating=rating.rating
                 )
             )
-        logger.info(f'Joining {len(joined)}')
+        # logger.info(f'Joining {len(joined)}')
+        self.batch_count += 1
+        logger.info(f'Batch count: {self.batch_count}')
         return Message(
             message.user_id, MessageType.MovieRating, joined, message.message_id
         )
