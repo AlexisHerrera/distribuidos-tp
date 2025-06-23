@@ -42,7 +42,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -68,7 +68,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -450,6 +450,23 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/watcher/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+  
+  chaos_monkey:
+    container_name: chaos_monkey
+    build:
+      context: .
+      dockerfile: 'src/server/Dockerfile'
+    command: ["python", "./src/utils/chaos_monkey/main.py"]
+    networks:
+      - testing_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    profiles: [chaos]
+    volumes:
+      - ./src/utils/chaos_monkey/config.yaml:/app/config.yaml:ro
       - ./running_nodes:/app/running_nodes:ro
       - /var/run/docker.sock:/var/run/docker.sock
   

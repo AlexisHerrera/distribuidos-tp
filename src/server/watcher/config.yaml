@@ -2,6 +2,4 @@ heartbeat_port: 13434
 timeout: 10
 reconnection_timeout: 5
 bully_port: 25117
-log_level: DEBUG
-nodes:
-- filter_post_2000-1
+log_level: INFO

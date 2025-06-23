@@ -51,7 +51,7 @@ class WatcherConfig:
         self.heartbeat_port: int = config.get('heartbeat_port', 13434)
         self.log_level: str = config.get('log_level', 'INFO')
 
-        filters = ['watcher']
+        filters = ['watcher', 'chaos_monkey']
         self.nodes: list[str] = NodesList(filters=filters).nodes
 
         # Timeout between heartbeats, in seconds
@@ -68,16 +68,43 @@ class WatcherConfig:
                 self.peers[node_name] = int(node_id)
 
 
+class ChaosMonkeyConfig:
+    def __init__(self, filename: str = 'config.yaml'):
+        data = {}
+        with open(filename, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+
+        self.__dict__.update(data)
+
+        if 'log_level' not in self.__dict__:
+            self.log_level = 'INFO'
+
+        self.nodes = NodesList(filters=['chaos_monkey']).nodes
+
+
 class NodesList:
     def __init__(self, filename: str = 'running_nodes', filters: list[str] = None):
         self.nodes: list[str] = []
         with open(filename, 'r', encoding='utf-8') as f:
             for line in f:
-                node_name = line.strip('\n ')
-                for filter in filters:
-                    if node_name.startswith(filter):
-                        continue
+                no_new_line = line.replace('\n', '')
+                node_name = no_new_line.strip('\n ')
+                if not filter_node(node_name, filters):
                     self.nodes.append(node_name)
+
+
+def filter_node(node_name: str, filters: list[str]) -> bool:
+    filtered = False
+
+    if not filters or len(filters) == 0:
+        return filtered
+
+    for filter in filters:
+        if node_name.startswith(filter):
+            filtered = True
+            break
+
+    return filtered
 
 
 def print_config(config: Config):

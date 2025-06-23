@@ -239,6 +239,27 @@ def create_watcher(watcher: ScalableService):
     return watchers
 
 
+def create_chaos_monkey():
+    container_name = 'chaos_monkey'
+    return f"""{container_name}:
+    container_name: {container_name}
+    build:
+      context: .
+      dockerfile: 'src/server/Dockerfile'
+    command: ["python", "./src/utils/chaos_monkey/main.py"]
+    networks:
+      - {NETWORK_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    profiles: [chaos]
+    volumes:
+      - ./src/utils/chaos_monkey/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+  """
+
+
 def create_services(
     scalable_services: list[ScalableService],
     config: Config,
@@ -262,6 +283,8 @@ def create_services(
 
     watchers = create_watcher(watcher)
 
+    chaos_monkey = create_chaos_monkey()
+
     return f"""
 services:
   {rabbitmq}
@@ -271,6 +294,7 @@ services:
   {sinks}
   {joiners}
   {watchers}
+  {chaos_monkey}
 """
 
 
