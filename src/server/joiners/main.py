@@ -65,7 +65,7 @@ class GenericJoinerNode(BaseNode):
         try:
             joined = self.logic.merge(message)
             self.connection.send(joined)
-            # logger.info(f'Joined {joined}')
+            logger.info(f'Joined {joined}')
         except Exception as e:
             logger.error(f'Error processing message in JoinerNode: {e}', exc_info=True)
 

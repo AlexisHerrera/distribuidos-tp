@@ -3,8 +3,12 @@ import io
 import logging
 import os
 import signal
+import socket
 import sys
+import threading
 import time
+import uuid
+from queue import Queue, Empty
 
 from src.common.protocol.batch import Batch, BatchType
 from src.common.socket_communication import (
@@ -72,148 +76,189 @@ def read_next_batch(csv_file, batch_size):
     return batch
 
 
-def send_movies(client_socket, args):
-    logging.info('Beginning to send movies...')
-    if not send_data(
-        client_socket, args.movies_path, BatchType.MOVIES, BATCH_SIZE_MOVIES
-    ):
-        logging.error('Error sending movies')
-    logging.info('Sending final EOF marker...')
-    eof_batch = Batch(BatchType.EOF, None)
-    eof_bytes = eof_batch.to_bytes()
-    send_message(client_socket, eof_bytes)
-    logging.info('Final EOF marker sent.')
+class Client:
+    def __init__(self, args):
+        self.args = args
+        self.client_socket = None
+        self.session_id = None
+        self.is_running = True
 
+        self.ack_queue = Queue()
 
-def send_cast(client_socket, args):
-    logging.info('Beginning to send credits...')
-    if not send_data(
-        client_socket, args.cast_path, BatchType.CREDITS, BATCH_SIZE_CREDITS
-    ):
-        logging.error('Error sending credits')
-    logging.info('Sending final EOF marker...')
-    eof_batch = Batch(BatchType.EOF, None)
-    eof_bytes = eof_batch.to_bytes()
-    send_message(client_socket, eof_bytes)
-    logging.info('Final EOF marker sent.')
+        self.sender_thread = threading.Thread(
+            target=self._sender_loop, name='SenderThread'
+        )
+        self.receiver_thread = threading.Thread(
+            target=self._receiver_loop, name='ReceiverThread'
+        )
 
+    def run(self):
+        try:
+            self.client_socket = self._create_client_socket()
+            if not self.client_socket:
+                logging.critical('Could not connect to server. Exiting.')
+                return
 
-def send_ratings(client_socket, args):
-    logging.info('Beginning to send ratings...')
-    if not send_data(
-        client_socket, args.ratings_path, BatchType.RATINGS, BATCH_SIZE_RATINGS
-    ):
-        logging.error('Error sending ratings')
-    logging.info('Sending final EOF marker...')
-    eof_batch = Batch(BatchType.EOF, None)
-    eof_bytes = eof_batch.to_bytes()
-    send_message(client_socket, eof_bytes)
-    logging.info('Final EOF marker sent.')
+            self.session_id = self._perform_handshake(self.client_socket, None)
 
+            self.receiver_thread.start()
+            self.sender_thread.start()
 
-def send_data(
-    client_socket, file_object: io.TextIOWrapper, batch_type: BatchType, batch_size
-):
-    if not client_socket:
-        logging.error('Cannot send data, client socket is not valid.')
-        return False
-    if not file_object:
-        logging.error('Cannot send data, file object is not valid.')
-        return False
+            self.sender_thread.join()
+            self.receiver_thread.join()
 
-    file_description = batch_type.name
-    logging.info(f'--- Starting to send {file_description} data ---')
-    total_lines_sent = 0
-    batch_number = 0
+        except (ConnectionError, ValueError) as e:
+            logging.error(f'A critical error occurred: {e}', exc_info=True)
+        finally:
+            self.stop()
+            logging.info('Client has finished.')
 
-    try:
-        header = file_object.readline()
-        if not header:
-            logging.warning(f'File for {file_description} seems empty.')
-            return True
+    def stop(self):
+        self.is_running = False
+        if self.client_socket:
+            try:
+                self.client_socket.close()
+            except socket.error:
+                pass
+        logging.info('Client shutdown sequence initiated.')
 
-        while True:
-            batch_lines = read_next_batch(file_object, batch_size=batch_size)
-            if not batch_lines:
-                logging.info(f'Finished reading file for {file_description}.')
+    def _sender_loop(self):
+        try:
+            self._send_file_data(
+                BatchType.MOVIES, self.args.movies_path, BATCH_SIZE_MOVIES
+            )
+            self._send_file_data(
+                BatchType.CREDITS, self.args.cast_path, BATCH_SIZE_CREDITS
+            )
+            self._send_file_data(
+                BatchType.RATINGS, self.args.ratings_path, BATCH_SIZE_RATINGS
+            )
+
+            logging.info('All data files have been sent.')
+        except ConnectionError as e:
+            logging.critical(
+                f'Sender thread failed due to connection error: {e}. Stopping client.'
+            )
+            self.stop()
+
+    def _receiver_loop(self):
+        logging.info('Receiver thread started. Waiting for messages from server...')
+        while self.is_running:
+            try:
+                raw_message = receive_message(self.client_socket)
+                if not raw_message:
+                    logging.info(
+                        'Connection closed by server (receive returned nothing).'
+                    )
+                    break
+
+                msg = Message.from_bytes(raw_message)
+
+                if msg.message_type == MessageType.ACK:
+                    logging.debug('ACK received from server, dispatching to sender.')
+                    self.ack_queue.put(msg)
+                elif msg.message_type == MessageType.EOF and not msg.data:
+                    logging.info(
+                        'Main EOF received from server. All results are in. Shutting down receiver.'
+                    )
+                    break
+                else:
+                    self._process_result_message(msg)
+            except (ConnectionError, ConnectionResetError):
+                if self.is_running:
+                    logging.warning('Connection lost. Receiver thread stopping.')
+                break
+            except Exception as e:
+                if self.is_running:
+                    logging.error(
+                        f'An error occurred in receiver loop: {e}', exc_info=True
+                    )
                 break
 
-            batch_number += 1
-            batch_obj = Batch(batch_type, batch_lines)
-            batch_bytes = batch_obj.to_bytes()
+        logging.info('Receiver thread has finished.')
+        self.stop()
 
-            if not batch_bytes:
-                logging.error(
-                    f'Failed to serialize batch {batch_number} for {file_description}. Stopping.'
-                )
-                return False
-
-            send_message(client_socket, batch_bytes)
-            total_lines_sent += len(batch_lines)
-            # logging.info(
-            #    f'Sent Batch #{batch_number} ({file_description}) with {len(batch_lines)} records.'
-            # )
-
-        logging.info(
-            f'--- Finished sending {file_description}. Total lines sent: {total_lines_sent} ---'
-        )
-        return True
-
-    except Exception as e:
-        logging.error(
-            f'Error while reading or sending batches for {file_description}: {e}',
-            exc_info=True,
-        )
-        return False
-
-
-def create_client_socket():
-    try:
-        server_host = os.getenv('SERVER_HOST', 'cleaner')
-        server_port = int(os.getenv('SERVER_PORT', '12345'))
-        max_retries = int(os.getenv('CONNECT_MAX_RETRIES', '5'))
-        retry_delay = float(os.getenv('CONNECT_RETRY_DELAY', '3.0'))
-    except ValueError as e:
-        logging.error(f'Invalid connection parameter environment variable: {e}')
-        return None
-
-    client_socket = None
-    for attempt in range(max_retries):
-        logging.info(
-            f'Attempting to connect to {server_host}:{server_port} (Attempt {attempt + 1}/{max_retries})...'
-        )
-        client_socket = connect_to_server(server_host, server_port)
-
-        if client_socket:
-            logging.info('Connection successful.')
-            return client_socket
-
-        logging.warning(f'Connection attempt {attempt + 1} failed.')
-        if attempt < max_retries - 1:
-            logging.info(f'Retrying in {retry_delay} seconds...')
-            time.sleep(retry_delay)
-        else:
-            logging.error(f'Connection failed after {max_retries} attempts.')
-
-    return None
-
-
-def receive_responses(client_socket):
-    logging.info('Esperando respuestas del servidor...')
-    while True:
+    def _send_file_data(
+        self, batch_type: BatchType, file_object: io.TextIOWrapper, batch_size
+    ):
+        file_description = batch_type.name
+        logging.info(f'--- Starting to send {file_description} data ---')
+        batch_count = 0
         try:
-            raw = receive_message(client_socket)
-        except ConnectionError:
-            logging.info('Conexión cerrada por servidor.')
-            break
+            header = file_object.readline()
+            if not header:
+                logging.warning(f'File for {file_description} is empty.')
+                return
 
-        msg = Message.from_bytes(raw)
-        if msg.message_type == MessageType.EOF:
-            logging.info('EOF recibido. Terminando recepción.')
-            break
+            while self.is_running:
+                batch_lines = read_next_batch(file_object, batch_size=batch_size)
+                if not batch_lines:
+                    break
 
+                batch_obj = Batch(batch_type, batch_lines)
+                self._send_with_retry_and_ack(batch_obj.to_bytes())
+                batch_count += 1
+
+            logging.info(
+                f'--- Finished sending {file_description} data, sending EOF. ---'
+            )
+            logging.info(f'Batchs sents: {batch_count}')
+            eof_batch = Batch(BatchType.EOF, None)
+            self._send_with_retry_and_ack(eof_batch.to_bytes())
+            logging.info(f'Final EOF for {file_description} sent and ACKed.')
+
+        except Exception:
+            raise
+
+    def _send_with_retry_and_ack(self, data_bytes: bytes):
+        max_retries = int(os.getenv('SEND_MAX_RETRIES', '5'))
+        retry_delay = float(os.getenv('SEND_RETRY_DELAY', '5.0'))
+        ack_timeout = 10.0
+
+        for _ in range(max_retries):
+            if not self.is_running:
+                raise ConnectionError('Client is shutting down.')
+
+            try:
+                send_message(self.client_socket, data_bytes)
+
+                ack_msg = self.ack_queue.get(timeout=ack_timeout)
+
+                if ack_msg.message_type == MessageType.ACK:
+                    logging.debug('ACK received from queue.')
+                    return
+
+            except Empty:
+                logging.warning(
+                    f'ACK not received within {ack_timeout}s. Retrying send...'
+                )
+            except (ConnectionError, BrokenPipeError, socket.error) as e:
+                logging.error(f'Connection error on send: {e}. Attempting reconnect...')
+                self._reconnect()
+
+            time.sleep(retry_delay)
+
+        raise ConnectionError(
+            f'Failed to send data and receive ACK after {max_retries} attempts.'
+        )
+
+    def _reconnect(self):
+        if self.client_socket:
+            try:
+                self.client_socket.close()
+            except socket.error:
+                pass
+
+        self.client_socket = self._create_client_socket()
+        if self.client_socket:
+            self.session_id = self._perform_handshake(
+                self.client_socket, self.session_id
+            )
+        else:
+            raise ConnectionError('Failed to reconnect to the server.')
+
+    def _process_result_message(self, msg: Message):
         filename_args = {'user_id': msg.user_id}
-
         # Q1: Movie
         if msg.message_type == MessageType.Movie:
             movies: list[Movie] = msg.data
@@ -291,6 +336,64 @@ def receive_responses(client_socket):
         else:
             logging.warning(f'Mensaje desconocido: {msg.message_type}')
 
+    def _create_client_socket(self):
+        try:
+            server_host = os.getenv('SERVER_HOST', 'cleaner')
+            server_port = int(os.getenv('SERVER_PORT', '12345'))
+            max_retries = int(os.getenv('CONNECT_MAX_RETRIES', '5'))
+            retry_delay = float(os.getenv('CONNECT_RETRY_DELAY', '3.0'))
+        except ValueError as e:
+            logging.error(f'Invalid connection parameter environment variable: {e}')
+            return None
+
+        for attempt in range(max_retries):
+            logging.info(
+                f'Attempting to connect to {server_host}:{server_port} (Attempt {attempt + 1}/{max_retries})...'
+            )
+            client_socket = connect_to_server(server_host, server_port)
+
+            if client_socket:
+                logging.info('Connection successful.')
+                return client_socket
+
+            logging.warning(f'Connection attempt {attempt + 1} failed.')
+            if attempt < max_retries - 1:
+                logging.info(f'Retrying in {retry_delay} seconds...')
+                time.sleep(retry_delay)
+            else:
+                logging.error(f'Connection failed after {max_retries} attempts.')
+
+        return None
+
+    def _perform_handshake(
+        self, client_socket: socket.socket, session_id: uuid.UUID | None
+    ) -> uuid.UUID:
+        try:
+            logging.info(
+                f'Performing handshake. Session ID: {"NEW" if not session_id else session_id}'
+            )
+            handshake_id = session_id or uuid.UUID(int=0)
+
+            request_msg = Message(handshake_id, MessageType.HANDSHAKE_SESSION)
+            send_message(client_socket, request_msg.to_bytes())
+
+            response_raw = receive_message(client_socket)
+            response_msg = Message.from_bytes(response_raw)
+
+            if response_msg.message_type == MessageType.HANDSHAKE_SESSION:
+                final_session_id = response_msg.user_id
+                logging.info(
+                    f'Handshake successful. Session established with ID: {final_session_id}'
+                )
+                return final_session_id
+            else:
+                raise ConnectionError(
+                    f'Handshake failed. Expected HANDSHAKE_SESSION, got {response_msg.message_type}'
+                )
+
+        except (ConnectionError, socket.error):
+            raise
+
 
 def main():
     try:
@@ -303,30 +406,16 @@ def main():
         print(f'Error during argument parsing: {e}', file=sys.stderr)
         sys.exit(1)
 
-    try:
-        client_socket = create_client_socket()
-        if not client_socket:
-            logging.critical(
-                'Could not connect to server after multiple retries. Exiting.'
-            )
-            return
+    client = Client(args)
 
-        def handle_signal(sig, frame):
-            client_socket.close()
+    def handle_signal(_sig, _frame):
+        logging.info('Signal received, stopping client...')
+        client.stop()
 
-        signal.signal(signal.SIGTERM, handle_signal)
-        signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
 
-        send_movies(client_socket, args)
-        send_cast(client_socket, args)
-        send_ratings(client_socket, args)
-        logging.info('Waiting for response.')
-        receive_responses(client_socket)
-        client_socket.close()
-        logging.info('Client socket closed.')
-    except ValueError as e:
-        logging.error('Could not connect to server', e)
-        sys.exit(1)
+    client.run()
 
 
 if __name__ == '__main__':

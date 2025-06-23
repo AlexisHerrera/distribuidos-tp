@@ -101,6 +101,8 @@ def create_client(client_id: int, dataset_path: str):
 
 def create_cleaner():
     WATCHER_NODES.append('cleaner')
+    state_volume_path = './.state/cleaner'
+
     return f"""cleaner:
     container_name: cleaner
     build:
@@ -120,6 +122,7 @@ def create_cleaner():
         condition: service_healthy
     volumes:
       - ./src/server/cleaner/config.yaml:/app/config.yaml
+      - {state_volume_path}:/app/state
 """
 
 
