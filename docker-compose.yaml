@@ -93,6 +93,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/cleaner/config.yaml:/app/config.yaml
+      - ./.state/cleaner:/app/state
 
   filter_single_country-1:
     container_name: filter_single_country-1
