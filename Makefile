@@ -17,6 +17,10 @@ docker-compose-logs:
 	docker compose -f docker-compose.yaml logs -f
 .PHONY: docker-compose-logs
 
+watch:
+	watch 'docker ps -a --filter "network=tp-escalabilidad_testing_net" --format "table {{.ID}}\t{{.State}}\t{{.Names}}\t{{.Status}}"'
+.PHONY: watch
+
 # make restart service=client-1
 restart:
 	@# Check if 'service' variable is empty using shell syntax inside the recipe
