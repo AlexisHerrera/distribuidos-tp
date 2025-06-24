@@ -1,5 +1,5 @@
 import argparse
-
+import os
 import yaml
 
 DOCKER_COMPOSE_FILENAME = 'docker-compose.yaml'
@@ -32,7 +32,6 @@ class ScalableService:
 
 class Config:
     def __init__(self, data: dict):
-        # Dynamically generate attributes based on the `key`s from `data`
         self.__dict__.update(data)
 
         if 'all' in self.__dict__ and self.all is not None and self.all > 0:
@@ -162,7 +161,7 @@ def create_joiner(joiner_type: str) -> str:
     """
 
 
-def create_node(service: ScalableService, index: int):
+def create_node(service: ScalableService, index: int, uuids: list[str] = None):
     container = f'{service.name}-{index}'
 
     WATCHER_NODES.append(container)
@@ -174,6 +173,12 @@ def create_node(service: ScalableService, index: int):
     ]
 
     peers_env = ','.join(peers)
+
+    if (service.name == 'ratings_joiner' or service.name == 'cast_joiner') and uuids is not None:
+        base, ext = os.path.splitext(service.config_file)
+        config_file_path = f"{base}_{uuids[index - 1]}{ext}"
+    else:
+        config_file_path = service.config_file
 
     return f"""{container}:
     container_name: {container}
@@ -191,20 +196,18 @@ def create_node(service: ScalableService, index: int):
       rabbitmq:
         condition: service_healthy
     volumes:
-      - {service.config_file}:/app/config.yaml
+      - {config_file_path}:/app/config.yaml
   """
 
 
-def create_scalable(service: ScalableService):
+def create_scalable(service: ScalableService, uuids: list[str] = None):
     nodes = ''
     for i in range(1, service.nodes + 1):
-        nodes += create_node(service, i)
-
+        nodes += create_node(service, i, uuids)
     return nodes
 
 
 def create_watcher():
-    # Create config file
     data = {}
     with open(WATCHER_CONFIG_PATH, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
@@ -231,7 +234,7 @@ def create_watcher():
 
 
 def create_services(
-    scalable_services: list[ScalableService], config: Config, dataset_path: str
+    scalable_services: list[ScalableService], config: Config, dataset_path: str, uuids: list[str]
 ):
     rabbitmq = create_rabbitmq()
     clients = ''
@@ -243,7 +246,10 @@ def create_services(
         sinks += create_sink(i)
     services = ''
     for service in scalable_services:
-        services += create_scalable(service)
+        if service.name == 'ratings_joiner' or service.name == 'cast_joiner':
+            services += create_scalable(service, uuids)
+        else:
+            services += create_scalable(service)
 
     watcher = create_watcher()
 
@@ -285,10 +291,10 @@ def parse_args():
 
 
 def create_docker_compose_data(
-    scalable_services: list[ScalableService], config: Config, dataset_path: str
+    scalable_services: list[ScalableService], config: Config, dataset_path: str, uuids: list[str]
 ):
     base = create_docker_compose_base()
-    services = create_services(scalable_services, config, dataset_path)
+    services = create_services(scalable_services, config, dataset_path, uuids)
     networks = create_networks()
 
     return base + services + networks
@@ -302,9 +308,16 @@ def read_config() -> Config:
     return Config(data)
 
 
+def read_client_uuids() -> list[str]:
+    with open('clients_uuids.csv', 'r', encoding='utf-8') as f:
+        line = f.readline().strip()
+        return [uuid.strip() for uuid in line.split(',') if uuid.strip()]
+
+
 def main():
     args = parse_args()
     config = read_config()
+    uuids = read_client_uuids()
     scalable_services = []
     base = BASE_PORT
     mapping = [
@@ -431,7 +444,7 @@ def main():
 
     dataset_path = SMALL_DATASET_PATH if args.small_dataset else DATASET_PATH
 
-    content = create_docker_compose_data(scalable_services, config, dataset_path)
+    content = create_docker_compose_data(scalable_services, config, dataset_path, uuids)
 
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.write(content)
