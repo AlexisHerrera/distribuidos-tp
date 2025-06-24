@@ -1,5 +1,10 @@
-heartbeat_port: 13434
-timeout: 10
-reconnection_timeout: 5
-bully_port: 25117
+healthchecker:
+  port: 13434
+  timeout: 10
+  reconnection_timeout: 5
+bully:
+  port: 25117
+  timeout: 5
+healthcheck:
+  port: 13434
 log_level: INFO

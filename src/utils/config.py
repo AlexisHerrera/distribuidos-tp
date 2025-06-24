@@ -16,7 +16,7 @@ class Config:
         rabbit_config = config['rabbit']
         connection = config['connection']
         log_config = config['log']
-        heartbeat = config['heartbeat']
+        healthcheck = config['healthcheck']
 
         self.rabbit_host = os.getenv('RABBIT_HOST', rabbit_config['host'])
 
@@ -34,8 +34,8 @@ class Config:
         )
         self.replicas_enabled = os.getenv('PEERS', '') != ''
 
-        # Heartbeat config
-        self.heartbeat_port = heartbeat['port']
+        # Healthcheck config
+        self.healthcheck_port = healthcheck['port']
 
     def get_env_var(self, var_name: str, default: str = None) -> str | None:
         return os.getenv(var_name, default)
@@ -48,17 +48,25 @@ class WatcherConfig:
         with open(filename, 'r') as f:
             config = yaml.safe_load(f)
 
-        self.heartbeat_port: int = config.get('heartbeat_port', 13434)
-        self.log_level: str = config.get('log_level', 'INFO')
+        # Healthchecker
+        healthchecker = config.get(
+            'healthcheck', {'port': 13434, 'timeout': 30, 'reconnection_timeout': 10}
+        )
+        self.healthchecker_port: int = healthchecker['port']
+        self.healthchecker_timeout: int = healthchecker['timeout']
+        self.healthchecker_reconnection_timeout: int = healthchecker[
+            'reconnection_timeout'
+        ]
 
-        filters = ['watcher', 'chaos_monkey']
-        self.nodes: list[str] = NodesList(filters=filters).nodes
+        # Healthcheck
+        healthcheck = config.get('healthcheck', {'port': 13434})
+        self.healthcheck_port = healthcheck['port']
 
-        # Timeout between heartbeats, in seconds
-        self.timeout: int = config.get('timeout', 2)
-        self.reconnection_timeout: int = config.get('reconnection_timeout', 1)
-        self.bully_port: int = config.get('bully_port', 25117)
-        self.node_id: int = int(os.getenv('NODE_ID', ''))
+        # Bully
+        bully = config.get('bully', {'port': 25117, 'timeout': 10})
+        self.bully_port: int = bully['port']
+        self.bully_timeout: int = bully['timeout']
+        self.node_id: int = int(os.getenv('NODE_ID'))  # There must be a NODE_ID
 
         peers: str = os.getenv('PEERS', '')
         self.peers: dict[str, int] = {}
@@ -66,6 +74,11 @@ class WatcherConfig:
             for p in peers.split(','):
                 node_id, node_name = p.split(':')
                 self.peers[node_name] = int(node_id)
+
+        filters = ['watcher', 'chaos_monkey']
+        self.nodes: list[str] = NodesList(filters=filters).nodes
+
+        self.log_level: str = config.get('log_level', 'INFO')
 
 
 class ChaosMonkeyConfig:

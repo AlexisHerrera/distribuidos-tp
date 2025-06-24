@@ -18,7 +18,7 @@ from src.common.socket_communication import (
 from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
 from src.server.cleaner.SessionStateMachine import SessionStateMachine
-from src.server.heartbeat import Heartbeat
+from src.server.healthcheck import Healthcheck
 
 # from src.server.leader_election import chaos_test
 from src.utils.config import Config
@@ -39,7 +39,7 @@ class Cleaner:
         logger.info('Initializing Cleaner...')
         self.config = config
         self.is_running = True
-        self.heartbeat: Heartbeat = Heartbeat(config.heartbeat_port)
+        self.healthcheck: Healthcheck = Healthcheck(config.healthcheck_port)
         self.connection = ConnectionCreator.create_multipublisher(config)
         self.server_socket = None
         self.expected_query_count = 5
@@ -563,9 +563,9 @@ class Cleaner:
                 logger.error(f'Error closing messaging connection: {e}', exc_info=True)
 
         try:
-            self.heartbeat.stop()
+            self.healthcheck.stop()
         except Exception as e:
-            logger.error(f'Error stopping heartbeater: {e}')
+            logger.error(f'Error stopping healthchecker: {e}')
 
         logger.info('Cleaner shutdown sequence complete.')
 

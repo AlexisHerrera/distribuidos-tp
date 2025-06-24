@@ -3,15 +3,15 @@ import subprocess
 import time
 from threading import Lock
 
-from src.messaging.protocol.heartbeat import HeartbeatProtocol
+from src.messaging.protocol.healthcheck import HealthcheckerProtocol
 from src.messaging.tcp_socket import SocketDisconnected, TCPSocket
 
 logger = logging.getLogger(__name__)
 
-MAX_MISSING_HEARTBEATS = 3
+MAX_MISSING_HEALTHCHECKS = 3
 
 
-class Heartbeater:
+class Healthchecker:
     def __init__(
         self, node_name: str, port: int, timeout: int, reconnection_timeout: int
     ):
@@ -27,55 +27,62 @@ class Heartbeater:
         self.socket: TCPSocket = None
 
     def run(self):
-        heartbeats = 0
+        healthcheck = 0
 
         try:
             self._first_connection()
 
             while self._is_running():
                 try:
-                    logger.debug(f'[HEARTBEATER] Sending heartbeat to {self.node_name}')
+                    logger.debug(
+                        f'[HEALTHCHECKER] Sending healthcheck to {self.node_name}'
+                    )
                     self.socket.send(
-                        HeartbeatProtocol.PING, HeartbeatProtocol.MESSAGE_BYTES_AMOUNT
+                        HealthcheckerProtocol.PING,
+                        HealthcheckerProtocol.MESSAGE_BYTES_AMOUNT,
                     )
 
-                    logger.debug(f'[HEARTBEATER] Waiting heartbeat of {self.node_name}')
-                    message = self.socket.recv(HeartbeatProtocol.MESSAGE_BYTES_AMOUNT)
+                    logger.debug(
+                        f'[HEALTHCHECKER] Waiting healthcheck of {self.node_name}'
+                    )
+                    message = self.socket.recv(
+                        HealthcheckerProtocol.MESSAGE_BYTES_AMOUNT
+                    )
 
-                    if message == HeartbeatProtocol.PONG:
+                    if message == HealthcheckerProtocol.PONG:
                         logger.debug(
-                            f'[HEARTBEATER] Received heartbeat from {self.node_name}. Sleeping...'
+                            f'[HEALTHCHECKER] Received healthcheck from {self.node_name}. Sleeping...'
                         )
-                        heartbeats = 0
+                        healthcheck = 0
                         time.sleep(self.timeout)
                 except TimeoutError:
-                    heartbeats += 1
+                    healthcheck += 1
                     logger.debug(
-                        f'[HEARTBEATER] {self.node_name} has {heartbeats} unreplied heartbeats'
+                        f'[HEALTHCHECKER] {self.node_name} has {healthcheck} unreplied healthcheck'
                     )
                 except SocketDisconnected:
-                    heartbeats = MAX_MISSING_HEARTBEATS
+                    healthcheck = MAX_MISSING_HEALTHCHECKS
                     logger.warning(
-                        f'[HEARTBEATER] {self.node_name} socket disconnected'
+                        f'[HEALTHCHECKER] {self.node_name} socket disconnected'
                     )
                 except ConnectionError as e:
-                    heartbeats = MAX_MISSING_HEARTBEATS
+                    healthcheck = MAX_MISSING_HEALTHCHECKS
                     logger.warning(
-                        f'[HEARTBEATER] {self.node_name} connection error: {e}'
+                        f'[HEALTHCHECKER] {self.node_name} connection error: {e}'
                     )
 
-                if heartbeats >= MAX_MISSING_HEARTBEATS:
+                if healthcheck >= MAX_MISSING_HEALTHCHECKS:
                     self._restart_and_reconnect_service()
-                    heartbeats = 0
+                    healthcheck = 0
 
         except Exception as e:
-            logger.error(f'[HEARTBEATER] Error while watching {self.node_name}: {e}')
+            logger.error(f'[HEALTHCHECKER] Error while watching {self.node_name}: {e}')
 
     def _first_connection(self):
         try:
             # Try to connect when node has just started
             self._connect_to_service()
-            logger.debug(f'[HEARTBEATER] Connected to node {self.node_name}')
+            logger.debug(f'[HEALTHCHECKER] Connected to node {self.node_name}')
         except Exception:
             # Suppose that the node had some error to start
             # so force the start and connect
@@ -87,17 +94,17 @@ class Heartbeater:
                 self._restart_service()
                 self._connect_to_service()
                 logger.debug(
-                    f'[HEARTBEATER] Successfuly restarted and connected to {self.node_name}'
+                    f'[HEALTHCHECKER] Successfuly restarted and connected to {self.node_name}'
                 )
                 break
             except Exception as e:
                 logger.warning(
-                    f'[HEARTBEATER] Could not restart and reconnect to {self.node_name}: {e}'
+                    f'[HEALTHCHECKER] Could not restart and reconnect to {self.node_name}: {e}'
                 )
             time.sleep(self.reconnection_timeout)
 
     def _restart_service(self):
-        logger.info(f'[HEARTBEATER] Restarting service {self.node_name}')
+        logger.info(f'[HEALTHCHECKER] Restarting service {self.node_name}')
         result = subprocess.run(
             ['docker', 'start', self.node_name],
             check=False,
@@ -105,7 +112,7 @@ class Heartbeater:
             stderr=subprocess.PIPE,
         )
         logger.info(
-            f'[HEARTBEATER] Command executed. Result={result.returncode}.'
+            f'[HEALTHCHECKER] Command executed. Result={result.returncode}.'
             f'Output={result.stdout}. Error={result.stderr}'
         )
 
