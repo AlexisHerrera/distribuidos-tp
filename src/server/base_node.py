@@ -29,7 +29,11 @@ class BaseNode(ABC):
         self._shutdown_initiated = False
         # Lock to ensure thread-safe shutdown
         self._shutdown_lock = threading.Lock()
-        self.connection = ConnectionCreator.create(config)
+        if(node_type_arg == 'argentina'):
+            self.connection = ConnectionCreator.create_multipublisher(config)
+        else:
+            self.connection = ConnectionCreator.create(config)
+        
         self.leader = None
         # Checks if it should continue processing messages
         self.completed_user_ids = set()
