@@ -112,9 +112,6 @@ def create_cleaner():
     environment:
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
-      - BATCH_SIZE_MOVIES=20
-      - BATCH_SIZE_RATINGS=100
-      - BATCH_SIZE_CREDITS=20
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -211,15 +208,6 @@ def create_scalable(service: ScalableService):
 
 
 def create_watcher(watcher: ScalableService):
-    # Create config file
-    data = {}
-    with open(WATCHER_CONFIG_PATH, 'r', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-
-    with open(WATCHER_CONFIG_PATH, 'w', encoding='utf-8') as f:
-        data['nodes'] = WATCHER_NODES
-        yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
-
     watchers = ''
     for i in range(1, watcher.nodes + 1):
         container_name = f'{watcher.name}-{i}'
@@ -245,9 +233,31 @@ def create_watcher(watcher: ScalableService):
         condition: service_healthy
     volumes:
       - ./src/server/watcher/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
       - /var/run/docker.sock:/var/run/docker.sock
   """
     return watchers
+
+
+def create_chaos_monkey():
+    container_name = 'chaos_monkey'
+    return f"""{container_name}:
+    container_name: {container_name}
+    build:
+      context: .
+      dockerfile: 'src/server/Dockerfile'
+    command: ["python", "./src/utils/chaos_monkey/main.py"]
+    networks:
+      - {NETWORK_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    profiles: [chaos]
+    volumes:
+      - ./src/utils/chaos_monkey/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+  """
 
 
 def create_services(
@@ -273,6 +283,8 @@ def create_services(
 
     watchers = create_watcher(watcher)
 
+    chaos_monkey = create_chaos_monkey()
+
     return f"""
 services:
   {rabbitmq}
@@ -282,6 +294,7 @@ services:
   {sinks}
   {joiners}
   {watchers}
+  {chaos_monkey}
 """
 
 

@@ -9,7 +9,7 @@ from typing import Any, Dict, Type
 
 from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
-from src.server.heartbeat import Heartbeat
+from src.server.healthcheck import Healthcheck
 from src.server.leader_election import LeaderElection
 from src.utils.config import Config
 from src.utils.in_flight_tracker import InFlightTracker
@@ -41,7 +41,7 @@ class BaseNode(ABC):
         self.has_results_persisted = has_result_persisted
         # Threads executor (should be instantiated on node)
         self._executor = None
-        self.heartbeat = Heartbeat(config.heartbeat_port)
+        self.healthcheck = Healthcheck(config.healthcheck_port)
 
         self.node_state_manager: StateManager | None = None
         self.processed_message_ids: set[str] = set()
@@ -249,7 +249,7 @@ class BaseNode(ABC):
                 logger.info('Stopping leader election...')
                 self.leader.stop()
                 logger.info('Leader election stopped')
-                self.heartbeat.stop()
+                self.healthcheck.stop()
             except Exception as e:
                 logger.error(f'Stopping or closing error: {e}')
 

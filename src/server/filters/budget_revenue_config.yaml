@@ -8,7 +8,7 @@ connection:
   publisher:
     - type: direct
       queue: movie_budget_revenue_clean
-heartbeat:
+healthcheck:
   port: 13434
 log:
   level: INFO

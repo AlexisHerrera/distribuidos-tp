@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from src.utils.config import Config, WatcherConfig
+from src.utils.config import Config, NodesList, WatcherConfig
 
 
 class TestConfig:
@@ -75,6 +75,49 @@ class TestConfig:
 
             assert len(config.peers) == len(expected)
             assert config.peers == expected
+
+    class TestNodesList:
+        def test_read_nodes_success_no_filter(self):
+            # File has:
+            # cleaner
+            # filter_decade_00-1
+            # cast_joiner
+            # watcher-1
+            # chaos_monkey
+            expected = [
+                'cleaner',
+                'filter_decade_00-1',
+                'cast_joiner',
+                'watcher-1',
+                'chaos_monkey',
+            ]
+            path = os.getcwd() + '/tests/utils/'
+            config = NodesList(path + 'test_nodes_list')
+
+            assert len(config.nodes) == len(expected)
+            for i in range(len(expected)):
+                assert config.nodes[i] == expected[i]
+
+        def test_read_nodes_success_filter_watcher(self):
+            # File has:
+            # cleaner
+            # filter_decade_00-1
+            # cast_joiner
+            # watcher-1
+            # chaos_monkey
+            expected = [
+                'cleaner',
+                'filter_decade_00-1',
+                'cast_joiner',
+            ]
+            path = os.getcwd() + '/tests/utils/'
+            config = NodesList(
+                path + 'test_nodes_list', filters=['watcher', 'chaos_monkey']
+            )
+
+            assert len(config.nodes) == len(expected)
+            for i in range(len(expected)):
+                assert config.nodes[i] == expected[i]
 
 
 if __name__ == '__main__':

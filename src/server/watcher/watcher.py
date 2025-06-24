@@ -3,15 +3,16 @@ import signal
 import threading
 from queue import SimpleQueue
 from threading import Event
+from typing import Callable
 
-from src.server.heartbeat import Heartbeat
-from src.server.watcher.bully import Bully
-from src.server.watcher.heartbeater import Heartbeater
+from src.server.healthcheck import Healthcheck
+from src.server.watcher.bully.bully import Bully
+from src.server.watcher.healthchecker import Healthchecker
 from src.utils.config import WatcherConfig
 
 logger = logging.getLogger(__name__)
 
-MAX_MISSING_HEARTBEATS = 3
+MAX_MISSING_HEALTHCHECKS = 3
 MESSAGE_TO_SEND = b'H'  # Heart
 SEND_BYTES_AMOUNT = len(MESSAGE_TO_SEND)
 EXPECTED_REPLY_MESSAGE = b'B'  # Beat
@@ -26,22 +27,25 @@ class Watcher:
         self.is_running_lock: threading.Lock = threading.Lock()
         self.is_running: bool = True
 
-        self.heartbeat: Heartbeat = Heartbeat(config.heartbeat_port)
+        self.healthcheck: Healthcheck = Healthcheck(config.healthcheck_port)
 
-        self.heartbeat_port: int = config.heartbeat_port
-        self.heartbeaters: dict[str, Heartbeater] = {}
+        self.healthchecker_port: int = config.healthchecker_port
+        self.healthcheckers: dict[str, Healthchecker] = {}
         self.nodes: list[str] = config.nodes
         self.peers: list[str] = [peer_name for peer_name in config.peers.keys()]
 
-        self.heartbeater_threads: list[threading.Thread] = []
+        self.healthchecker_threads: list[threading.Thread] = []
 
-        self.timeout: int = config.timeout
-        self.reconnection_timeout = config.reconnection_timeout
+        self.healthchecker_timeout: int = config.healthchecker_port
+        self.healthchecker_reconnection_timeout = (
+            config.healthchecker_reconnection_timeout
+        )
 
         self.bully: Bully = Bully(
             port=config.bully_port,
             peers=config.peers,
             node_id=config.node_id,
+            connection_timeout=config.bully_timeout,
             as_leader=self._run_as_leader,
             as_follower=self._run_as_follower,
         )
@@ -64,41 +68,38 @@ class Watcher:
         with self.is_running_lock:
             return self.is_running
 
-    def _initialize_heartbeaters(self, nodes: list[str]):
+    def _initialize_healthcheckers(self, nodes: list[str]):
         for node_name in nodes:
-            h = Heartbeater(
-                node_name, self.heartbeat_port, self.timeout, self.reconnection_timeout
+            h = Healthchecker(
+                node_name,
+                self.healthchecker_port,
+                self.healthchecker_timeout,
+                self.healthchecker_reconnection_timeout,
             )
             t = threading.Thread(target=h.run)
-            self.heartbeaters[node_name] = h
-            self.heartbeater_threads.append(t)
+            self.healthcheckers[node_name] = h
+            self.healthchecker_threads.append(t)
 
             t.start()
 
-    def _stop_heartbeaters(self):
-        # Stop heartbeaters
-        for _, h in self.heartbeaters.items():
-            h.stop()
-
-        # Stop threads
-        for t in self.heartbeater_threads:
-            t.join()
-
     def _run_as_leader(self, change_leader: Event):
-        self._initialize_heartbeaters(self.nodes)
+        self._initialize_healthcheckers(self.nodes)
 
         change_leader.wait()
-        # Stop heartbeaters
-        self._stop_heartbeaters()
+        change_leader.clear()
+        # Stop healthcheckers
+        self._stop_healthcheckers()
 
-    def _run_as_follower(self, change_leader: Event):
-        self._initialize_heartbeaters(self.peers)
+    def _run_as_follower(self, change_leader: Event, callback: Callable[[], None]):
+        self._initialize_healthcheckers(self.peers)
 
         while self._is_running():
+            callback()
             change_leader.wait()
+            change_leader.clear()
             if self.bully.am_i_leader():
-                # Stop heartbeaters
-                self._stop_heartbeaters()
+                # Stop healthcheckers
+                self._stop_healthcheckers()
                 break
 
     def run(self):
@@ -112,10 +113,21 @@ class Watcher:
                 logger.error(f'{e}')
                 break
 
+    def _stop_healthcheckers(self):
+        # Stop healthcheckers
+        for _, h in self.healthcheckers.items():
+            h.stop()
+
+        # Stop threads
+        for t in self.healthchecker_threads:
+            t.join()
+
     def stop(self):
+        logger.info('[WATCHER] Stopping')
         with self.is_running_lock:
             self.is_running = False
 
         self.bully.stop()
 
-        self.heartbeat.stop()
+        self.healthcheck.stop()
+        logger.info('[WATCHER] Stopped')

@@ -7,7 +7,7 @@ connection:
   publisher:
     - type: direct
       queue: actor
-heartbeat:
+healthcheck:
   port: 13434
 log:
   level: INFO

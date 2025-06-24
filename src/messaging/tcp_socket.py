@@ -7,12 +7,22 @@ logger = logging.getLogger(__name__)
 DEFAULT_RETRY_TIMEOUT = 2  # seconds
 
 
+class SocketDisconnected(Exception):
+    "Raised when received 0 bytes from socket"
+
+    def __init__(self):
+        super().__init__('Socket disconnected')
+
+
 class TCPSocket:
     def __init__(self, socket: socket):
         self.socket: socket = socket
 
     @classmethod
-    def create(cls):
+    def create(cls, timeout: int | None = None):
+        if timeout:
+            socket.setdefaulttimeout(timeout)
+
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         return cls(s)
 
@@ -77,7 +87,7 @@ class TCPSocket:
             msg_bytes = self.socket.recv(bytes_amount - total_bytes_amount)
             msg_bytes_len = len(msg_bytes)
             if msg_bytes_len == 0:
-                return None
+                raise SocketDisconnected
             total_bytes_amount += msg_bytes_len
             message += msg_bytes
 

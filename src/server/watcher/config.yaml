@@ -1,36 +1,10 @@
-heartbeat_port: 13434
-timeout: 5
-reconnection_timeout: 1
-bully_port: 25117
-log_level: DEBUG
-nodes:
-- cleaner
-- q1_sink
-- q2_sink
-- q3_sink
-- q4_sink
-- q5_sink
-- ratings_joiner
-- cast_joiner
-- filter_single_country-1
-- filter_single_country-2
-- country_budget_counter-1
-- country_budget_counter-2
-- filter_budget_revenue-1
-- filter_budget_revenue-2
-- sentiment_analyzer-1
-- sentiment_analyzer-2
-- filter_post_2000-1
-- filter_post_2000-2
-- filter_argentina-1
-- filter_argentina-2
-- filter_argentina_and_spain-1
-- filter_argentina_and_spain-2
-- filter_decade_00-1
-- filter_decade_00-2
-- rating_counter-1
-- rating_counter-2
-- cast_splitter-1
-- cast_splitter-2
-- actor_counter-1
-- actor_counter-2
+healthchecker:
+  port: 13434
+  timeout: 10
+  reconnection_timeout: 5
+bully:
+  port: 25117
+  timeout: 5
+healthcheck:
+  port: 13434
+log_level: INFO

@@ -1,9 +1,13 @@
 from src.messaging.tcp_socket import TCPSocket
 
+DEFAULT_BACKLOG = 1
+
 
 class ServerSocket:
-    def __init__(self, port: int, backlog: int = 1):
-        self.socket = TCPSocket.create()
+    def __init__(
+        self, port: int, backlog: int = DEFAULT_BACKLOG, timeout: int | None = None
+    ):
+        self.socket = TCPSocket.create(timeout)
         self.socket.bind(('', port))
         self.socket.listen(backlog)
 

@@ -32,5 +32,8 @@ echo ">>> Generando docker-compose.yaml con argumentos: '${GENERATE_COMPOSE_ARGS
 GENERATE_COMPOSE_ARGS="${GENERATE_COMPOSE_ARGS}"
 python generate-compose.py ${GENERATE_COMPOSE_ARGS}
 
+echo ">>> Generando running_nodes file"
+bash ./generate-running-nodes.sh
+
 echo ">>> Lanzando contenedores"
 make docker-compose-up

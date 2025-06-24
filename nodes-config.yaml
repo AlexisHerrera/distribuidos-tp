@@ -1,5 +1,5 @@
 # Scale all scalable nodes equally
-all: 2
+all: 1
 
 # Clients
 clients: 2
@@ -22,4 +22,4 @@ cast_splitter: 1
 sentiment_analyzer: 2
 
 # Watcher
-watcher: 1
+watcher: 3
