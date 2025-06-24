@@ -17,7 +17,7 @@ from src.common.socket_communication import (
 )
 from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
-from src.server.cleaner.SessionStateMachine import SessionStateMachine
+from src.server.cleaner.CleanerStateMachine import CleanerStateMachine
 from src.server.heartbeat import Heartbeat
 
 # from src.server.leader_election import chaos_test
@@ -153,7 +153,7 @@ class Cleaner:
                         )
                         break
 
-                state_machine = SessionStateMachine(client_state['stage'])
+                state_machine = CleanerStateMachine(client_state['stage'])
                 if state_machine.is_finished():
                     logger.info(
                         f'[{user_id}] Session is already finished. Waiting for final results.'
@@ -196,7 +196,7 @@ class Cleaner:
                 user_id,
                 {
                     'user_id': user_id,
-                    'stage': SessionStateMachine.STAGES[0],
+                    'stage': CleanerStateMachine.STAGES[0],
                     'queries_received': 0,
                     'socket': None,
                     'lock': threading.Lock(),
@@ -223,7 +223,7 @@ class Cleaner:
                 user_id = uuid.UUID(user_id_str)
                 self.clients[user_id] = {
                     'user_id': user_id,
-                    'stage': data.get('stage', SessionStateMachine.STAGES[0]),
+                    'stage': data.get('stage', CleanerStateMachine.STAGES[0]),
                     'queries_received': data.get('queries_received', 0),
                     'socket': None,
                     'lock': threading.Lock(),
@@ -233,7 +233,7 @@ class Cleaner:
 
     def _advance_session_stage(self, user_id: uuid.UUID):
         def advance(state):
-            state_machine = SessionStateMachine(state['stage'])
+            state_machine = CleanerStateMachine(state['stage'])
             state_machine.advance()
             state['stage'] = state_machine.stage
             logger.info(
@@ -299,7 +299,7 @@ class Cleaner:
                         f'Cannot process EOF for user {user_id}: session not found.'
                     )
                 current_stage = client_state['stage']
-            stage_config = SessionStateMachine.STAGE_CONFIG.get(current_stage, {})
+            stage_config = CleanerStateMachine.STAGE_CONFIG.get(current_stage, {})
             eof_message_type = stage_config.get('message_type')
 
             if not eof_message_type:
@@ -351,14 +351,14 @@ class Cleaner:
 
                 batch = Batch.from_bytes(raw_batch_bytes)
                 # Save batch on disk
-                wal_filepath = self.client_input_wal_manager.write_entry(
+                _wal_filepath = self.client_input_wal_manager.write_entry(
                     user_id, batch.type.name, raw_batch_bytes
                 )
                 try:
                     ack_message = Message(user_id, MessageType.ACK, None)
                     with client_lock:
                         send_message(client_socket, ack_message.to_bytes())
-                    logger.debug(f'[{user_id}] Sent ACK to client for batch.')
+                    # logger.info(f'[{user_id}] Sent ACK to client for batch.')
                 except Exception as ack_e:
                     logger.error(
                         f'[{user_id}] Failed to send ACK to client: {ack_e}. Client will likely resend.'
@@ -367,7 +367,7 @@ class Cleaner:
 
                 self._process_and_send_batch(user_id, raw_batch_bytes)
                 # Remove because is already saved
-                self.client_input_wal_manager.remove_entry(wal_filepath)
+                # self.client_input_wal_manager.remove_entry(wal_filepath)
             except ConnectionResetError:
                 logger.warning(
                     f'[{user_id}] Client connection reset during {data_type_label} processing.'
