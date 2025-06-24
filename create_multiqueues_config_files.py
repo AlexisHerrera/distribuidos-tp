@@ -168,9 +168,47 @@ def create_config_files_cast_joiner(clients_uuids: list[str], output_directory: 
         print(f"Cast joiner configuration file created: {cast_config_filename}")
 
 
+def create_config_file_argentina_filter(clients_uuids: list[str], output_config_path: str):
+    config = {
+        'rabbit': {
+            'host': 'rabbitmq'
+        },
+        'connection': {
+            'consumer': [
+                {
+                    'type': 'broadcast',
+                    'queue': 'post_2000_argentina_filter',
+                    'exchange': 'post_2000'
+                }
+            ],
+            'publisher': [
+                {
+                    'type': 'broadcast',
+                    'exchange': f'argentina_post_2000_{uuid}',
+                    'msg_type': 'Movie'
+                } for uuid in clients_uuids
+            ]
+        },
+        'heartbeat': {
+            'port': 13434
+        },
+        'log': {
+            'level': 'INFO'
+        }
+    }
+
+    os.makedirs(os.path.dirname(output_config_path), exist_ok=True)
+
+    with open(output_config_path, 'w') as file:
+        yaml.dump(config, file, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
+
+    print(f"Argentina filter configuration file '{output_config_path}' created successfully with {len(clients_uuids)} UUID-based publishers.")
+
+
 def main():
     uuid_csv_path = 'clients_uuids.csv'
     cleaner_config_path = 'src/server/cleaner/config.yaml'
+    argentina_filter_config_path = 'src/server/filters/argentina_config.yaml'
     joiners_dir = 'src/server/joiners/'
 
     try:
@@ -179,6 +217,7 @@ def main():
         create_config_file_cleaner(clients_uuids, cleaner_config_path)
         create_config_files_ratings_joiner(clients_uuids, joiners_dir)
         create_config_files_cast_joiner(clients_uuids, joiners_dir)
+        create_config_file_argentina_filter(clients_uuids, argentina_filter_config_path)
 
     except Exception as e:
         print(f"Error: {e}")
