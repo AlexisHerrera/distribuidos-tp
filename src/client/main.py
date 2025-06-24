@@ -6,10 +6,10 @@ import signal
 import socket
 import sys
 import threading
-import time
 import uuid
 from queue import Empty, Queue
 
+from src.client.ClientStateMachine import ClientState, ClientStateMachine
 from src.common.protocol.batch import Batch, BatchType
 from src.common.socket_communication import (
     connect_to_server,
@@ -30,7 +30,10 @@ BATCH_SIZE_CREDITS = int(os.getenv('BATCH_SIZE_CREDITS', '20'))
 RESULTS_FOLDER = '.results'
 Q_RESULT_FILE_NAME_TEMPLATE = RESULTS_FOLDER + '/user_{user_id}_Q{n}.txt'
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(threadName)s - %(levelname)s - %(message)s',
+)
 
 
 def parse_arguments():
@@ -81,9 +84,30 @@ class Client:
         self.args = args
         self.client_socket = None
         self.session_id = None
-        self.is_running = True
 
         self.ack_queue = Queue()
+        # Socket management (wait restart)
+        self._socket_lock = threading.Lock()
+        # Only signaled when everything has ended
+        self._shutdown_event = threading.Event()
+        self._connection_ready = threading.Event()
+        self._reconnect_needed = threading.Event()
+
+        self.results_received = 0
+        self.TOTAL_RESULTS_EXPECTED = 5
+
+        self.file_offsets = {
+            ClientState.SENDING_MOVIES: 0,
+            ClientState.SENDING_CREDITS: 0,
+            ClientState.SENDING_RATINGS: 0,
+        }
+
+        batch_sizes = {
+            'MOVIES': BATCH_SIZE_MOVIES,
+            'CREDITS': BATCH_SIZE_CREDITS,
+            'RATINGS': BATCH_SIZE_RATINGS,
+        }
+        self.state_machine = ClientStateMachine(args=args, BATCH_SIZES=batch_sizes)
 
         self.sender_thread = threading.Thread(
             target=self._sender_loop, name='SenderThread'
@@ -91,171 +115,271 @@ class Client:
         self.receiver_thread = threading.Thread(
             target=self._receiver_loop, name='ReceiverThread'
         )
+        self.connection_thread = threading.Thread(
+            target=self._connection_manager_loop, name='ConnectionManagerThread'
+        )
 
     def run(self):
         try:
-            self.client_socket = self._create_client_socket()
-            if not self.client_socket:
-                logging.critical('Could not connect to server. Exiting.')
-                return
+            self._initial_connect()
 
-            self.session_id = self._perform_handshake(self.client_socket, None)
-
+            self.connection_thread.start()
             self.receiver_thread.start()
             self.sender_thread.start()
 
             self.sender_thread.join()
             self.receiver_thread.join()
+            self.connection_thread.join()
 
-        except (ConnectionError, ValueError) as e:
-            logging.error(f'A critical error occurred: {e}', exc_info=True)
+            if self._shutdown_event.is_set():
+                logging.info('Client was shut down prematurely.')
+            else:
+                logging.info('Client work completed successfully.')
+        except Exception as e:
+            logging.error(
+                f'A critical error occurred in the main thread: {e}', exc_info=True
+            )
         finally:
             self.stop()
             logging.info('Client has finished.')
 
     def stop(self):
-        self.is_running = False
-        if self.client_socket:
-            try:
-                self.client_socket.close()
-            except socket.error:
-                pass
-        logging.info('Client shutdown sequence initiated.')
+        if not self._shutdown_event.is_set():
+            logging.info('Client shutdown sequence initiated.')
+            self._shutdown_event.set()
+            self._reconnect_needed.set()
+            self._connection_ready.set()
+            if self.client_socket:
+                try:
+                    self.client_socket.close()
+                except socket.error:
+                    pass
+
+    def _trigger_reconnection(self):
+        with self._socket_lock:
+            if self._connection_ready.is_set():
+                logging.info('Signaling connection loss to Connection Manager.')
+                self._connection_ready.clear()
+                self._reconnect_needed.set()
+
+    def _connection_manager_loop(self):
+        logging.info('Connection Manager started, waiting for reconnect signals.')
+        while not self._shutdown_event.is_set():
+            self._reconnect_needed.wait()
+
+            if self._shutdown_event.is_set():
+                break
+
+            logging.info(
+                'Connection Manager received signal, starting reconnection process.'
+            )
+            self._reconnect_logic()
+
+            # Clean signal for next use
+            self._reconnect_needed.clear()
+
+        logging.info('Connection Manager has finished.')
+
+    def _reconnect_logic(self):
+        retry_delay = float(os.getenv('CONNECT_RETRY_DELAY', '5.0'))
+        while not self._shutdown_event.is_set():
+            logging.info('Attempting to reconnect...')
+            new_socket = self._create_client_socket()
+            if new_socket:
+                try:
+                    self.session_id = self._perform_handshake(
+                        new_socket, self.session_id
+                    )
+                    with self._socket_lock:
+                        self.client_socket = new_socket
+                    self._connection_ready.set()
+                    logging.info('Reconnection successful.')
+                    return
+                except ConnectionError as e:
+                    logging.warning(f'Handshake failed during reconnect: {e}')
+                    try:
+                        new_socket.close()
+                    except socket.error:
+                        pass
+
+            logging.warning(
+                f'Reconnect attempt failed. Retrying in {retry_delay} seconds...'
+            )
+            self._shutdown_event.wait(timeout=retry_delay)
 
     def _sender_loop(self):
-        try:
-            self._send_file_data(
-                BatchType.MOVIES, self.args.movies_path, BATCH_SIZE_MOVIES
-            )
-            self._send_file_data(
-                BatchType.CREDITS, self.args.cast_path, BATCH_SIZE_CREDITS
-            )
-            self._send_file_data(
-                BatchType.RATINGS, self.args.ratings_path, BATCH_SIZE_RATINGS
-            )
+        while (
+            not self._shutdown_event.is_set()
+            and self.state_machine.get_current_stage()
+            not in [ClientState.WAITING_RESULTS, ClientState.DONE]
+        ):
+            try:
+                self._connection_ready.wait()
+                current_state = self.state_machine.get_current_stage()
+                current_config = self.state_machine.get_current_config()
 
-            logging.info('All data files have been sent.')
-        except ConnectionError as e:
-            logging.critical(
-                f'Sender thread failed due to connection error: {e}. Stopping client.'
-            )
-            self.stop()
+                if current_config:
+                    self._send_file_data(
+                        current_state,
+                        current_config['file'],
+                        current_config['batch_size'],
+                    )
+                    self.state_machine.advance()
+
+            except ConnectionError:
+                logging.warning(
+                    'Sender detected a connection error. Signaling thread to reconnect'
+                )
+                self._trigger_reconnection()
+
+        if not self._shutdown_event.is_set():
+            logging.info('Sender thread has sent all files and is now finished.')
 
     def _receiver_loop(self):
-        logging.info('Receiver thread started. Waiting for messages from server...')
-        while self.is_running:
+        while (
+            not self._shutdown_event.is_set()
+            and self.state_machine.get_current_stage() != ClientState.DONE
+        ):
+            self._connection_ready.wait()
             try:
                 raw_message = receive_message(self.client_socket)
                 if not raw_message:
-                    logging.info(
-                        'Connection closed by server (receive returned nothing).'
-                    )
+                    if not self._shutdown_event.is_set():
+                        raise ConnectionError('Connection closed by server.')
                     break
 
                 msg = Message.from_bytes(raw_message)
 
                 if msg.message_type == MessageType.ACK:
-                    logging.debug('ACK received from server, dispatching to sender.')
                     self.ack_queue.put(msg)
-                elif msg.message_type == MessageType.EOF and not msg.data:
-                    logging.info(
-                        'Main EOF received from server. All results are in. Shutting down receiver.'
-                    )
-                    break
                 else:
                     self._process_result_message(msg)
-            except (ConnectionError, ConnectionResetError):
-                if self.is_running:
-                    logging.warning('Connection lost. Receiver thread stopping.')
-                break
-            except Exception as e:
-                if self.is_running:
-                    logging.error(
-                        f'An error occurred in receiver loop: {e}', exc_info=True
-                    )
-                break
 
+            except (
+                ConnectionError,
+                ConnectionResetError,
+                socket.timeout,
+                socket.error,
+            ) as e:
+                if not self._shutdown_event.is_set():
+                    logging.warning(
+                        f'Receiver detected connection loss: {e}. Notifying Connection Manager.'
+                    )
+                    self._trigger_reconnection()
+            except Exception as e:
+                if not self._shutdown_event.is_set():
+                    logging.error(
+                        f'An unexpected error occurred in receiver loop: {e}',
+                        exc_info=True,
+                    )
+                    self.stop()
+                    break
         logging.info('Receiver thread has finished.')
-        self.stop()
 
     def _send_file_data(
-        self, batch_type: BatchType, file_object: io.TextIOWrapper, batch_size
+        self, current_state: ClientState, file_object: io.TextIOWrapper, batch_size
     ):
-        file_description = batch_type.name
+        file_description = current_state.name
         logging.info(f'--- Starting to send {file_description} data ---')
-        batch_count = 0
-        try:
+
+        last_confirmed_offset = self.file_offsets[current_state]
+        file_object.seek(last_confirmed_offset)
+
+        if last_confirmed_offset == 0:
             header = file_object.readline()
             if not header:
                 logging.warning(f'File for {file_description} is empty.')
                 return
+            self.file_offsets[current_state] = file_object.tell()
 
-            while self.is_running:
-                batch_lines = read_next_batch(file_object, batch_size=batch_size)
-                if not batch_lines:
-                    break
+        batch_count = 0
+        while not self._shutdown_event.is_set():
+            batch_lines = read_next_batch(file_object, batch_size)
+            if not batch_lines:
+                break
 
-                batch_obj = Batch(batch_type, batch_lines)
-                self._send_with_retry_and_ack(batch_obj.to_bytes())
-                batch_count += 1
+            config = self.state_machine.get_current_config()
+            batch_type = config['batch_type']
+            batch_obj = Batch(batch_type, batch_lines)
 
-            logging.info(
-                f'--- Finished sending {file_description} data, sending EOF. ---'
-            )
-            logging.info(f'Batchs sents: {batch_count}')
-            eof_batch = Batch(BatchType.EOF, None)
-            self._send_with_retry_and_ack(eof_batch.to_bytes())
-            logging.info(f'Final EOF for {file_description} sent and ACKed.')
+            self._send_batch_and_wait_ack(batch_obj.to_bytes())
 
-        except Exception:
-            raise
+            self.file_offsets[current_state] = file_object.tell()
+            batch_count += 1
+            logging.info(f'Batch #{batch_count} for {file_description} sent and ACKed.')
 
-    def _send_with_retry_and_ack(self, data_bytes: bytes):
+        logging.info(f'--- Finished sending {file_description} data, sending EOF. ---')
+        eof_batch = Batch(BatchType.EOF, None)
+        self._send_batch_and_wait_ack(eof_batch.to_bytes())
+        logging.info(f'Final EOF for {file_description} sent and ACKed.')
+
+    def _send_batch_and_wait_ack(self, data_bytes: bytes):
         max_retries = int(os.getenv('SEND_MAX_RETRIES', '5'))
-        retry_delay = float(os.getenv('SEND_RETRY_DELAY', '5.0'))
-        ack_timeout = 10.0
+        ack_timeout = float(os.getenv('ACK_TIMEOUT', '10.0'))
 
-        for _ in range(max_retries):
-            if not self.is_running:
+        for attempt in range(max_retries):
+            if self._shutdown_event.is_set():
                 raise ConnectionError('Client is shutting down.')
-
+            # Espera a que la conexión vuelva
+            self._connection_ready.wait()
             try:
-                send_message(self.client_socket, data_bytes)
+                with self._socket_lock:
+                    send_message(self.client_socket, data_bytes)
 
                 ack_msg = self.ack_queue.get(timeout=ack_timeout)
-
                 if ack_msg.message_type == MessageType.ACK:
                     logging.debug('ACK received from queue.')
                     return
-
             except Empty:
                 logging.warning(
-                    f'ACK not received within {ack_timeout}s. Retrying send...'
+                    f'ACK not received within {ack_timeout}s (Attempt {attempt + 1}/{max_retries}).'
                 )
-            except (ConnectionError, BrokenPipeError, socket.error) as e:
-                logging.error(f'Connection error on send: {e}. Attempting reconnect...')
-                self._reconnect()
-
-            time.sleep(retry_delay)
+                continue
+            except (socket.error, BrokenPipeError) as e:
+                logging.error(
+                    f'Connection error on send: {e}. Notifying Connection Manager.'
+                )
+                self._trigger_reconnection()
 
         raise ConnectionError(
             f'Failed to send data and receive ACK after {max_retries} attempts.'
         )
 
-    def _reconnect(self):
-        if self.client_socket:
-            try:
-                self.client_socket.close()
-            except socket.error:
-                pass
-
+    def _initial_connect(self):
         self.client_socket = self._create_client_socket()
         if self.client_socket:
-            self.session_id = self._perform_handshake(
-                self.client_socket, self.session_id
-            )
+            self.session_id = self._perform_handshake(self.client_socket, None)
+            self._connection_ready.set()
         else:
-            raise ConnectionError('Failed to reconnect to the server.')
+            logging.critical('Could not connect to server on startup. Exiting.')
+            raise ConnectionError('Failed to establish initial connection.')
+
+    def _reconnect_loop(self):
+        retry_delay = float(os.getenv('CONNECT_RETRY_DELAY', '5.0'))
+        while not self._shutdown_event.is_set():
+            logging.info('Attempting to reconnect...')
+            new_socket = self._create_client_socket()
+            if new_socket:
+                try:
+                    self.session_id = self._perform_handshake(
+                        new_socket, self.session_id
+                    )
+                    self.client_socket = new_socket
+                    self._connection_ready.set()
+                    logging.info('Reconnection successful.')
+                    return
+                except ConnectionError as e:
+                    logging.warning(f'Handshake failed during reconnect: {e}')
+                    try:
+                        new_socket.close()
+                    except socket.error:
+                        pass
+
+            logging.warning(
+                f'Reconnect attempt failed. Retrying in {retry_delay} seconds...'
+            )
+            # Espera para el siguiente reintento, pero se interrumpe si el cliente se apaga.
+            self._shutdown_event.wait(timeout=retry_delay)
 
     def _process_result_message(self, msg: Message):
         filename_args = {'user_id': msg.user_id}
@@ -332,9 +456,16 @@ class Client:
                 f.write(
                     f'[Q5] MovieAvgBudget → Positive={mab.positive:.2f}, Negative={mab.negative:.2f}\n'
                 )
-
         else:
             logging.warning(f'Mensaje desconocido: {msg.message_type}')
+
+        self.results_received += 1
+        logging.info(
+            f'Result #{self.results_received}/{self.TOTAL_RESULTS_EXPECTED} received.'
+        )
+        if self.results_received >= self.TOTAL_RESULTS_EXPECTED:
+            logging.info('All expected results have been received. Client is done.')
+            self.state_machine.set_stage(ClientState.DONE)
 
     def _create_client_socket(self):
         try:
@@ -359,7 +490,9 @@ class Client:
             logging.warning(f'Connection attempt {attempt + 1} failed.')
             if attempt < max_retries - 1:
                 logging.info(f'Retrying in {retry_delay} seconds...')
-                time.sleep(retry_delay)
+                self._shutdown_event.wait(timeout=retry_delay)
+                if self._shutdown_event.is_set():
+                    return None
             else:
                 logging.error(f'Connection failed after {max_retries} attempts.')
 
@@ -375,9 +508,12 @@ class Client:
             handshake_id = session_id or uuid.UUID(int=0)
 
             request_msg = Message(handshake_id, MessageType.HANDSHAKE_SESSION)
-            send_message(client_socket, request_msg.to_bytes())
+            with self._socket_lock:
+                send_message(client_socket, request_msg.to_bytes())
+                response_raw = receive_message(client_socket)
 
-            response_raw = receive_message(client_socket)
+            if not response_raw:
+                raise ConnectionError('Socket closed during handshake response.')
             response_msg = Message.from_bytes(response_raw)
 
             if response_msg.message_type == MessageType.HANDSHAKE_SESSION:
@@ -391,8 +527,8 @@ class Client:
                     f'Handshake failed. Expected HANDSHAKE_SESSION, got {response_msg.message_type}'
                 )
 
-        except (ConnectionError, socket.error):
-            raise
+        except (socket.error, ConnectionError) as e:
+            raise ConnectionError(f'Failed to perform handshake: {e}') from e
 
 
 def main():

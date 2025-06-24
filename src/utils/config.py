@@ -93,7 +93,7 @@ class ChaosMonkeyConfig:
             self.log_level = 'INFO'
 
         self.nodes = NodesList(
-            filters=['chaos_monkey', 'cleaner', 'ratings_joiner', 'cast_joiner']
+            filters=['chaos_monkey', 'ratings_joiner', 'cast_joiner']
         ).nodes
 
 
