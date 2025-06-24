@@ -21,6 +21,19 @@ watch:
 	watch 'docker ps -a --filter "network=tp-escalabilidad_testing_net" --format "table {{.ID}}\t{{.State}}\t{{.Names}}\t{{.Status}}"'
 .PHONY: watch
 
+monkey-up:
+	docker compose -f docker-compose.yaml up chaos_monkey -d --build
+.PHONY: monkey-up
+
+monkey-down:
+	docker compose -f docker-compose.yaml stop chaos_monkey -t 1
+	docker compose -f docker-compose.yaml down chaos_monkey
+.PHONY: monkey-down
+
+chaos:
+	docker compose -f docker-compose.yaml --profile chaos up -d --build
+.PHONY: chaos
+
 # make restart service=client-1
 restart:
 	@# Check if 'service' variable is empty using shell syntax inside the recipe
