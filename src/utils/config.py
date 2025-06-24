@@ -50,7 +50,7 @@ class WatcherConfig:
 
         # Healthchecker
         healthchecker = config.get(
-            'healthcheck', {'port': 13434, 'timeout': 30, 'reconnection_timeout': 10}
+            'healthchecker', {'port': 13434, 'timeout': 30, 'reconnection_timeout': 10}
         )
         self.healthchecker_port: int = healthchecker['port']
         self.healthchecker_timeout: int = healthchecker['timeout']
