@@ -7,7 +7,7 @@ connection:
   publisher:
     - type: direct
       queue: decade_00
-heartbeat:
+healthcheck:
   port: 13434
 log:
   level: INFO
