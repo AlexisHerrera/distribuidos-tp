@@ -59,7 +59,7 @@ class ChaosMonkey:
 
     def _stop_service(self, node_name: str):
         result = subprocess.run(
-            ['docker', 'stop', node_name],
+            ['docker', 'kill', '--signal=SIGKILL', node_name],
             check=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

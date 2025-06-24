@@ -8,7 +8,7 @@ import sys
 import threading
 import time
 import uuid
-from queue import Queue, Empty
+from queue import Empty, Queue
 
 from src.common.protocol.batch import Batch, BatchType
 from src.common.socket_communication import (
@@ -24,7 +24,7 @@ from src.model.movie_budget_counter import MovieBudgetCounter
 from src.model.movie_rating_avg import MovieRatingAvg
 
 BATCH_SIZE_MOVIES = int(os.getenv('BATCH_SIZE_MOVIES', '20'))
-BATCH_SIZE_RATINGS = int(os.getenv('BATCH_SIZE_RATINGS', '100'))
+BATCH_SIZE_RATINGS = int(os.getenv('BATCH_SIZE_RATINGS', '200'))
 BATCH_SIZE_CREDITS = int(os.getenv('BATCH_SIZE_CREDITS', '20'))
 
 RESULTS_FOLDER = '.results'

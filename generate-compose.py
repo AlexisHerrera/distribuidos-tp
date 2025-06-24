@@ -112,9 +112,6 @@ def create_cleaner():
     environment:
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
-      - BATCH_SIZE_MOVIES=20
-      - BATCH_SIZE_RATINGS=100
-      - BATCH_SIZE_CREDITS=20
     networks:
       - {NETWORK_NAME}
     depends_on:

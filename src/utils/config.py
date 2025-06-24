@@ -79,7 +79,9 @@ class ChaosMonkeyConfig:
         if 'log_level' not in self.__dict__:
             self.log_level = 'INFO'
 
-        self.nodes = NodesList(filters=['chaos_monkey']).nodes
+        self.nodes = NodesList(
+            filters=['chaos_monkey', 'cleaner', 'ratings_joiner', 'cast_joiner']
+        ).nodes
 
 
 class NodesList:
