@@ -89,15 +89,6 @@ class Cleaner:
             logger.error(f'Failed to read UUIDs from {filepath}: {e}', exc_info=True)
         return uuids
 
-    def _setup_signal_handlers(self):
-        def signal_handler(signum, frame):
-            logger.warning(
-                f'Signal {signal.Signals(signum).name} received. Initiating shutdown...'
-            )
-            self.shutdown()
-    def _recover_from_wal(self):
-        logger.info('Attempting to recover batches from WAL...')
-        recovered_batches = self.client_input_wal_manager.recover()
     def _handshake(self, client_socket, address) -> uuid.UUID | None:
         def update_socket(state):
             state['socket'] = client_socket
