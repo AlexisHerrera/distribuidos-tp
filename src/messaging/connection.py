@@ -64,8 +64,8 @@ class MultiPublisherConnection:
         else: # Only for Direct Publishers with more than one client.
             return self._get_publisher_for_client(publishers_by_message_type,message.user_id)
     
-    def _get_publishers_by_message_type(self, message_type: MessageType) -> list[Publisher] | None:
-        return [publisher for message_type, publisher in self.__publishers if message_type == message_type]
+    def _get_publishers_by_message_type(self, msg_type: MessageType) -> list[Publisher] | None:
+        return [publisher for message_type, publisher in self.__publishers if message_type == msg_type]
     
     def _get_publisher_for_client(
         self,
