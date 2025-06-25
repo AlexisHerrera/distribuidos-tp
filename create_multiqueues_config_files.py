@@ -44,7 +44,7 @@ def create_config(clients_uuids: list[str]) -> dict:
                 }
             ]
         },
-        'heartbeat': {
+        'healthcheck': {
             'port': 13434
         },
         'log': {
@@ -107,7 +107,7 @@ def create_config_files_ratings_joiner(clients_uuids: list[str], output_director
                     }
                 ]
             },
-            'heartbeat': {
+            'healthcheck': {
                 'port': 13434
             },
             'log': {
@@ -152,7 +152,7 @@ def create_config_files_cast_joiner(clients_uuids: list[str], output_directory: 
                     }
                 ]
             },
-            'heartbeat': {
+            'healthcheck': {
                 'port': 13434
             },
             'log': {
@@ -189,7 +189,7 @@ def create_config_file_argentina_filter(clients_uuids: list[str], output_config_
                 } for uuid in clients_uuids
             ]
         },
-        'heartbeat': {
+        'healthcheck': {
             'port': 13434
         },
         'log': {
