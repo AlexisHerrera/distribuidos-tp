@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Type
 
 from src.messaging.connection_creator import ConnectionCreator
+from src.messaging.connection import MultiPublisherConnection
 from src.messaging.protocol.message import Message, MessageType
 from src.server.healthcheck import Healthcheck
 from src.server.leader_election import LeaderElection
@@ -261,7 +262,12 @@ class BaseNode(ABC):
         try:
             logger.info('Propagating EOF to next stage...')
             eof_message = Message(user_id, MessageType.EOF, None, message_id=None)
-            self.connection.thread_safe_send(eof_message)
+            if isinstance(self.connection, MultiPublisherConnection):
+                self.connection.send_eof(
+                    eof_message, target_queue_type=MessageType.Movie
+                )
+            else:    
+                self.connection.thread_safe_send(eof_message)
 
             logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')
         except Exception as e:
