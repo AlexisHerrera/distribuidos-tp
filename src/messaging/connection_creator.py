@@ -42,7 +42,7 @@ class ConnectionCreator:
 
         if len(consumers_config) > 0:
             if consumers_config[0]['type'] == 'broadcast':
-                consumer = BroadcastConsumer(broker_cons, consumers_config[0]['queue'])
+                consumer = BroadcastConsumer(broker_cons, consumers_config[0]['exchange'], consumers_config[0]['queue'])
             else:
                 consumer = NamedQueueConsumer(broker_cons, consumers_config[0]['queue'])
 
