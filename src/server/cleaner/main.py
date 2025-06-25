@@ -243,12 +243,22 @@ class Cleaner:
         state_machine = CleanerStateMachine(client_state['stage'])
         while self.is_running and not state_machine.is_finished():
             # Get client data. If fails, caller will catch the exception
-            raw_batch_bytes = receive_message(client_socket)
+            window_message_bytes = receive_message(client_socket)
+            window_message = Message.from_bytes(window_message_bytes)
+            if window_message.message_type != MessageType.WINDOW:
+                raise ValueError(f'Expected WINDOW message, received: {window_message}')
+            batches_to_read = int(window_message.data)
+
+            for _ in range(batches_to_read):
+                # it is guaranteed that client will
+                # not send data message after EOF, until receives from client an ACK
+                raw_batch_bytes = receive_message(client_socket)
+                # This updates client_state['stage'] to make this loop finish
+                self._process_and_send_batch(user_id, raw_batch_bytes, state_machine)
+
             ack_message = Message(user_id, MessageType.ACK, None)
             with client_lock:
                 send_message(client_socket, ack_message.to_bytes())
-            # This updates client_state['stage'] to make this loop finish
-            self._process_and_send_batch(user_id, raw_batch_bytes, state_machine)
 
     def _process_and_send_batch(
         self,

@@ -26,6 +26,7 @@ from src.model.movie_rating_avg import MovieRatingAvg
 BATCH_SIZE_MOVIES = int(os.getenv('BATCH_SIZE_MOVIES', '20'))
 BATCH_SIZE_RATINGS = int(os.getenv('BATCH_SIZE_RATINGS', '200'))
 BATCH_SIZE_CREDITS = int(os.getenv('BATCH_SIZE_CREDITS', '20'))
+WINDOW_SIZE = int(os.getenv('WINDOW_SIZE', '100'))
 
 RESULTS_FOLDER = '.results'
 Q_RESULT_FILE_NAME_TEMPLATE = RESULTS_FOLDER + '/user_{user_id}_Q{n}.txt'
@@ -77,6 +78,25 @@ def read_next_batch(csv_file, batch_size):
             break
         batch.append(line.strip())
     return batch
+
+
+def _peek_and_count_batches(
+    file_object: io.TextIOWrapper, batch_size: int, max_batches: int
+):
+    initial_pos = file_object.tell()
+    batch_count = 0
+    eof_reached = False
+    try:
+        while batch_count < max_batches:
+            lines = read_next_batch(file_object, batch_size)
+            if not lines:
+                eof_reached = True
+                break
+            batch_count += 1
+    finally:
+        file_object.seek(initial_pos)
+
+    return batch_count, eof_reached
 
 
 class Client:
@@ -280,69 +300,103 @@ class Client:
         self, current_state: ClientState, file_object: io.TextIOWrapper, batch_size
     ):
         file_description = current_state.name
-        logging.info(f'--- Starting to send {file_description} data ---')
-
+        logging.info(
+            f'--- Starting to send {file_description} data using windowing ---'
+        )
         last_confirmed_offset = self.file_offsets[current_state]
         file_object.seek(last_confirmed_offset)
 
+        # Ignore header
         if last_confirmed_offset == 0:
             header = file_object.readline()
             if not header:
                 logging.warning(f'File for {file_description} is empty.')
+                # Aún así, envía un EOF para que el servidor sepa que no hay datos.
+                self._send_window_and_wait_ack([], send_eof=True)
                 return
             self.file_offsets[current_state] = file_object.tell()
 
-        batch_count = 0
         while not self._shutdown_event.is_set():
-            batch_lines = read_next_batch(file_object, batch_size)
-            if not batch_lines:
+            # Peek how many can be sent in this window
+            batches_in_window, eof_in_window = _peek_and_count_batches(
+                file_object, batch_size, WINDOW_SIZE
+            )
+            if batches_in_window == 0 and not eof_in_window:
+                logging.info(f'[{file_description}] No more data to send.')
                 break
 
+            # Read batches and append
+            batches_to_send = []
+            for _ in range(batches_in_window):
+                batch_lines = read_next_batch(file_object, batch_size)
+                if batch_lines:
+                    batches_to_send.append(batch_lines)
+
+            offset_after_window = file_object.tell()
             config = self.state_machine.get_current_config()
             batch_type = config['batch_type']
-            batch_obj = Batch(batch_type, batch_lines)
+            batch_objects = [Batch(batch_type, data) for data in batches_to_send]
 
-            self._send_batch_and_wait_ack(batch_obj.to_bytes())
+            logging.info(
+                f'[{file_description}] Preparing window with {len(batch_objects)} data batches. EOF in window: {eof_in_window}'
+            )
+            self._send_window_and_wait_ack(batch_objects, eof_in_window)
 
-            self.file_offsets[current_state] = file_object.tell()
-            batch_count += 1
-            logging.info(f'Batch #{batch_count} for {file_description} sent and ACKed.')
+            # Update offset only if acked
+            self.file_offsets[current_state] = offset_after_window
+            logging.info(
+                f'[{file_description}] Window sent and ACKed. New file offset: {offset_after_window}'
+            )
 
-        logging.info(f'--- Finished sending {file_description} data, sending EOF. ---')
-        eof_batch = Batch(BatchType.EOF, None)
-        self._send_batch_and_wait_ack(eof_batch.to_bytes())
-        logging.info(f'Final EOF for {file_description} sent and ACKed.')
+            if eof_in_window:
+                logging.info(
+                    f'--- Finished sending {file_description} data (EOF sent). ---'
+                )
+                break
 
-    def _send_batch_and_wait_ack(self, data_bytes: bytes):
+    def _send_window_and_wait_ack(self, batches: list[Batch], send_eof: bool):
         max_retries = int(os.getenv('SEND_MAX_RETRIES', '5'))
         ack_timeout = float(os.getenv('ACK_TIMEOUT', '10.0'))
 
         for attempt in range(max_retries):
-            if self._shutdown_event.is_set():
-                raise ConnectionError('Client is shutting down.')
-            # Espera a que la conexión vuelva
             self._connection_ready.wait()
             try:
-                with self._socket_lock:
-                    send_message(self.client_socket, data_bytes)
+                messages_to_send_bytes = [b.to_bytes() for b in batches]
+                if send_eof:
+                    eof_batch = Batch(BatchType.EOF, None)
+                    messages_to_send_bytes.append(eof_batch.to_bytes())
 
+                if not messages_to_send_bytes:
+                    return
+
+                window_size = len(messages_to_send_bytes)
+                window_message = Message(
+                    self.session_id, MessageType.WINDOW, str(window_size)
+                )
+
+                with self._socket_lock:
+                    send_message(self.client_socket, window_message.to_bytes())
+                    for msg_bytes in messages_to_send_bytes:
+                        send_message(self.client_socket, msg_bytes)
+
+                # Wait ACK for window
                 ack_msg = self.ack_queue.get(timeout=ack_timeout)
-                if ack_msg.message_type == MessageType.ACK:
-                    logging.debug('ACK received from queue.')
+                if ack_msg and ack_msg.message_type == MessageType.ACK:
+                    logging.info(f'Window ACK received for {window_size} messages.')
                     return
             except Empty:
                 logging.warning(
-                    f'ACK not received within {ack_timeout}s (Attempt {attempt + 1}/{max_retries}).'
-                )
-                continue
-            except (socket.error, BrokenPipeError) as e:
-                logging.error(
-                    f'Connection error on send: {e}. Notifying Connection Manager.'
+                    f'ACK for window not received in {ack_timeout}s (Attempt {attempt + 1}/{max_retries}).'
                 )
                 self._trigger_reconnection()
-
+                continue
+            except (socket.error, BrokenPipeError, ConnectionError) as e:
+                logging.error(
+                    f'Connection error on sending window: {e}. Notifying Connection Manager.'
+                )
+                self._trigger_reconnection()
         raise ConnectionError(
-            f'Failed to send data and receive ACK after {max_retries} attempts.'
+            f'Failed to send window and receive ACK after {max_retries} attempts.'
         )
 
     def _initial_connect(self):
