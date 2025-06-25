@@ -278,6 +278,8 @@ class Cleaner:
             # Depending on current stage, it will send an EOF to the queue
             eof_message_type = config_current_stage['message_type']
             self._publish_eof(user_id, eof_message_type)
+            # Duplicate eof to see what happens
+            # self._publish_eof(user_id, eof_message_type)
             state_machine.advance()
             self._update_stage(user_id, state_machine.stage)
             return

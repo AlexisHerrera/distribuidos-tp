@@ -31,7 +31,7 @@ def chaos_test(probability: float, crash_message: str):
 class LeaderElection:
     def __init__(self, config: Config, node_instance):
         self.node = node_instance
-        self.node_id = config.node_id
+        self.node_id = config.node_id  # eg: filter_argentina-1
         self.port = int(config.port)
         self.peers: list[tuple[str, str]] = [tuple(p.split(':')) for p in config.peers]
         self.peer_ids: list[str] = [host for host, port in self.peers]
@@ -77,8 +77,8 @@ class LeaderElection:
             if role == 'leader':
                 # Invalidate leader uncompleted
                 logger.warning(
-                    f'Node was a LEADER for user {user_id} before crashing. '
-                    'Invalidating state to prevent split-brain. Will become a follower if notified.'
+                    f'Node was a LEADER for user {user_id} before crashing.'
+                    'Invalidating state restart EOF cycle. Waiting for EOF again.'
                 )
                 with self.state_lock:
                     if user_id_str in self.persisted_states:
@@ -149,6 +149,10 @@ class LeaderElection:
         with self.state_lock:
             current_state = self.persisted_states.get(user_id_str, {})
 
+        if current_state.get('status') == 'completed':
+            logger.info(f'Duplicated EOF for user id {user_id}. Ignoring')
+            return
+
         if current_state.get('role') == 'follower':
             logger.error(
                 f'STATE CONFLICT: Received master EOF from queue for user {user_id}, '
@@ -192,6 +196,34 @@ class LeaderElection:
         with self.state_lock:
             state = self.persisted_states.get(user_id_str, {})
 
+        if state.get('role') == 'leader':
+            if leader_host < self.node_id:
+                logger.warning(
+                    f"LEADER CONFLICT for user {user_id}. Peer '{leader_host}' has a smaller ID. "
+                    f'Demoting self from LEADER to FOLLOWER.'
+                )
+
+                def demote_to_follower(s):
+                    current_in_flight = self.node.get_in_flight_count(user_id)
+                    s.update(
+                        {
+                            'role': 'follower',
+                            'status': 'finalizing',
+                            'leader_addr': (leader_host, leader_port),
+                            'pending_dones_from': [],
+                            'in_flight_snapshot': current_in_flight,
+                        }
+                    )
+
+                self._update_and_persist_state(user_id_str, demote_to_follower)
+                threading.Thread(target=self._finalize_client, args=(user_id,)).start()
+                return
+            else:
+                logger.warning(
+                    f"LEADER CONFLICT for user {user_id}. Ignoring peer '{leader_host}' "
+                    f"because my ID '{self.node_id}' is smaller. I remain the LEADER."
+                )
+                return
         if state.get('status') == 'completed':
             logger.warning(
                 f'Received EOF for completed user {user_id}. Resending DONE.'
@@ -232,6 +264,9 @@ class LeaderElection:
 
         def process_done_update(state):
             if not state or state.get('role') != 'leader':
+                logger.warning(
+                    'Receiving DONE not having client state nor being leader'
+                )
                 return
 
             pending = state.get('pending_dones_from', [])
