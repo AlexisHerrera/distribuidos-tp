@@ -42,7 +42,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -68,7 +68,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data:/app/.data
+      - ./.data-small:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:

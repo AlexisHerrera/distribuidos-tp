@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from src.messaging.protocol.message import Message, MessageType
 from src.model.cast import Cast
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class CastJoinerLogic(BaseJoinerLogic):
     def __init__(self):
-        self.base_data: dict[int, dict[int, Movie]] = {}
+        self.base_data: dict[uuid.UUID, dict[int, Movie]] = {}
         logger.info('CastJoinerLogic initialized.')
 
     def merge(self, message: Message) -> Message:

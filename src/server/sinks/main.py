@@ -26,12 +26,20 @@ AVAILABLE_SINK_LOGICS = {
 
 class SinkNode(BaseNode):
     def __init__(self, config: Config, sink_type: str):
-        super().__init__(config, sink_type, has_result_persisted=True)
+        super().__init__(
+            config, sink_type, has_data_persisted=True, should_send_results=True
+        )
         self.logic: BaseSinkLogic
         logger.info(f"SinkNode '{sink_type}' initialized.")
 
     def _get_logic_registry(self) -> Dict[str, Type]:
         return AVAILABLE_SINK_LOGICS
+
+    def _load_node_state(self):
+        app_state = super()._load_node_state()
+        if app_state and hasattr(self.logic, 'load_application_state'):
+            self.logic.load_application_state(app_state)
+            logger.info('Application state restored successfully.')
 
     def handle_message(self, message: Message):
         try:
