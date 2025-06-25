@@ -103,7 +103,7 @@ def create_config_files_ratings_joiner(clients_uuids: list[str], output_director
                     {
                         'type': 'broadcast',
                         'queue': 'argentina_post_2000_ratings',
-                        'exchange': 'argentina_post_2000'
+                        'exchange': f'argentina_post_2000_{client_id}'
                     }
                 ]
             },
@@ -148,7 +148,7 @@ def create_config_files_cast_joiner(clients_uuids: list[str], output_directory: 
                     {
                         'type': 'broadcast',
                         'queue': 'argentina_post_2000_cast',
-                        'exchange': 'argentina_post_2000'
+                        'exchange': f'argentina_post_2000_{client_id}'
                     }
                 ]
             },
