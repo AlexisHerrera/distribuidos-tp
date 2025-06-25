@@ -18,6 +18,9 @@ class BroadcastPublisher(Publisher):
     def put(self, broker: Broker, body: Message):
         broker.put(exchange=self.__exchange_name, body=body.to_bytes())
 
+    @property
+    def exchange_name(self):
+        return self.__exchange_name
 
 class DirectPublisher(Publisher):
     def __init__(self, broker: Broker, queue_name: str):
@@ -26,3 +29,7 @@ class DirectPublisher(Publisher):
 
     def put(self, broker: Broker, body: Message):
         broker.put(routing_key=self.__routing_key, body=body.to_bytes())
+
+    @property
+    def routing_key(self):
+        return self.__routing_key

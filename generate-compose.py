@@ -1,5 +1,5 @@
 import argparse
-
+import os
 import yaml
 
 DOCKER_COMPOSE_FILENAME = 'docker-compose.yaml'
@@ -32,12 +32,11 @@ class ScalableService:
 
 class Config:
     def __init__(self, data: dict):
-        # Dynamically generate attributes based on the `key`s from `data`
         self.__dict__.update(data)
 
         if 'all' in self.__dict__ and self.all is not None and self.all > 0:
             for k in self.__dict__.keys():
-                if k == 'clients' or k == 'watcher':
+                if k == 'clients' or k == 'ratings_joiner' or k == 'cast_joiner' or k == 'watcher':
                     continue
                 self.__dict__[k] = self.all
 
@@ -119,6 +118,7 @@ def create_cleaner():
         condition: service_healthy
     volumes:
       - ./src/server/cleaner/config.yaml:/app/config.yaml
+      - ./clients_uuids.csv:/app/clients_uuids.csv
       - {state_volume_path}:/app/state
 """
 
@@ -145,38 +145,28 @@ def create_sink(n: int):
 """
 
 
-def create_joiner(joiner_type: str) -> str:
-    WATCHER_NODES.append(joiner_type)
-    return f"""
-  {joiner_type}:
-    container_name: {joiner_type}
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/joiners/main.py", {joiner_type}]
-    networks:
-      - {NETWORK_NAME}
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/joiners/{joiner_type}_config.yaml:/app/config.yaml
-    """
-
-
-def create_node(service: ScalableService, index: int):
+def create_node(service: ScalableService, index: int, uuids: list[str] = None):
     container = f'{service.name}-{index}'
 
     WATCHER_NODES.append(container)
 
-    peers = [
-        f'{service.name}-{i}:{service.port}'
-        for i in range(1, service.nodes + 1)
-        if i != index
-    ]
+    if service.name in ('ratings_joiner', 'cast_joiner'): # As each instance is independent of the other.
+        peers = []
+    else:
+        peers = [
+            f'{service.name}-{i}:{service.port}'
+            for i in range(1, service.nodes + 1)
+            if i != index
+        ]
 
     peers_env = ','.join(peers)
     state_volume_path = f'./.state/{container}'
+
+    if (service.name == 'ratings_joiner' or service.name == 'cast_joiner') and uuids is not None:
+        base, ext = os.path.splitext(service.config_file)
+        config_file_path = f"{base}_{uuids[index - 1]}{ext}"
+    else:
+        config_file_path = service.config_file
 
     return f"""{container}:
     container_name: {container}
@@ -194,16 +184,15 @@ def create_node(service: ScalableService, index: int):
       rabbitmq:
         condition: service_healthy
     volumes:
-      - {service.config_file}:/app/config.yaml
+      - {config_file_path}:/app/config.yaml
       - {state_volume_path}:/app/state
   """
 
 
-def create_scalable(service: ScalableService):
+def create_scalable(service: ScalableService, uuids: list[str] = None):
     nodes = ''
     for i in range(1, service.nodes + 1):
-        nodes += create_node(service, i)
-
+        nodes += create_node(service, i, uuids)
     return nodes
 
 
@@ -264,6 +253,7 @@ def create_services(
     scalable_services: list[ScalableService],
     config: Config,
     dataset_path: str,
+    uuids: list[str],
     watcher: ScalableService,
 ):
     rabbitmq = create_rabbitmq()
@@ -274,12 +264,12 @@ def create_services(
     sinks = ''
     for i in list(range(1, 6)):
         sinks += create_sink(i)
-    joiners = ''
-    for joiner in ['ratings', 'cast']:
-        joiners += create_joiner(f'{joiner}_joiner')
     services = ''
     for service in scalable_services:
-        services += create_scalable(service)
+        if service.name == 'ratings_joiner' or service.name == 'cast_joiner':
+            services += create_scalable(service, uuids)
+        else:
+            services += create_scalable(service)
 
     watchers = create_watcher(watcher)
 
@@ -292,7 +282,6 @@ services:
   {cleaner}
   {services}
   {sinks}
-  {joiners}
   {watchers}
   {chaos_monkey}
 """
@@ -328,10 +317,11 @@ def create_docker_compose_data(
     scalable_services: list[ScalableService],
     config: Config,
     dataset_path: str,
+    uuids: list[str],
     watcher: ScalableService,
 ):
     base = create_docker_compose_base()
-    services = create_services(scalable_services, config, dataset_path, watcher)
+    services = create_services(scalable_services, config, dataset_path, uuids, watcher)
     networks = create_networks()
 
     return base + services + networks
@@ -345,9 +335,16 @@ def read_config() -> Config:
     return Config(data)
 
 
+def read_client_uuids() -> list[str]:
+    with open('clients_uuids.csv', 'r', encoding='utf-8') as f:
+        line = f.readline().strip()
+        return [uuid.strip() for uuid in line.split(',') if uuid.strip()]
+
+
 def main():
     args = parse_args()
     config = read_config()
+    uuids = read_client_uuids()
     scalable_services = []
     base = BASE_PORT
     mapping = [
@@ -428,6 +425,20 @@ def main():
             'actor_counter',
             './src/server/counters/actor_counter_config.yaml',
         ),
+        (
+            'ratings_joiner',
+            config.ratings_joiner,
+            'src/server/joiners/main.py',
+            'ratings_joiner',
+            './src/server/joiners/ratings_joiner_config.yaml',
+        ),
+        (
+            'cast_joiner',
+            config.cast_joiner,
+            'src/server/joiners/main.py',
+            'cast_joiner',
+            './src/server/joiners/cast_joiner_config.yaml',
+        )
     ]
     for idx, (name, count, script, logic, cfg) in enumerate(mapping):
         if count and count > 0:
@@ -467,7 +478,7 @@ def main():
         config_file='./src/server/watcher/config.yaml',
     )
     content = create_docker_compose_data(
-        scalable_services, config, dataset_path, watcher
+        scalable_services, config, dataset_path,uuids, watcher
     )
 
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:

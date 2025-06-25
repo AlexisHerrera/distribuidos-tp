@@ -17,6 +17,11 @@ rating_counter: 2
 country_budget_counter: 2
 actor_counter: 2
 
+# Joiners
+
+ratings_joiner: 2
+cast_joiner: 2
+
 # Others
 cast_splitter: 2
 sentiment_analyzer: 2

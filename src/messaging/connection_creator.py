@@ -2,7 +2,7 @@ from src.messaging.broker import RabbitMQBroker
 from src.messaging.connection import Connection, MultiPublisherConnection
 from src.messaging.consumer import BroadcastConsumer, NamedQueueConsumer
 from src.messaging.protocol.message import MessageType
-from src.messaging.publisher import BroadcastPublisher, DirectPublisher
+from src.messaging.publisher import BroadcastPublisher, DirectPublisher, Publisher
 from src.utils.config import Config
 
 
@@ -42,11 +42,11 @@ class ConnectionCreator:
 
         if len(consumers_config) > 0:
             if consumers_config[0]['type'] == 'broadcast':
-                consumer = BroadcastConsumer(broker_cons, consumers_config[0]['queue'])
+                consumer = BroadcastConsumer(broker_cons, consumers_config[0]['exchange'], consumers_config[0]['queue'])
             else:
                 consumer = NamedQueueConsumer(broker_cons, consumers_config[0]['queue'])
 
-        publishers = {}
+        publishers: list[tuple[MessageType, Publisher]] = []
 
         for p in config.publishers:
             msg_type = MessageType(p['msg_type'])
@@ -56,6 +56,6 @@ class ConnectionCreator:
             else:
                 publisher = DirectPublisher(broker_pub, p['queue'])
 
-            publishers[msg_type] = publisher
+            publishers.append((msg_type, publisher))
 
         return MultiPublisherConnection(broker_cons, broker_pub, publishers, consumer)

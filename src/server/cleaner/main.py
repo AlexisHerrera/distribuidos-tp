@@ -1,5 +1,6 @@
 import logging
 import os
+import csv
 import queue
 import signal
 import socket
@@ -60,6 +61,8 @@ class Cleaner:
             target=self._receive_results_loop, name='ResultsQueueThread', daemon=True
         )
 
+        self.clients_uuids = self._load_clients_uuids('clients_uuids.csv')
+
         try:
             self.port = int(os.getenv('SERVER_PORT', '12345'))
             self.backlog = int(os.getenv('LISTENING_BACKLOG', '3'))
@@ -72,6 +75,17 @@ class Cleaner:
             raise ValueError(f'Configuration error: {e}') from e
 
         logger.info('Cleaner initialized.')
+
+    def _load_clients_uuids(self, filepath: str) -> list[str]:
+        uuids = []
+        try:
+            with open(filepath, mode='r', newline='') as csvfile:
+                reader = csv.reader(csvfile)
+                for row in reader:
+                    uuids.extend(uuid.strip() for uuid in row if uuid.strip())
+        except Exception as e:
+            logger.error(f'Failed to read UUIDs from {filepath}: {e}', exc_info=True)
+        return uuids
 
     def _handshake(self, client_socket, address) -> uuid.UUID | None:
         def update_socket(state):
@@ -625,7 +639,18 @@ class Cleaner:
             logger.info('Cleaner has finished its run method.')
 
     def generate_user_id(self) -> uuid.UUID:
-        return uuid.uuid4()
+        try:
+            user_id_str = self.clients_uuids.pop()
+            user_id = uuid.UUID(user_id_str)
+            logger.debug(f'Popped user_id from stack: {user_id}')
+        except IndexError:
+            logger.warning('UUID list is empty. Generating a random UUID instead.')
+            user_id = uuid.uuid4()
+        except ValueError as e:
+            logger.error(f'Invalid UUID format popped from list: {e}', exc_info=True)
+            user_id = uuid.uuid4()
+
+        return user_id
 
 
 if __name__ == '__main__':
