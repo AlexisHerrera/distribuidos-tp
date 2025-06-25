@@ -145,35 +145,19 @@ def create_sink(n: int):
 """
 
 
-def create_joiner(joiner_type: str) -> str:
-    WATCHER_NODES.append(joiner_type)
-    return f"""
-  {joiner_type}:
-    container_name: {joiner_type}
-    build:
-      context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/joiners/main.py", {joiner_type}]
-    networks:
-      - {NETWORK_NAME}
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./src/server/joiners/{joiner_type}_config.yaml:/app/config.yaml
-    """
-
-
 def create_node(service: ScalableService, index: int, uuids: list[str] = None):
     container = f'{service.name}-{index}'
 
     WATCHER_NODES.append(container)
 
-    peers = [
-        f'{service.name}-{i}:{service.port}'
-        for i in range(1, service.nodes + 1)
-        if i != index
-    ]
+    if service.name in ('ratings_joiner', 'cast_joiner'): # As each instance is independent of the other.
+        peers = []
+    else:
+        peers = [
+            f'{service.name}-{i}:{service.port}'
+            for i in range(1, service.nodes + 1)
+            if i != index
+        ]
 
     peers_env = ','.join(peers)
     state_volume_path = f'./.state/{container}'
