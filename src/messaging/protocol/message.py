@@ -15,6 +15,7 @@ from src.messaging.protocol.movie_rating_count import MovieRatingCounterProtocol
 from src.messaging.protocol.movie_sentiment import MovieSentimentProtocol
 from src.messaging.protocol.null import NullProtocol
 from src.messaging.protocol.rating import RatingProtocol
+from src.messaging.protocol.window import WindowProtocol
 
 
 class MessageType(Enum):
@@ -33,6 +34,7 @@ class MessageType(Enum):
     EOF = 100
     ACK = 101
     HANDSHAKE_SESSION = 102
+    WINDOW = 103
 
     @classmethod
     def _missing_(cls, value):
@@ -153,5 +155,7 @@ class Message:
                 return MovieRatingAvgProtocol()
             case MessageType.EOF:
                 return EOFProtocol()
+            case MessageType.WINDOW:
+                return WindowProtocol()
             case _:
                 return NullProtocol()
