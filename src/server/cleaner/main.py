@@ -19,9 +19,7 @@ from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
 from src.server.cleaner.CleanerStateMachine import CleanerStateMachine
 from src.server.healthcheck import Healthcheck
-# from src.server.leader_election import chaos_test
 
-# from src.server.leader_election import chaos_test
 from src.utils.config import Config
 from src.utils.log import initialize_log
 from src.utils.state_manager import StateManager
@@ -251,9 +249,9 @@ class Cleaner:
             batches_to_read = int(window_message.data)
 
             for _i in range(batches_to_read):
-                # if i == 5:
+                # if _i == 5:
                 #     chaos_test(0.01, 'Crash in middle of batch read.'
-                #                      'Should go back to last ACK')
+                #                      'Batch ')
                 # it is guaranteed that client will
                 # not send data message after EOF, until receives from client an ACK
                 raw_batch_bytes = receive_message(client_socket)
@@ -274,7 +272,6 @@ class Cleaner:
         batch = Batch.from_bytes(raw_batch_bytes)
         if not batch:
             raise ValueError(f'[{user_id}] Failed to decode batch during processing.')
-
         config_current_stage = state_machine.get_current_config()
         expected_batch_type = config_current_stage['batch_type']
         if batch.type == BatchType.EOF:
@@ -306,10 +303,12 @@ class Cleaner:
 
         object_list = batch_to_list_objects(batch)
         if object_list:
-            output_message = Message(user_id, associated_message_type, object_list)
+            output_message = Message(
+                user_id, associated_message_type, object_list, message_id=batch.id
+            )
             self.connection.send(output_message)
-            logger.debug(
-                f'[{user_id}] Published batch of {len(object_list)} objects of type {associated_message_type.name}.'
+            logger.info(
+                f'[{user_id}] Published batch id {batch.id} of {len(object_list)} objects of type {associated_message_type.name}.'
             )
 
     def _publish_eof(self, user_id: uuid.UUID, stream_message_type: MessageType):
