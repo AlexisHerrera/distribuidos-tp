@@ -3,7 +3,7 @@ import subprocess
 import time
 from threading import Lock
 
-from src.messaging.protocol.healthcheck import HealthcheckerProtocol
+from src.messaging.protocol.healthcheck import HealthcheckProtocol
 from src.messaging.tcp_socket import SocketDisconnected, TCPSocket
 
 logger = logging.getLogger(__name__)
@@ -38,18 +38,16 @@ class Healthchecker:
                         f'[HEALTHCHECKER] Sending healthcheck to {self.node_name}'
                     )
                     self.socket.send(
-                        HealthcheckerProtocol.PING,
-                        HealthcheckerProtocol.MESSAGE_BYTES_AMOUNT,
+                        HealthcheckProtocol.PING,
+                        HealthcheckProtocol.MESSAGE_BYTES_AMOUNT,
                     )
 
                     logger.debug(
                         f'[HEALTHCHECKER] Waiting healthcheck of {self.node_name}'
                     )
-                    message = self.socket.recv(
-                        HealthcheckerProtocol.MESSAGE_BYTES_AMOUNT
-                    )
+                    message = self.socket.recv(HealthcheckProtocol.MESSAGE_BYTES_AMOUNT)
 
-                    if message == HealthcheckerProtocol.PONG:
+                    if message == HealthcheckProtocol.PONG:
                         logger.debug(
                             f'[HEALTHCHECKER] Received healthcheck from {self.node_name}. Sleeping...'
                         )

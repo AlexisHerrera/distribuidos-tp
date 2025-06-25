@@ -2,7 +2,7 @@ import logging
 import threading
 from queue import Empty, SimpleQueue
 
-from src.messaging.protocol.healthcheck import HealthcheckerProtocol
+from src.messaging.protocol.healthcheck import HealthcheckProtocol
 from src.messaging.server_socket import ServerSocket
 from src.messaging.tcp_socket import TCPSocket
 
@@ -23,16 +23,14 @@ class Healthcheck:
     def _manage_client(self, socket: TCPSocket, addr: tuple):
         try:
             while self._is_running():
-                message = socket.recv(HealthcheckerProtocol.MESSAGE_BYTES_AMOUNT)
+                message = socket.recv(HealthcheckProtocol.MESSAGE_BYTES_AMOUNT)
                 logger.debug(f'[HEALTHCHECK] Received {message} from {addr}')
 
                 socket.send(
-                    HealthcheckerProtocol.PONG,
-                    HealthcheckerProtocol.MESSAGE_BYTES_AMOUNT,
+                    HealthcheckProtocol.PONG,
+                    HealthcheckProtocol.MESSAGE_BYTES_AMOUNT,
                 )
-                logger.debug(
-                    f'[HEALTHCHECK] Sent {HealthcheckerProtocol.PONG} to {addr}'
-                )
+                logger.debug(f'[HEALTHCHECK] Sent {HealthcheckProtocol.PONG} to {addr}')
         except Exception as e:
             logger.error(
                 f'[HEALTHCHECK] Error while managing client in healthcheck: {e}'
