@@ -56,16 +56,16 @@ class MultiPublisherConnection:
         self.__consumer = consumer
         self._pub_lock = threading.Lock()
 
-    def _get_publisher(self, message: Message) -> Publisher | None:
-        publishers_by_message_type = self._get_publishers_by_message_type(message)
+    def _get_publisher(self, message: Message, message_type: MessageType) -> Publisher | None:
+        publishers_by_message_type = self._get_publishers_by_message_type(message_type)
         
         if(len(publishers_by_message_type) == 1):
             return publishers_by_message_type[0]
         else: # Only for Direct Publishers with more than one client.
             return self._get_publisher_for_client(publishers_by_message_type,message.user_id)
     
-    def _get_publishers_by_message_type(self, message: Message) -> list[Publisher] | None:
-        return [publisher for message_type, publisher in self.__publishers if message_type == message.message_type]
+    def _get_publishers_by_message_type(self, message_type: MessageType) -> list[Publisher] | None:
+        return [publisher for message_type, publisher in self.__publishers if message_type == message_type]
     
     def _get_publisher_for_client(
         self,
@@ -97,7 +97,7 @@ class MultiPublisherConnection:
             )
             return
 
-        publisher = self._get_publisher(message)
+        publisher = self._get_publisher(message, message.message_type)
         if not publisher:
             logger.error(
                 f'Message type {message.message_type} not in publishers for send'
@@ -114,7 +114,7 @@ class MultiPublisherConnection:
             )
             return
 
-        publisher = self._get_publisher(eof_message)
+        publisher = self._get_publisher(eof_message, target_queue_type)
         if not publisher:
             logger.error(
                 f'[{eof_message.user_id}] Target queue type {target_queue_type} for EOF not in publishers'

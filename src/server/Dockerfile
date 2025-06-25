@@ -3,8 +3,8 @@ FROM python:3.12-alpine
 RUN apk update
 RUN apk add docker
 
-ENV PYTHONUNBUFFERED 1
-ENV PYTHONPATH /app
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 WORKDIR /app
 
