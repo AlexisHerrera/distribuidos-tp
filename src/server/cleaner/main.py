@@ -19,6 +19,7 @@ from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
 from src.server.cleaner.CleanerStateMachine import CleanerStateMachine
 from src.server.healthcheck import Healthcheck
+# from src.server.leader_election import chaos_test
 
 # from src.server.leader_election import chaos_test
 from src.utils.config import Config
@@ -249,7 +250,10 @@ class Cleaner:
                 raise ValueError(f'Expected WINDOW message, received: {window_message}')
             batches_to_read = int(window_message.data)
 
-            for _ in range(batches_to_read):
+            for _i in range(batches_to_read):
+                # if i == 5:
+                #     chaos_test(0.01, 'Crash in middle of batch read.'
+                #                      'Should go back to last ACK')
                 # it is guaranteed that client will
                 # not send data message after EOF, until receives from client an ACK
                 raw_batch_bytes = receive_message(client_socket)
