@@ -275,8 +275,8 @@ class BaseNode(ABC):
                 )
             else:    
                 self.connection.thread_safe_send(eof_message)
+                logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')
 
-            logger.info(f'EOF SENT to queue {self.config.publishers[0]["queue"]}')
         except Exception as e:
             logger.error(f'Could not publish EOF: {e}')
 
