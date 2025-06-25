@@ -14,7 +14,7 @@ connection:
     - type: direct
       queue: credits_clean
       msg_type: Cast
-heartbeat:
+healthcheck:
   port: 13434
 log:
   level: INFO

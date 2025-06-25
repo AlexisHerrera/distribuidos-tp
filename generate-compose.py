@@ -19,7 +19,7 @@ class ScalableService:
         nodes: int,
         command: str,
         config_file: str,
-        port: int,
+        port: int = BASE_PORT,
         dockerfile: str = 'src/server/Dockerfile',
     ):
         self.name = name
@@ -36,7 +36,7 @@ class Config:
 
         if 'all' in self.__dict__ and self.all is not None and self.all > 0:
             for k in self.__dict__.keys():
-                if k == 'clients' or k == 'ratings_joiner' or k == 'cast_joiner':
+                if k == 'clients' or k == 'ratings_joiner' or k == 'cast_joiner' or k == 'watcher':
                     continue
                 self.__dict__[k] = self.all
 
@@ -100,6 +100,8 @@ def create_client(client_id: int, dataset_path: str):
 
 def create_cleaner():
     WATCHER_NODES.append('cleaner')
+    state_volume_path = './.state/cleaner'
+
     return f"""cleaner:
     container_name: cleaner
     build:
@@ -109,9 +111,6 @@ def create_cleaner():
     environment:
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
-      - BATCH_SIZE_MOVIES=20
-      - BATCH_SIZE_RATINGS=100
-      - BATCH_SIZE_CREDITS=20
     networks:
       - {NETWORK_NAME}
     depends_on:
@@ -120,14 +119,17 @@ def create_cleaner():
     volumes:
       - ./src/server/cleaner/config.yaml:/app/config.yaml
       - ./clients_uuids.csv:/app/clients_uuids.csv
+      - {state_volume_path}:/app/state
 """
 
 
 def create_sink(n: int):
-    WATCHER_NODES.append(f'q{n}_sink')
+    container = f'q{n}_sink'
+    WATCHER_NODES.append(container)
+    state_volume_path = f'./.state/{container}'
     return f"""
-  q{n}_sink:
-    container_name: q{n}_sink
+  {container}:
+    container_name: {container}
     build:
       context: .
       dockerfile: src/server/Dockerfile
@@ -139,6 +141,7 @@ def create_sink(n: int):
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q{n}_config.yaml:/app/config.yaml
+      - {state_volume_path}:/app/state
 """
 
 
@@ -173,6 +176,7 @@ def create_node(service: ScalableService, index: int, uuids: list[str] = None):
     ]
 
     peers_env = ','.join(peers)
+    state_volume_path = f'./.state/{container}'
 
     if (service.name == 'ratings_joiner' or service.name == 'cast_joiner') and uuids is not None:
         base, ext = os.path.splitext(service.config_file)
@@ -197,6 +201,7 @@ def create_node(service: ScalableService, index: int, uuids: list[str] = None):
         condition: service_healthy
     volumes:
       - {config_file_path}:/app/config.yaml
+      - {state_volume_path}:/app/state
   """
 
 
@@ -207,34 +212,65 @@ def create_scalable(service: ScalableService, uuids: list[str] = None):
     return nodes
 
 
-def create_watcher():
-    data = {}
-    with open(WATCHER_CONFIG_PATH, 'r', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
+def create_watcher(watcher: ScalableService):
+    watchers = ''
+    for i in range(1, watcher.nodes + 1):
+        container_name = f'{watcher.name}-{i}'
 
-    with open(WATCHER_CONFIG_PATH, 'w', encoding='utf-8') as f:
-        data['nodes'] = WATCHER_NODES
-        yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
+        peers = [
+            f'{j}:{watcher.name}-{j}' for j in range(1, watcher.nodes + 1) if j != i
+        ]
+        peers_env = ','.join(peers)
 
-    return f"""watcher:
-    container_name: watcher
+        watchers += f"""{container_name}:
+    container_name: {container_name}
     build:
       context: .
-      dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/watcher/main.py"]
+      dockerfile: {watcher.dockerfile}
+    command: {watcher.command}
+    networks:
+      - {NETWORK_NAME}
+    environment:
+      - NODE_ID={i}
+      - PEERS={peers_env}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/watcher/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+  """
+    return watchers
+
+
+def create_chaos_monkey():
+    container_name = 'chaos_monkey'
+    return f"""{container_name}:
+    container_name: {container_name}
+    build:
+      context: .
+      dockerfile: 'src/server/Dockerfile'
+    command: ["python", "./src/utils/chaos_monkey/main.py"]
     networks:
       - {NETWORK_NAME}
     depends_on:
       rabbitmq:
         condition: service_healthy
+    profiles: [chaos]
     volumes:
-      - ./src/server/watcher/config.yaml:/app/config.yaml
+      - ./src/utils/chaos_monkey/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
       - /var/run/docker.sock:/var/run/docker.sock
   """
 
 
 def create_services(
-    scalable_services: list[ScalableService], config: Config, dataset_path: str, uuids: list[str]
+    scalable_services: list[ScalableService],
+    config: Config,
+    dataset_path: str,
+    uuids: list[str],
+    watcher: ScalableService,
 ):
     rabbitmq = create_rabbitmq()
     clients = ''
@@ -251,7 +287,9 @@ def create_services(
         else:
             services += create_scalable(service)
 
-    watcher = create_watcher()
+    watchers = create_watcher(watcher)
+
+    chaos_monkey = create_chaos_monkey()
 
     return f"""
 services:
@@ -260,7 +298,8 @@ services:
   {cleaner}
   {services}
   {sinks}
-  {watcher}
+  {watchers}
+  {chaos_monkey}
 """
 
 
@@ -291,10 +330,14 @@ def parse_args():
 
 
 def create_docker_compose_data(
-    scalable_services: list[ScalableService], config: Config, dataset_path: str, uuids: list[str]
+    scalable_services: list[ScalableService],
+    config: Config,
+    dataset_path: str,
+    uuids: list[str],
+    watcher: ScalableService,
 ):
     base = create_docker_compose_base()
-    services = create_services(scalable_services, config, dataset_path, uuids)
+    services = create_services(scalable_services, config, dataset_path, uuids, watcher)
     networks = create_networks()
 
     return base + services + networks
@@ -444,17 +487,18 @@ def main():
 
     dataset_path = SMALL_DATASET_PATH if args.small_dataset else DATASET_PATH
 
-    content = create_docker_compose_data(scalable_services, config, dataset_path, uuids)
+    watcher = ScalableService(
+        name='watcher',
+        nodes=config.watcher,
+        command='["python", "./src/server/watcher/main.py"]',
+        config_file='./src/server/watcher/config.yaml',
+    )
+    content = create_docker_compose_data(
+        scalable_services, config, dataset_path,uuids, watcher
+    )
 
     with open(DOCKER_COMPOSE_FILENAME, 'w', encoding='utf-8') as f:
         f.write(content)
-
-    with open(WATCHER_CONFIG_PATH, 'r+', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-
-        data['nodes'] = WATCHER_NODES
-        f.seek(0)
-        yaml.dump(data, f, indent=4, encoding='utf-8', sort_keys=False)
 
 
 if __name__ == '__main__':

@@ -2,20 +2,15 @@ import time
 import unittest
 
 from src.messaging.tcp_socket import TCPSocket
-from src.server.heartbeat import Heartbeat
+from src.server.healthcheck import Healthcheck
 
 
-class TestHeartbeat:
-    class Config:
-        def __init__(self):
-            self.heartbeat_port = 13434
-            self.heartbeat_watcher_port = 13435
-
-    def test_heartbeat(self):
-        config = TestHeartbeat.Config()
-        heartbeat = Heartbeat(config)
+class TestHealthcheck:
+    def test_healthcheck(self):
+        healthcheck_port = 13434
+        healthcheck = Healthcheck(healthcheck_port)
         watcher = None
-        addr = ('127.0.0.1', config.heartbeat_port)
+        addr = ('127.0.0.1', healthcheck_port)
         tries = 0
         while tries < 3:
             try:
@@ -26,7 +21,7 @@ class TestHeartbeat:
                 time.sleep(1)
 
         if watcher is None:
-            heartbeat.stop()
+            healthcheck.stop()
             raise AssertionError
 
         message = b'H'
@@ -38,7 +33,7 @@ class TestHeartbeat:
         expected_bytes_amount = len(expected_message)
         recv_message = watcher.recv(expected_bytes_amount)
         watcher.stop()
-        heartbeat.stop()
+        healthcheck.stop()
 
         assert recv_message == expected_message
 

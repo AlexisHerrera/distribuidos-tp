@@ -9,8 +9,7 @@ connection:
       queue: another_queue
     - type: broadcast
       queue: other_queue
-heartbeat:
+healthcheck:
   port: 13434
-  watcher_port: 13434
 log:
   level: ERROR

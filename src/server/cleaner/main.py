@@ -7,10 +7,10 @@ import socket
 import sys
 import threading
 import uuid
-from collections import defaultdict
 from queue import Queue
+from typing import Callable
 
-from src.common.protocol.batch import Batch, BatchType
+from src.common.protocol.batch import Batch, BatchType, batch_to_list_objects
 from src.common.socket_communication import (
     create_server_socket,
     receive_message,
@@ -18,17 +18,21 @@ from src.common.socket_communication import (
 )
 from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
-from src.model.cast import Cast
-from src.model.movie import Movie
-from src.model.rating import Rating
-from src.server.cleaner.clean_credits import parse_line_to_credits
-from src.server.cleaner.clean_movies import parse_line_to_movie
-from src.server.cleaner.clean_ratings import parse_line_to_rating
-from src.server.heartbeat import Heartbeat
+from src.server.cleaner.CleanerStateMachine import CleanerStateMachine
+from src.server.healthcheck import Healthcheck
+
+# from src.server.leader_election import chaos_test
 from src.utils.config import Config
 from src.utils.log import initialize_log
+from src.utils.state_manager import StateManager
+from src.utils.wal_manager import WALManager
 
 logger = logging.getLogger(__name__)
+
+CLEANER_STATE_DIR = '/app/state'
+WAL_DIR = os.path.join(CLEANER_STATE_DIR, 'wal')
+STATE_FILE = 'state.json'
+PENDING_RESULTS_WAL_DIR = os.path.join(CLEANER_STATE_DIR, 'pending_results_wal')
 
 
 class Cleaner:
@@ -36,18 +40,26 @@ class Cleaner:
         logger.info('Initializing Cleaner...')
         self.config = config
         self.is_running = True
-        self.heartbeat: Heartbeat = Heartbeat(config)
+        self.healthcheck: Healthcheck = Healthcheck(config.healthcheck_port)
         self.connection = ConnectionCreator.create_multipublisher(config)
         self.server_socket = None
         self.expected_query_count = 5
-        self.client_data = {}
-        self.client_data_lock = threading.Lock()
-        self.next_user_id = 0
-        self.user_id_lock = threading.Lock()
+
+        # State management
+        self.state_manager = StateManager(STATE_FILE)
+        # WAL messages (input tcp from client)
+        self.client_input_wal_manager = WALManager(WAL_DIR)
+        # Wal manager for results
+        self.pending_results_wal_manager = WALManager(PENDING_RESULTS_WAL_DIR)
+
+        # clients = { "user_id" : { 'socket': client_socket, 'queries_received': number, 'lock': threading.Lock()}}
+        self.clients = {}
+        self.clients_lock = threading.Lock()
+        self._load_clients()
         # Sender Thread
-        self.send_queue: Queue[tuple[int, bytes]] = queue.Queue()
+        self.send_queue: Queue[tuple[uuid.UUID, bytes, str]] = queue.Queue()
         self.sender_thread = threading.Thread(
-            target=self._send_loop, name='SenderThread', daemon=True
+            target=self._send_results_to_client_loop, name='SenderThread', daemon=True
         )
         self.results_processing_thread = threading.Thread(
             target=self._receive_results_loop, name='ResultsQueueThread', daemon=True
@@ -85,90 +97,268 @@ class Cleaner:
                 f'Signal {signal.Signals(signum).name} received. Initiating shutdown...'
             )
             self.shutdown()
+    def _recover_from_wal(self):
+        logger.info('Attempting to recover batches from WAL...')
+        recovered_batches = self.client_input_wal_manager.recover()
 
-        signal.signal(signal.SIGTERM, signal_handler)
-        signal.signal(signal.SIGINT, signal_handler)
-        logger.info('Signal handlers configured.')
+        for filepath, raw_batch_bytes in recovered_batches:
+            try:
+                filename = os.path.basename(filepath)
+                user_id_str = filename.split('_')[0]
+                user_id = uuid.UUID(user_id_str)
+                logger.info(f'Recovering batch for user {user_id} from {filename}')
+                self._process_and_send_batch(user_id, raw_batch_bytes)
 
-    def _setup_server_socket(self):
-        if not self.is_running:
-            return False
+                self.client_input_wal_manager.remove_entry(filepath)
+            except Exception as e:
+                logger.error(
+                    f'Failed to recover batch from WAL file {filepath}: {e}',
+                    exc_info=True,
+                )
+
+    def _handle_single_client(self, client_socket, address_tuple):
+        address = f'{address_tuple[0]}:{address_tuple[1]}'
+        user_id = None
+
         try:
-            logger.info(f'Setting up server socket on port {self.port}...')
-            self.server_socket = create_server_socket(self.port, self.backlog)
-            logger.info('Server socket listening.')
-            return True
+            # Handshake
+            raw_handshake = receive_message(client_socket)
+            handshake_msg = Message.from_bytes(raw_handshake)
+
+            if handshake_msg.message_type != MessageType.HANDSHAKE_SESSION:
+                logger.error(
+                    f'Connection from {address} did not start with a handshake. Closing.'
+                )
+                return
+
+            client_provided_id = handshake_msg.user_id
+            is_new_client = client_provided_id == uuid.UUID(int=0)
+
+            if is_new_client:
+                user_id = self.generate_user_id()
+                logger.info(
+                    f'New client from {address}. Assigned new session ID: {user_id}'
+                )
+
+                def create_session(state):
+                    state['socket'] = client_socket
+
+                self._update_client_state(user_id, create_session)
+            else:
+                user_id = client_provided_id
+                logger.info(
+                    f'Client reconnected from {address}. Resuming session ID: {user_id}'
+                )
+
+                def resume_session(state):
+                    state['socket'] = client_socket
+
+                self._update_client_state(user_id, resume_session)
+
+            # Confirm handshake
+            response_msg = Message(user_id, MessageType.HANDSHAKE_SESSION)
+            send_message(client_socket, response_msg.to_bytes())
+
+            # Get client lock
+            with self.clients_lock:
+                client_lock = self.clients[user_id]['lock']
+
+            # Loop after handshake
+            while self.is_running:
+                with self.clients_lock:
+                    client_state = self.clients.get(user_id)
+                    if not client_state or not client_state.get('socket'):
+                        logger.warning(
+                            f'[{user_id}] Session terminated or socket closed externally.'
+                        )
+                        break
+
+                state_machine = CleanerStateMachine(client_state['stage'])
+                if state_machine.is_finished():
+                    logger.info(
+                        f'[{user_id}] Session is already finished. Waiting for final results.'
+                    )
+                    break
+
+                stage_config = state_machine.get_current_config()
+                logger.info(f'[{user_id}] Executing stage: {client_state["stage"]}')
+
+                success = self._process_client_data(
+                    user_id, client_socket, stage_config, client_lock
+                )
+                if not success:
+                    raise ConnectionError(
+                        f'Failed to process stream for stage {client_state["stage"]}'
+                    )
+
+        except (
+            ConnectionError,
+            ConnectionResetError,
+            ConnectionAbortedError,
+            socket.error,
+        ) as e:
+            logger.warning(
+                f'[{user_id}] Connection error with client {address}: {e}. Disconnecting.'
+            )
         except Exception as e:
-            logger.critical(f'Failed to set up server socket: {e}', exc_info=True)
-            self.is_running = False
-            return False
+            logger.error(
+                f'[{user_id}] Unhandled error in client handler for {address}: {e}',
+                exc_info=True,
+            )
+        finally:
+            logger.debug(f'[{user_id}] Client handler thread for {address} is ending.')
 
-    def batch_to_list_objects(self, batch: Batch) -> list:
-        if batch.type == BatchType.MOVIES:
-            return self._batch_data_to_movies(batch.data)
-        elif batch.type == BatchType.CREDITS:
-            return self._batch_data_to_credits(batch.data)
-        elif batch.type == BatchType.RATINGS:
-            return self._batch_data_to_ratings(batch.data)
-        else:
-            logger.warning(f'No parser implemented for BatchType: {batch.type.name}')
-            return []
+    def _update_client_state(
+        self, user_id: uuid.UUID, update_func: Callable[[dict], None]
+    ):
+        with self.clients_lock:
+            client_state = self.clients.setdefault(
+                user_id,
+                {
+                    'user_id': user_id,
+                    'stage': CleanerStateMachine.STAGES[0],
+                    'queries_received': 0,
+                    'socket': None,
+                    'lock': threading.Lock(),
+                },
+            )
+            update_func(client_state)
+            self._save_all_clients_state()
 
-    def _batch_data_to_movies(self, data_lines: list[str]) -> list[Movie]:
-        parsed_movies = []
-        for line in data_lines:
-            if not self.is_running:
-                break
-            if not line.strip():
-                continue
-            movie = parse_line_to_movie(line)
-            if movie:
-                parsed_movies.append(movie)
+    def _save_all_clients_state(self):
+        state_to_persist = {}
+        for user_id, data in self.clients.items():
+            state_to_persist[str(user_id)] = {
+                'stage': data['stage'],
+                'queries_received': data['queries_received'],
+            }
+        self.state_manager.save_state(state_to_persist)
 
-        return parsed_movies
+    def _load_clients(self):
+        logger.info('Loading client states from disk...')
+        persisted_states = self.state_manager.load_state()
 
-    def _batch_data_to_credits(self, data_lines: list[str]) -> list[Cast]:
-        parsed_credits = []
-        for line in data_lines:
-            if not self.is_running:
-                break
-            if not line.strip():
-                continue
-            credits = parse_line_to_credits(line)
-            if credits:
-                parsed_credits.append(credits)
+        with self.clients_lock:
+            for user_id_str, data in persisted_states.items():
+                user_id = uuid.UUID(user_id_str)
+                self.clients[user_id] = {
+                    'user_id': user_id,
+                    'stage': data.get('stage', CleanerStateMachine.STAGES[0]),
+                    'queries_received': data.get('queries_received', 0),
+                    'socket': None,
+                    'lock': threading.Lock(),
+                }
 
-        return parsed_credits
+        logger.info(f'Restored {len(self.clients)} client states into memory.')
 
-    def _batch_data_to_ratings(self, data_lines: list[str]) -> list[Rating]:
-        parsed_ratings = []
-        for line in data_lines:
-            if not self.is_running:
-                break
-            if not line.strip():
-                continue
-            rating = parse_line_to_rating(line)
-            if rating:
-                parsed_ratings.append(rating)
+    def _advance_session_stage(self, user_id: uuid.UUID):
+        def advance(state):
+            state_machine = CleanerStateMachine(state['stage'])
+            state_machine.advance()
+            state['stage'] = state_machine.stage
+            logger.info(
+                f'Session for user {user_id} advanced to stage [{state["stage"]}]'
+            )
 
-        return parsed_ratings
+        self._update_client_state(user_id, advance)
+
+    def _cleanup_pending_results_wal(self, user_id: uuid.UUID):
+        """Deletes al results from a user, it is only executed when client has received all"""
+        logger.info(f'[{user_id}] Cleaning up pending result WAL files.')
+        wal_dir = self.pending_results_wal_manager.wal_dir
+        user_id_prefix = str(user_id)
+
+        try:
+            for filename in os.listdir(wal_dir):
+                if filename.startswith(user_id_prefix) and filename.endswith('.wal'):
+                    filepath_to_remove = os.path.join(wal_dir, filename)
+                    self.pending_results_wal_manager.remove_entry(filepath_to_remove)
+        except FileNotFoundError:
+            logger.warning(
+                f'WAL directory {wal_dir} not found during cleanup for user {user_id}. Nothing to do.'
+            )
+        except Exception as e:
+            logger.error(
+                f'[{user_id}] Error during pending results WAL cleanup: {e}',
+                exc_info=True,
+            )
+
+    def _cleanup_client(self, user_id: uuid.UUID):
+        logger.info(f'[{user_id}] Cleaning up all resources and persistent state.')
+        self._cleanup_pending_results_wal(user_id)
+
+        with self.clients_lock:
+            client_info = self.clients.pop(user_id, None)
+            if client_info:
+                self._save_all_clients_state()
+                sock = client_info.get('socket')
+                if sock:
+                    try:
+                        sock.close()
+                    except (socket.error, OSError):
+                        pass
+
+    def _process_and_send_batch(self, user_id: uuid.UUID, raw_batch_bytes: bytes):
+        # chaos_test(0.001, 'Crash 0.1% before reading from TCP')
+        batch = Batch.from_bytes(raw_batch_bytes)
+        if not batch:
+            raise ValueError(f'[{user_id}] Failed to decode batch during processing.')
+
+        message_type_map = {
+            BatchType.MOVIES: MessageType.Movie,
+            BatchType.CREDITS: MessageType.Cast,
+            BatchType.RATINGS: MessageType.Rating,
+        }
+        associated_message_type = message_type_map.get(batch.type)
+
+        if batch.type == BatchType.EOF:
+            with self.clients_lock:
+                client_state = self.clients.get(user_id)
+                if not client_state:
+                    raise ValueError(
+                        f'Cannot process EOF for user {user_id}: session not found.'
+                    )
+                current_stage = client_state['stage']
+            stage_config = CleanerStateMachine.STAGE_CONFIG.get(current_stage, {})
+            eof_message_type = stage_config.get('message_type')
+
+            if not eof_message_type:
+                raise ValueError(
+                    f'Cannot process EOF for user {user_id}: invalid stage {current_stage}'
+                )
+
+            self._publish_eof(user_id, eof_message_type)
+            self._advance_session_stage(user_id)
+            return
+
+        if not associated_message_type:
+            logger.warning(f'No MessageType mapping for BatchType: {batch.type}')
+            return
+
+        object_list = batch_to_list_objects(batch)
+        if object_list:
+            output_message = Message(user_id, associated_message_type, object_list)
+            self.connection.send(output_message)
+            logger.debug(
+                f'[{user_id}] Published batch of {len(object_list)} objects of type {associated_message_type.name}.'
+            )
 
     def _process_client_data(
         self,
         user_id: uuid.UUID,
         client_socket,
-        data_type_label: str,
-        associated_message_type: MessageType,
+        stage_config: dict,
+        client_lock: threading.Lock,
     ):
+        data_type_label = stage_config['label']
         if not self.is_running or not client_socket:
             logger.error(
                 f'[{user_id}] Cannot process client data for {data_type_label}: component missing or not running.'
             )
             return False
-
-        logger.info(f'[{user_id}] Starting to process {data_type_label} from client...')
-        processed_counts = defaultdict(int)
-        total_batches = 0
+        logger.info(
+            f'[{user_id}] Starting to process stream [{data_type_label}] from client...'
+        )
 
         while self.is_running:
             try:
@@ -180,49 +370,24 @@ class Cleaner:
                     return False
 
                 batch = Batch.from_bytes(raw_batch_bytes)
-                total_batches += 1
-                if batch is None:
-                    logger.error(
-                        f'[{user_id}] Failed to decode Batch #{total_batches} for {data_type_label}.'
-                    )
-                    return False
-
-                logger.debug(
-                    f'[{user_id}] Received Batch #{total_batches} ({data_type_label}): Type={batch.type.name}, Lines={len(batch.data)}'
+                # Save batch on disk
+                wal_filepath = self.client_input_wal_manager.write_entry(
+                    user_id, batch.type.name, raw_batch_bytes
                 )
-
-                if batch.type == BatchType.EOF:
-                    logger.info(
-                        f'[{user_id}] EOF Batch received for {data_type_label}. End of this stream.'
-                    )
-                    self._publish_eof(user_id, associated_message_type)
-                    break
-
-                object_list = self.batch_to_list_objects(batch)
-                if not associated_message_type:
-                    logger.warning(
-                        f'[{user_id}] No target queue or message type defined for BatchType: {batch.type.name}. Skipping batch.'
-                    )
-                    continue
-
-                model_object_list = [obj for obj in object_list if self.is_running]
-                if not self.is_running and model_object_list:
-                    logger.info(
-                        f'[{user_id}] Server shutting down, aborting send for batch of {associated_message_type.name}'
+                try:
+                    ack_message = Message(user_id, MessageType.ACK, None)
+                    with client_lock:
+                        send_message(client_socket, ack_message.to_bytes())
+                    # logger.info(f'[{user_id}] Sent ACK to client for batch.')
+                except Exception as ack_e:
+                    logger.error(
+                        f'[{user_id}] Failed to send ACK to client: {ack_e}. Client will likely resend.'
                     )
                     return False
 
-                if model_object_list:
-                    output_message = Message(
-                        user_id, associated_message_type, model_object_list
-                    )
-
-                    self.connection.send(output_message)
-                    processed_counts[batch.type] += len(model_object_list)
-                    logger.debug(
-                        f'[{user_id}] Published {len(model_object_list)} objects of type {batch.type.name} from Batch #{total_batches}'
-                    )
-
+                self._process_and_send_batch(user_id, raw_batch_bytes)
+                # Remove because is already saved
+                self.client_input_wal_manager.remove_entry(wal_filepath)
             except ConnectionResetError:
                 logger.warning(
                     f'[{user_id}] Client connection reset during {data_type_label} processing.'
@@ -249,24 +414,7 @@ class Cleaner:
         logger.info(
             f'[{user_id}] Client data processing for {data_type_label} finished.'
         )
-        logger.info(
-            f'[{user_id}] Processing Summary for {data_type_label}: {dict(processed_counts)}'
-        )
         return True
-
-    def _receive_results_loop(self):
-        logger.info(
-            'Result processing thread started. Waiting for messages from queue...'
-        )
-        try:
-            self.connection.recv(self._process_message_from_queue)
-        except Exception as e:
-            if self.is_running:
-                logger.critical(
-                    f'Fatal error in result processing thread: {e}', exc_info=True
-                )
-        finally:
-            logger.info('Result processing thread finished.')
 
     def _publish_eof(self, user_id: uuid.UUID, stream_message_type: MessageType):
         try:
@@ -283,11 +431,25 @@ class Cleaner:
                 exc_info=True,
             )
 
+    def _receive_results_loop(self):
+        logger.info(
+            'Result processing thread started. Waiting for messages from queue...'
+        )
+        try:
+            self.connection.recv(self._process_message_from_queue)
+        except Exception as e:
+            if self.is_running:
+                logger.critical(
+                    f'Fatal error in result processing thread: {e}', exc_info=True
+                )
+        finally:
+            logger.info('Result processing thread finished.')
+
     def _process_message_from_queue(self, message: Message):
         user_id = message.user_id
 
-        with self.client_data_lock:
-            client_info = self.client_data.get(user_id)
+        with self.clients_lock:
+            client_info = self.clients.get(user_id)
 
         if not client_info:
             if message.message_type != MessageType.EOF:
@@ -318,22 +480,39 @@ class Cleaner:
         logger.info(f'[{user_id}] Received query result: {code}')
 
         payload = message.to_bytes()
-        self.send_queue.put((user_id, payload))
+        try:
+            wal_filepath = self.pending_results_wal_manager.write_entry(
+                user_id, message.message_type.name, payload
+            )
+        except Exception as e:
+            logger.critical(
+                f'[{user_id}] Failed to persist result to WAL. Message might be lost on restart. Error: {e}',
+                exc_info=True,
+            )
+            wal_filepath = None
 
-        logger.info(f'[{user_id}] Enqueued {code} for sending')
+        if wal_filepath:
+            self.send_queue.put((user_id, payload, wal_filepath))
+            logger.info(
+                f'[{user_id}] Enqueued {code} for sending and persisted to WAL.'
+            )
+        else:
+            # WAL Failed. Ignored because it will retry
+            pass
 
-    def _send_loop(self):
+    def _send_results_to_client_loop(self):
         while self.is_running or not self.send_queue.empty():
             try:
-                user_id, payload = self.send_queue.get(timeout=1)
+                user_id, payload, wal_filepath = self.send_queue.get(timeout=1)
             except queue.Empty:
                 continue
 
-            with self.client_data_lock:
-                client_info = self.client_data.get(user_id)
-            if not client_info:
-                logger.debug(
-                    f'[{user_id}] Client disconnected before sending query result'
+            with self.clients_lock:
+                client_info = self.clients.get(user_id)
+
+            if not client_info or not client_info.get('socket'):
+                logger.warning(
+                    f'[{user_id}] Client disconnected. Result from {wal_filepath} will be re-queued on next restart.'
                 )
                 self.send_queue.task_done()
                 continue
@@ -345,96 +524,32 @@ class Cleaner:
                 try:
                     logger.info(f'[{user_id}] Sending query result to client.')
                     send_message(client_socket, payload)
-                    client_info['queries_received'] += 1
-                    if client_info['queries_received'] >= self.expected_query_count:
+                    # It is going to be deleted on cleanup
+                    # self.pending_results_wal_manager.remove_entry(wal_filepath)
+
+                    def increment_queries(state):
+                        state['queries_received'] += 1
+
+                    self._update_client_state(user_id, increment_queries)
+
+                    with self.clients_lock:
+                        final_count = self.clients[user_id]['queries_received']
+
+                    if final_count >= self.expected_query_count:
+                        logger.info(
+                            f'[{user_id}] All expected query results received. Cleaning up client.'
+                        )
                         self._cleanup_client(user_id)
+                        # Si se cae acá, caso ultra borde, se pierde todo lo que el cliente
+                        # no haya leído. No hago ACK para no tener bloqueada la cola de results.
+                        # Tampoco hago que sea bloqueante para que no se mezcle con los acks que
+                        # recibe por medio de los datos.
                 except Exception as e:
                     logger.error(
                         f'[{user_id}] Error sending query result: {e}', exc_info=True
                     )
-                    self._cleanup_client(user_id)
                 finally:
                     self.send_queue.task_done()
-
-    def _handle_single_client(self, client_socket, client_address):
-        user_id = self.generate_user_id()
-
-        logger.info(
-            f'[{user_id}] New connection accepted from {client_address[0]}:{client_address[1]}. Handling in thread: {threading.current_thread().name}'
-        )
-
-        with self.client_data_lock:
-            self.client_data[user_id] = {
-                'socket': client_socket,
-                'queries_received': 0,
-                'lock': threading.Lock(),
-            }
-
-        all_data_processed_successfully = True
-        try:
-            if all_data_processed_successfully:
-                all_data_processed_successfully = self._process_client_data(
-                    user_id, client_socket, 'MOVIES', MessageType.Movie
-                )
-
-            if all_data_processed_successfully and self.is_running:
-                all_data_processed_successfully = self._process_client_data(
-                    user_id, client_socket, 'CREDITS', MessageType.Cast
-                )
-
-            if all_data_processed_successfully and self.is_running:
-                all_data_processed_successfully = self._process_client_data(
-                    user_id, client_socket, 'RATINGS', MessageType.Rating
-                )
-
-            if not self.is_running:
-                logger.info(
-                    f'[{user_id}] Server shutdown initiated. Aborting further processing for this client.'
-                )
-                all_data_processed_successfully = False
-
-            if all_data_processed_successfully:
-                logger.info(
-                    f'[{user_id}] All data streams received from client and corresponding EOFs published to message queue. Client connection remains open, awaiting query results.'
-                )
-            else:
-                logger.warning(
-                    f'[{user_id}] Data processing failed or was incomplete for one or more streams. Cleaning up client.'
-                )
-                self._cleanup_client(user_id)
-
-        except Exception as e:
-            logger.error(
-                f'[{user_id}] Unhandled error in client handler for {client_address[0]}:{client_address[1]}: {e}',
-                exc_info=True,
-            )
-            if self.is_running:
-                self._cleanup_client(user_id)
-        finally:
-            logger.debug(
-                f'[{user_id}] Client handler thread for {client_address[0]}:{client_address[1]} is ending.'
-            )
-
-    def _cleanup_client(self, user_id: uuid.UUID):
-        logger.info(f'[{user_id}] Cleaning up client resources.')
-        with self.client_data_lock:
-            client_info = self.client_data.pop(user_id, None)
-
-        if client_info:
-            client_socket = client_info['socket']
-            try:
-                client_socket.shutdown(socket.SHUT_RDWR)
-            except (socket.error, OSError):
-                pass
-            try:
-                client_socket.close()
-                logger.info(f'[{user_id}] Client socket closed.')
-            except (socket.error, OSError) as e:
-                logger.warning(f'[{user_id}] Error closing client socket: {e}')
-        else:
-            logger.warning(
-                f'[{user_id}] Attempted to clean up client, but not found in active list.'
-            )
 
     def shutdown(self):
         if not self.is_running:
@@ -450,8 +565,8 @@ class Cleaner:
                 logger.warning(f'Error closing server socket: {e}')
             self.server_socket = None
 
-        with self.client_data_lock:
-            active_user_ids = list(self.client_data.keys())
+        with self.clients_lock:
+            active_user_ids = list(self.clients.keys())
 
         logger.info(
             f'Found {len(active_user_ids)} active clients to clean up during shutdown.'
@@ -468,11 +583,64 @@ class Cleaner:
                 logger.error(f'Error closing messaging connection: {e}', exc_info=True)
 
         try:
-            self.heartbeat.stop()
+            self.healthcheck.stop()
         except Exception as e:
-            logger.error(f'Error stopping heartbeater: {e}')
+            logger.error(f'Error stopping healthchecker: {e}')
 
         logger.info('Cleaner shutdown sequence complete.')
+
+    def _setup_server_socket(self):
+        if not self.is_running:
+            return False
+        try:
+            logger.info(f'Setting up server socket on port {self.port}...')
+            self.server_socket = create_server_socket(self.port, self.backlog)
+            logger.info('Server socket listening.')
+            return True
+        except Exception as e:
+            logger.critical(f'Failed to set up server socket: {e}', exc_info=True)
+            self.is_running = False
+            return False
+
+    def _setup_signal_handlers(self):
+        def signal_handler(signum, frame):
+            logger.warning(
+                f'Signal {signal.Signals(signum).name} received. Initiating shutdown...'
+            )
+            self.shutdown()
+
+        signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+        logger.info('Signal handlers configured.')
+
+    def _recover_pending_results(self):
+        logger.info('Attempting to recover pending results from WAL...')
+        recovered_results = self.pending_results_wal_manager.recover()
+
+        for filepath, payload in recovered_results:
+            try:
+                filename = os.path.basename(filepath)
+                user_id_str = filename.split('_')[0]
+                user_id = uuid.UUID(user_id_str)
+                self.send_queue.put((user_id, payload, filepath))
+                logger.info(
+                    f'Re-enqueued pending result for user {user_id} from {filename}'
+                )
+
+            except (IndexError, ValueError) as e:
+                logger.error(
+                    f'Failed to parse user_id from pending result file {filepath}: {e}',
+                    exc_info=True,
+                )
+            except Exception as e:
+                logger.error(
+                    f'Failed to recover pending result from file {filepath}: {e}',
+                    exc_info=True,
+                )
+
+        logger.info(
+            f'Recovered and re-enqueued {len(recovered_results)} pending results.'
+        )
 
     def run(self):
         if not self.is_running:
@@ -482,6 +650,8 @@ class Cleaner:
             return
 
         self._setup_signal_handlers()
+        self._recover_from_wal()
+        self._recover_pending_results()
 
         if not self._setup_server_socket():
             logger.critical('Failed to setup server socket. Cleaner cannot run.')

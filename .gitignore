@@ -179,5 +179,8 @@ cython_debug/
 .data*
 .results
 
+# state
+.state
+
 # VSCode local config
 .vscode

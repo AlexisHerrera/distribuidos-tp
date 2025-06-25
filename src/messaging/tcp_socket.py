@@ -1,7 +1,17 @@
 import logging
 import socket
+import time
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_RETRY_TIMEOUT = 2  # seconds
+
+
+class SocketDisconnected(Exception):
+    "Raised when received 0 bytes from socket"
+
+    def __init__(self):
+        super().__init__('Socket disconnected')
 
 
 class TCPSocket:
@@ -9,7 +19,10 @@ class TCPSocket:
         self.socket: socket = socket
 
     @classmethod
-    def create(cls):
+    def create(cls, timeout: int | None = None):
+        if timeout:
+            socket.setdefaulttimeout(timeout)
+
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         return cls(s)
 
@@ -23,6 +36,34 @@ class TCPSocket:
         s.connect(addr)
 
         return cls(s)
+
+    @staticmethod
+    def connect_while_condition(
+        host: str,
+        port: int,
+        condition: callable,
+        retry_timeout: int = DEFAULT_RETRY_TIMEOUT,
+        timeout: int | None = None,
+    ):
+        addr = (host, port)
+        socket = None
+        while condition():
+            try:
+                socket = TCPSocket.create_and_connect(addr, timeout)
+                break
+            except ConnectionRefusedError as e:
+                logger.warning(f'Could not connect to {host}:{port}: {e}')
+            except OSError as e:
+                logger.warning(f'Could not connect to {host}:{port}: {e}')
+
+            time.sleep(retry_timeout)
+
+        return socket
+
+    @staticmethod
+    def gethostbyaddress(addr: tuple) -> str:
+        (host, _, _) = socket.gethostbyaddr(addr[0])
+        return host.split('.')[0]  # Take the first part of the host name
 
     def accept(self):
         return self.socket.accept()
@@ -46,7 +87,7 @@ class TCPSocket:
             msg_bytes = self.socket.recv(bytes_amount - total_bytes_amount)
             msg_bytes_len = len(msg_bytes)
             if msg_bytes_len == 0:
-                return None
+                raise SocketDisconnected
             total_bytes_amount += msg_bytes_len
             message += msg_bytes
 

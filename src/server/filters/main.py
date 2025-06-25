@@ -63,7 +63,12 @@ class FilterNode(BaseNode):
             if len(movies) > 0:
                 try:
                     self.connection.send(
-                        Message(message.user_id, MessageType.Movie, movies)
+                        Message(
+                            message.user_id,
+                            MessageType.Movie,
+                            movies,
+                            message.message_id,
+                        )
                     )
                     logger.info(f'Se enviaron {len(movies)}')
                 except Exception as e:

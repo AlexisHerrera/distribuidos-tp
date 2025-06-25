@@ -1,3 +1,6 @@
+from typing import Any
+
+
 class Movie:
     def __init__(
         self,
@@ -18,3 +21,21 @@ class Movie:
         self.budget = budget
         self.revenue = revenue
         self.overview = overview
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            'movie_id': self.id,
+            'title': self.title,
+            'genres': list(self.genres) if self.genres else [],
+            'release_date': self.release_date,
+            'production_countries': list(self.production_countries)
+            if self.production_countries
+            else [],
+            'budget': self.budget,
+            'revenue': self.revenue,
+            'overview': self.overview,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> 'Movie':
+        return cls(**data)

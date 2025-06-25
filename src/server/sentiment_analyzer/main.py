@@ -20,16 +20,6 @@ class SentimentAnalyzerNode(BaseNode):
     def _get_logic_registry(self):
         return AVAILABLE_ANALYZER_LOGICS
 
-    # def _start_eof_monitor(self):
-    #     if not self.leader.enabled:
-    #         return
-    #     self.leader.wait_for_eof()
-
-    #     logger.info('EOF detected by monitor — waiting for in-flight tasks...')
-    #     self.__executor.shutdown(wait=True)
-    #     logger.info('All in-flight tasks completed.')
-    #     super()._start_eof_monitor()
-
     def handle_message(self, message):
         if not self.is_running():
             return
@@ -44,7 +34,9 @@ class SentimentAnalyzerNode(BaseNode):
             for r in logic_result:
                 result.extend(r)
 
-            out_message = Message(message.user_id, MessageType.MovieSentiment, result)
+            out_message = Message(
+                message.user_id, MessageType.MovieSentiment, result, message.message_id
+            )
             self.connection.send(out_message)
         else:
             logger.warning(f'Unknown message type received: {message.message_type}')

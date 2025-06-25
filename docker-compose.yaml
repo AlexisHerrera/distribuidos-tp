@@ -42,7 +42,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data-small:/app/.data
+      - ./.data:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -68,7 +68,7 @@ services:
     networks:
       - testing_net
     volumes:
-      - ./.data-small:/app/.data
+      - ./.data:/app/.data
       - ./.results:/app/.results
     depends_on:
       cleaner:
@@ -83,9 +83,6 @@ services:
     environment:
       - SERVER_PORT=12345
       - LISTENING_BACKLOG=3
-      - BATCH_SIZE_MOVIES=20
-      - BATCH_SIZE_RATINGS=100
-      - BATCH_SIZE_CREDITS=20
     networks:
       - testing_net
     depends_on:
@@ -93,6 +90,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/cleaner/config.yaml:/app/config.yaml
+      - ./.state/cleaner:/app/state
 
   filter_single_country-1:
     container_name: filter_single_country-1
@@ -111,6 +109,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/single_country_config.yaml:/app/config.yaml
+      - ./.state/filter_single_country-1:/app/state
   country_budget_counter-1:
     container_name: country_budget_counter-1
     build:
@@ -128,6 +127,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/country_budget_config.yaml:/app/config.yaml
+      - ./.state/country_budget_counter-1:/app/state
   filter_budget_revenue-1:
     container_name: filter_budget_revenue-1
     build:
@@ -145,6 +145,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/budget_revenue_config.yaml:/app/config.yaml
+      - ./.state/filter_budget_revenue-1:/app/state
   sentiment_analyzer-1:
     container_name: sentiment_analyzer-1
     build:
@@ -162,6 +163,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sentiment_analyzer/config.yaml:/app/config.yaml
+      - ./.state/sentiment_analyzer-1:/app/state
   filter_post_2000-1:
     container_name: filter_post_2000-1
     build:
@@ -179,6 +181,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/post_2000_config.yaml:/app/config.yaml
+      - ./.state/filter_post_2000-1:/app/state
   filter_argentina-1:
     container_name: filter_argentina-1
     build:
@@ -196,6 +199,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/argentina_config.yaml:/app/config.yaml
+      - ./.state/filter_argentina-1:/app/state
   filter_argentina_and_spain-1:
     container_name: filter_argentina_and_spain-1
     build:
@@ -213,6 +217,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/argentina_and_spain_config.yaml:/app/config.yaml
+      - ./.state/filter_argentina_and_spain-1:/app/state
   filter_decade_00-1:
     container_name: filter_decade_00-1
     build:
@@ -230,6 +235,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/filters/decade_00_config.yaml:/app/config.yaml
+      - ./.state/filter_decade_00-1:/app/state
   rating_counter-1:
     container_name: rating_counter-1
     build:
@@ -247,6 +253,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/rating_counter_config.yaml:/app/config.yaml
+      - ./.state/rating_counter-1:/app/state
   cast_splitter-1:
     container_name: cast_splitter-1
     build:
@@ -264,6 +271,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/splitters/config.yaml:/app/config.yaml
+      - ./.state/cast_splitter-1:/app/state
   actor_counter-1:
     container_name: actor_counter-1
     build:
@@ -281,6 +289,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/counters/actor_counter_config.yaml:/app/config.yaml
+      - ./.state/actor_counter-1:/app/state
   
   
   q1_sink:
@@ -296,6 +305,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q1_config.yaml:/app/config.yaml
+      - ./.state/q1_sink:/app/state
 
   q2_sink:
     container_name: q2_sink
@@ -310,6 +320,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q2_config.yaml:/app/config.yaml
+      - ./.state/q2_sink:/app/state
 
   q3_sink:
     container_name: q3_sink
@@ -324,6 +335,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q3_config.yaml:/app/config.yaml
+      - ./.state/q3_sink:/app/state
 
   q4_sink:
     container_name: q4_sink
@@ -338,6 +350,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q4_config.yaml:/app/config.yaml
+      - ./.state/q4_sink:/app/state
 
   q5_sink:
     container_name: q5_sink
@@ -352,6 +365,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src/server/sinks/q5_config.yaml:/app/config.yaml
+      - ./.state/q5_sink:/app/state
 
   
   ratings_joiner:
@@ -382,19 +396,76 @@ services:
     volumes:
       - ./src/server/joiners/cast_joiner_config.yaml:/app/config.yaml
     
-  watcher:
-    container_name: watcher
+  watcher-1:
+    container_name: watcher-1
     build:
       context: .
       dockerfile: src/server/Dockerfile
-    command: ["python", "src/server/watcher/main.py"]
+    command: ["python", "./src/server/watcher/main.py"]
+    networks:
+      - testing_net
+    environment:
+      - NODE_ID=1
+      - PEERS=2:watcher-2,3:watcher-3
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/watcher/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+  watcher-2:
+    container_name: watcher-2
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "./src/server/watcher/main.py"]
+    networks:
+      - testing_net
+    environment:
+      - NODE_ID=2
+      - PEERS=1:watcher-1,3:watcher-3
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/watcher/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+  watcher-3:
+    container_name: watcher-3
+    build:
+      context: .
+      dockerfile: src/server/Dockerfile
+    command: ["python", "./src/server/watcher/main.py"]
+    networks:
+      - testing_net
+    environment:
+      - NODE_ID=3
+      - PEERS=1:watcher-1,2:watcher-2
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./src/server/watcher/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+  
+  chaos_monkey:
+    container_name: chaos_monkey
+    build:
+      context: .
+      dockerfile: 'src/server/Dockerfile'
+    command: ["python", "./src/utils/chaos_monkey/main.py"]
     networks:
       - testing_net
     depends_on:
       rabbitmq:
         condition: service_healthy
+    profiles: [chaos]
     volumes:
-      - ./src/server/watcher/config.yaml:/app/config.yaml
+      - ./src/utils/chaos_monkey/config.yaml:/app/config.yaml:ro
+      - ./running_nodes:/app/running_nodes:ro
       - /var/run/docker.sock:/var/run/docker.sock
   
 networks:

@@ -32,4 +32,4 @@ class ActorCounterLogic(BaseCounterLogic):
 
         logger.info(f'[{user_id}] Sending {len(result_list)} partial actor counts.')
 
-        return Message(user_id, MessageType.ActorCount, result_list)
+        return Message(user_id, MessageType.ActorCount, result_list, message.message_id)
