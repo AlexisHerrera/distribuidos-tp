@@ -35,5 +35,9 @@ python generate-compose.py ${GENERATE_COMPOSE_ARGS}
 echo ">>> Generando running_nodes file"
 bash ./generate-running-nodes.sh
 
+echo ">>> Limpiando el directorio de estado previo..."
+rm -rf .state
+mkdir -p .state
+
 echo ">>> Lanzando contenedores"
 make docker-compose-up
