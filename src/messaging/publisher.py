@@ -26,3 +26,7 @@ class DirectPublisher(Publisher):
 
     def put(self, broker: Broker, body: Message):
         broker.put(routing_key=self.__routing_key, body=body.to_bytes())
+
+    @property
+    def routing_key(self):
+        return self.__routing_key

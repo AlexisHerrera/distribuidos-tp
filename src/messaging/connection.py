@@ -75,7 +75,7 @@ class MultiPublisherConnection:
         user_id_str = str(user_id)
 
         for publisher in directPublishers:
-            routing_key = getattr(publisher, '__routing_key', 'UNKNOWN')
+            routing_key = publisher.routing_key
             if user_id_str in routing_key:
                 return publisher
 
