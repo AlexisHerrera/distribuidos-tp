@@ -312,7 +312,8 @@ class Client:
             if not header:
                 logging.warning(f'File for {file_description} is empty.')
                 # Aún así, envía un EOF para que el servidor sepa que no hay datos.
-                self._send_window_and_wait_ack([], send_eof=True)
+                eof_batch = Batch(uuid.uuid4(), BatchType.EOF, None)
+                self._send_window_and_wait_ack([eof_batch])
                 return
             self.file_offsets[current_state] = file_object.tell()
 
@@ -335,12 +336,17 @@ class Client:
             offset_after_window = file_object.tell()
             config = self.state_machine.get_current_config()
             batch_type = config['batch_type']
-            batch_objects = [Batch(batch_type, data) for data in batches_to_send]
+            batch_objects = [
+                Batch(uuid.uuid4(), batch_type, data) for data in batches_to_send
+            ]
+            if eof_in_window:
+                eof_batch = Batch(uuid.uuid4(), BatchType.EOF, None)
+                batch_objects.append(eof_batch)
 
             logging.info(
                 f'[{file_description}] Preparing window with {len(batch_objects)} data batches. EOF in window: {eof_in_window}'
             )
-            self._send_window_and_wait_ack(batch_objects, eof_in_window)
+            self._send_window_and_wait_ack(batch_objects)
 
             # Update offset only if acked
             self.file_offsets[current_state] = offset_after_window
@@ -354,18 +360,13 @@ class Client:
                 )
                 break
 
-    def _send_window_and_wait_ack(self, batches: list[Batch], send_eof: bool):
-        max_retries = int(os.getenv('SEND_MAX_RETRIES', '5'))
+    def _send_window_and_wait_ack(self, batches: list[Batch]):
         ack_timeout = float(os.getenv('ACK_TIMEOUT', '10.0'))
-
-        for attempt in range(max_retries):
+        attempt = 0
+        while True:
             self._connection_ready.wait()
             try:
                 messages_to_send_bytes = [b.to_bytes() for b in batches]
-                if send_eof:
-                    eof_batch = Batch(BatchType.EOF, None)
-                    messages_to_send_bytes.append(eof_batch.to_bytes())
-
                 if not messages_to_send_bytes:
                     return
 
@@ -382,22 +383,20 @@ class Client:
                 # Wait ACK for window
                 ack_msg = self.ack_queue.get(timeout=ack_timeout)
                 if ack_msg and ack_msg.message_type == MessageType.ACK:
+                    attempt = 0
                     logging.info(f'Window ACK received for {window_size} messages.')
                     return
             except Empty:
+                attempt += 1
                 logging.warning(
-                    f'ACK for window not received in {ack_timeout}s (Attempt {attempt + 1}/{max_retries}).'
+                    f'ACK for window not received in {ack_timeout}s (Attempt {attempt + 1}).'
                 )
-                self._trigger_reconnection()
                 continue
             except (socket.error, BrokenPipeError, ConnectionError) as e:
                 logging.error(
                     f'Connection error on sending window: {e}. Notifying Connection Manager.'
                 )
                 self._trigger_reconnection()
-        raise ConnectionError(
-            f'Failed to send window and receive ACK after {max_retries} attempts.'
-        )
 
     def _initial_connect(self):
         self.client_socket = self._create_client_socket()
