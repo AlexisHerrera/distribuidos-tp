@@ -150,11 +150,7 @@ class Client:
             self.sender_thread.join()
             self.receiver_thread.join()
             self.connection_thread.join()
-
-            if self._shutdown_event.is_set():
-                logging.info('Client was shut down prematurely.')
-            else:
-                logging.info('Client work completed successfully.')
+            logging.info('Client work completed successfully.')
         except Exception as e:
             logging.error(
                 f'A critical error occurred in the main thread: {e}', exc_info=True
@@ -185,7 +181,10 @@ class Client:
     def _connection_manager_loop(self):
         logging.info('Connection Manager started, waiting for reconnect signals.')
         while not self._shutdown_event.is_set():
-            self._reconnect_needed.wait()
+            self._reconnect_needed.wait(timeout=5)
+
+            if not self._reconnect_needed.is_set():
+                continue
 
             if self._shutdown_event.is_set():
                 break
@@ -294,7 +293,8 @@ class Client:
                     )
                     self.stop()
                     break
-        logging.info('Receiver thread has finished.')
+        logging.info('Receiver thread has finished. Finishing reconnection thread')
+        self.stop()
 
     def _send_file_data(
         self, current_state: ClientState, file_object: io.TextIOWrapper, batch_size
@@ -517,8 +517,11 @@ class Client:
             f'Result #{self.results_received}/{self.TOTAL_RESULTS_EXPECTED} received.'
         )
         if self.results_received >= self.TOTAL_RESULTS_EXPECTED:
-            logging.info('All expected results have been received. Client is done.')
+            # All results received, no one is writing or reading
+            request_msg = Message(self.session_id, MessageType.ACK)
+            send_message(self.client_socket, request_msg.to_bytes())
             self.state_machine.set_stage(ClientState.DONE)
+            logging.info('All expected results have been received. Client is done.')
 
     def _create_client_socket(self):
         try:

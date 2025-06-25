@@ -16,7 +16,7 @@ LEADER_ELECTION_STATE_NAME = 'leader_election_state.json'
 
 
 class FinalizationTimeoutError(Exception):
-    """Leader Timeout"""
+    """Timeout Exception, should requeue"""
 
     pass
 

@@ -19,6 +19,7 @@ from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
 from src.server.cleaner.CleanerStateMachine import CleanerStateMachine
 from src.server.healthcheck import Healthcheck
+from src.server.leader_election import FinalizationTimeoutError
 
 from src.utils.config import Config
 from src.utils.log import initialize_log
@@ -343,22 +344,8 @@ class Cleaner:
             logger.info('Result processing thread finished.')
 
     def _process_message_from_queue(self, message: Message):
+        """Results rabbit queue loop"""
         user_id = message.user_id
-
-        with self.clients_lock:
-            client_info = self.clients.get(user_id)
-
-        if not client_info:
-            if message.message_type != MessageType.EOF:
-                logger.warning(
-                    f'[N/A User] Received message for unknown or disconnected user_id: '
-                    f'{user_id}, type: {message.message_type.name}. Cannot deliver.'
-                )
-            else:
-                logger.debug(
-                    f'[N/A User] Received EOF for user_id: {user_id} not active or already cleaned up.'
-                )
-            return
 
         if message.message_type == MessageType.EOF:
             logger.debug(
@@ -386,16 +373,12 @@ class Cleaner:
                 f'[{user_id}] Failed to persist result to WAL. Message might be lost on restart. Error: {e}',
                 exc_info=True,
             )
-            wal_filepath = None
+            raise FinalizationTimeoutError(
+                'Will requeue because could not write on WAL'
+            ) from e
 
-        if wal_filepath:
-            self.send_queue.put((user_id, payload, wal_filepath))
-            logger.info(
-                f'[{user_id}] Enqueued {code} for sending and persisted to WAL.'
-            )
-        else:
-            # WAL Failed. Ignored because it will retry
-            pass
+        self.send_queue.put((user_id, payload, wal_filepath))
+        logger.info(f'[{user_id}] Enqueued {code} for sending and persisted to WAL.')
 
     def _send_results_to_client_loop(self):
         while self.is_running or not self.send_queue.empty():
@@ -421,8 +404,6 @@ class Cleaner:
                 try:
                     logger.info(f'[{user_id}] Sending query result to client.')
                     send_message(client_socket, payload)
-                    # It is going to be deleted on cleanup
-                    # self.pending_results_wal_manager.remove_entry(wal_filepath)
 
                     def increment_queries(state):
                         state['queries_received'] += 1
@@ -436,11 +417,13 @@ class Cleaner:
                         logger.info(
                             f'[{user_id}] All expected query results received. Cleaning up client.'
                         )
-                        self._cleanup_client(user_id)
-                        # Si se cae acá, caso ultra borde, se pierde todo lo que el cliente
-                        # no haya leído. No hago ACK para no tener bloqueada la cola de results.
-                        # Tampoco hago que sea bloqueante para que no se mezcle con los acks que
-                        # recibe por medio de los datos.
+                        # Wait ACK just to know client received all results.
+                        # It only sends ACK when received all results
+                        message_bytes = receive_message(client_socket)
+                        ack_message = Message.from_bytes(message_bytes)
+                        if ack_message and ack_message.message_type == MessageType.ACK:
+                            # Cleans up client safely. Disconnects and removes persisted results
+                            self._cleanup_client(user_id)
                 except Exception as e:
                     logger.error(
                         f'[{user_id}] Error sending query result: {e}', exc_info=True
