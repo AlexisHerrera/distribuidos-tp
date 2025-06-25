@@ -1,10 +1,10 @@
 healthchecker:
   port: 13434
-  timeout: 10
-  reconnection_timeout: 5
+  timeout: 5
+  reconnection_timeout: 2
 bully:
   port: 25117
-  timeout: 5
+  timeout: 3
 healthcheck:
   port: 13434
 log_level: INFO

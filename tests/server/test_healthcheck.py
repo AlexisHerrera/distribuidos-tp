@@ -1,6 +1,7 @@
 import time
 import unittest
 
+from src.messaging.protocol.healthcheck import HealthcheckProtocol
 from src.messaging.tcp_socket import TCPSocket
 from src.server.healthcheck import Healthcheck
 
@@ -24,13 +25,13 @@ class TestHealthcheck:
             healthcheck.stop()
             raise AssertionError
 
-        message = b'H'
-        bytes_amount = len(message)
+        message = HealthcheckProtocol.PING
+        bytes_amount = HealthcheckProtocol.MESSAGE_BYTES_AMOUNT
 
         watcher.send(message, bytes_amount)
 
-        expected_message = b'B'
-        expected_bytes_amount = len(expected_message)
+        expected_message = HealthcheckProtocol.PONG
+        expected_bytes_amount = HealthcheckProtocol.MESSAGE_BYTES_AMOUNT
         recv_message = watcher.recv(expected_bytes_amount)
         watcher.stop()
         healthcheck.stop()

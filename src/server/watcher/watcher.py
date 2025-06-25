@@ -29,17 +29,17 @@ class Watcher:
 
         self.healthcheck: Healthcheck = Healthcheck(config.healthcheck_port)
 
-        self.healthchecker_port: int = config.healthchecker_port
-        self.healthcheckers: dict[str, Healthchecker] = {}
         self.nodes: list[str] = config.nodes
         self.peers: list[str] = [peer_name for peer_name in config.peers.keys()]
 
-        self.healthchecker_threads: list[threading.Thread] = []
-
-        self.healthchecker_timeout: int = config.healthchecker_port
+        self.healthcheckers: dict[str, Healthchecker] = {}
+        self.healthchecker_port: int = config.healthchecker_port
+        self.healthchecker_timeout: int = config.healthchecker_timeout
         self.healthchecker_reconnection_timeout = (
             config.healthchecker_reconnection_timeout
         )
+
+        self.healthchecker_threads: list[threading.Thread] = []
 
         self.bully: Bully = Bully(
             port=config.bully_port,
