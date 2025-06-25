@@ -20,6 +20,7 @@ from src.messaging.connection_creator import ConnectionCreator
 from src.messaging.protocol.message import Message, MessageType
 from src.server.cleaner.CleanerStateMachine import CleanerStateMachine
 from src.server.healthcheck import Healthcheck
+# from src.server.leader_election import chaos_test
 
 # from src.server.leader_election import chaos_test
 from src.utils.config import Config
@@ -30,7 +31,6 @@ from src.utils.wal_manager import WALManager
 logger = logging.getLogger(__name__)
 
 CLEANER_STATE_DIR = '/app/state'
-WAL_DIR = os.path.join(CLEANER_STATE_DIR, 'wal')
 STATE_FILE = 'state.json'
 PENDING_RESULTS_WAL_DIR = os.path.join(CLEANER_STATE_DIR, 'pending_results_wal')
 
@@ -47,8 +47,6 @@ class Cleaner:
 
         # State management
         self.state_manager = StateManager(STATE_FILE)
-        # WAL messages (input tcp from client)
-        self.client_input_wal_manager = WALManager(WAL_DIR)
         # Wal manager for results
         self.pending_results_wal_manager = WALManager(PENDING_RESULTS_WAL_DIR)
 
@@ -100,97 +98,55 @@ class Cleaner:
     def _recover_from_wal(self):
         logger.info('Attempting to recover batches from WAL...')
         recovered_batches = self.client_input_wal_manager.recover()
+    def _handshake(self, client_socket, address) -> uuid.UUID | None:
+        def update_socket(state):
+            state['socket'] = client_socket
 
-        for filepath, raw_batch_bytes in recovered_batches:
-            try:
-                filename = os.path.basename(filepath)
-                user_id_str = filename.split('_')[0]
-                user_id = uuid.UUID(user_id_str)
-                logger.info(f'Recovering batch for user {user_id} from {filename}')
-                self._process_and_send_batch(user_id, raw_batch_bytes)
+        # Handshake
+        raw_handshake = receive_message(client_socket)
+        handshake_msg = Message.from_bytes(raw_handshake)
 
-                self.client_input_wal_manager.remove_entry(filepath)
-            except Exception as e:
-                logger.error(
-                    f'Failed to recover batch from WAL file {filepath}: {e}',
-                    exc_info=True,
-                )
+        if handshake_msg.message_type != MessageType.HANDSHAKE_SESSION:
+            logger.error(
+                f'Connection from {address} did not start with a handshake. Closing.'
+            )
+            return None
+
+        client_provided_id = handshake_msg.user_id
+        is_new_client = client_provided_id == uuid.UUID(int=0)
+
+        if is_new_client:
+            user_id = self.generate_user_id()
+            logger.info(
+                f'New client from {address}. Assigned new session ID: {user_id}'
+            )
+
+            self._update_client_state(user_id, update_socket)
+        else:
+            user_id = client_provided_id
+            logger.info(
+                f'Client reconnected from {address}. Resuming session ID: {user_id}'
+            )
+            self._update_client_state(user_id, update_socket)
+
+        # Confirm handshake
+        response_msg = Message(user_id, MessageType.HANDSHAKE_SESSION)
+        send_message(client_socket, response_msg.to_bytes())
+        return user_id
 
     def _handle_single_client(self, client_socket, address_tuple):
+        """
+        Starts handshake, and if everything is ok, calls process data.
+        """
         address = f'{address_tuple[0]}:{address_tuple[1]}'
         user_id = None
 
         try:
-            # Handshake
-            raw_handshake = receive_message(client_socket)
-            handshake_msg = Message.from_bytes(raw_handshake)
-
-            if handshake_msg.message_type != MessageType.HANDSHAKE_SESSION:
-                logger.error(
-                    f'Connection from {address} did not start with a handshake. Closing.'
-                )
+            # handshake
+            user_id = self._handshake(client_socket, address)
+            if user_id is None:
                 return
-
-            client_provided_id = handshake_msg.user_id
-            is_new_client = client_provided_id == uuid.UUID(int=0)
-
-            if is_new_client:
-                user_id = self.generate_user_id()
-                logger.info(
-                    f'New client from {address}. Assigned new session ID: {user_id}'
-                )
-
-                def create_session(state):
-                    state['socket'] = client_socket
-
-                self._update_client_state(user_id, create_session)
-            else:
-                user_id = client_provided_id
-                logger.info(
-                    f'Client reconnected from {address}. Resuming session ID: {user_id}'
-                )
-
-                def resume_session(state):
-                    state['socket'] = client_socket
-
-                self._update_client_state(user_id, resume_session)
-
-            # Confirm handshake
-            response_msg = Message(user_id, MessageType.HANDSHAKE_SESSION)
-            send_message(client_socket, response_msg.to_bytes())
-
-            # Get client lock
-            with self.clients_lock:
-                client_lock = self.clients[user_id]['lock']
-
-            # Loop after handshake
-            while self.is_running:
-                with self.clients_lock:
-                    client_state = self.clients.get(user_id)
-                    if not client_state or not client_state.get('socket'):
-                        logger.warning(
-                            f'[{user_id}] Session terminated or socket closed externally.'
-                        )
-                        break
-
-                state_machine = CleanerStateMachine(client_state['stage'])
-                if state_machine.is_finished():
-                    logger.info(
-                        f'[{user_id}] Session is already finished. Waiting for final results.'
-                    )
-                    break
-
-                stage_config = state_machine.get_current_config()
-                logger.info(f'[{user_id}] Executing stage: {client_state["stage"]}')
-
-                success = self._process_client_data(
-                    user_id, client_socket, stage_config, client_lock
-                )
-                if not success:
-                    raise ConnectionError(
-                        f'Failed to process stream for stage {client_state["stage"]}'
-                    )
-
+            self._process_client_data(user_id, client_socket)
         except (
             ConnectionError,
             ConnectionResetError,
@@ -211,6 +167,7 @@ class Cleaner:
     def _update_client_state(
         self, user_id: uuid.UUID, update_func: Callable[[dict], None]
     ):
+        """Gives a function to modify client state"""
         with self.clients_lock:
             client_state = self.clients.setdefault(
                 user_id,
@@ -226,6 +183,7 @@ class Cleaner:
             self._save_all_clients_state()
 
     def _save_all_clients_state(self):
+        """Save all whole cleaner state. Should be called with a lock at clients"""
         state_to_persist = {}
         for user_id, data in self.clients.items():
             state_to_persist[str(user_id)] = {
@@ -251,16 +209,11 @@ class Cleaner:
 
         logger.info(f'Restored {len(self.clients)} client states into memory.')
 
-    def _advance_session_stage(self, user_id: uuid.UUID):
-        def advance(state):
-            state_machine = CleanerStateMachine(state['stage'])
-            state_machine.advance()
-            state['stage'] = state_machine.stage
-            logger.info(
-                f'Session for user {user_id} advanced to stage [{state["stage"]}]'
-            )
+    def _update_stage(self, user_id: uuid.UUID, stage):
+        def stage_update_function(state):
+            state['stage'] = stage
 
-        self._update_client_state(user_id, advance)
+        self._update_client_state(user_id, stage_update_function)
 
     def _cleanup_pending_results_wal(self, user_id: uuid.UUID):
         """Deletes al results from a user, it is only executed when client has received all"""
@@ -298,42 +251,81 @@ class Cleaner:
                     except (socket.error, OSError):
                         pass
 
-    def _process_and_send_batch(self, user_id: uuid.UUID, raw_batch_bytes: bytes):
+    def _process_client_data(self, user_id: uuid.UUID, client_socket: socket.socket):
+        # Get client lock
+        with self.clients_lock:
+            client_lock = self.clients[user_id]['lock']
+
+        with self.clients_lock:
+            client_state = self.clients.get(user_id)
+            if not client_state or not client_state.get('socket'):
+                logger.warning(
+                    f'[{user_id}] Session terminated or socket closed externally.'
+                )
+                return
+
+        state_machine = CleanerStateMachine(client_state['stage'])
+        while self.is_running and not state_machine.is_finished():
+            # Get client data. If fails, caller will catch the exception
+            window_message_bytes = receive_message(client_socket)
+            window_message = Message.from_bytes(window_message_bytes)
+            if window_message.message_type != MessageType.WINDOW:
+                raise ValueError(f'Expected WINDOW message, received: {window_message}')
+            batches_to_read = int(window_message.data)
+
+            for _i in range(batches_to_read):
+                # if i == 5:
+                #     chaos_test(0.01, 'Crash in middle of batch read.'
+                #                      'Should go back to last ACK')
+                # it is guaranteed that client will
+                # not send data message after EOF, until receives from client an ACK
+                raw_batch_bytes = receive_message(client_socket)
+                # This updates client_state['stage'] to make this loop finish
+                self._process_and_send_batch(user_id, raw_batch_bytes, state_machine)
+
+            ack_message = Message(user_id, MessageType.ACK, None)
+            with client_lock:
+                send_message(client_socket, ack_message.to_bytes())
+
+    def _process_and_send_batch(
+        self,
+        user_id: uuid.UUID,
+        raw_batch_bytes: bytes,
+        state_machine: CleanerStateMachine,
+    ):
         # chaos_test(0.001, 'Crash 0.1% before reading from TCP')
         batch = Batch.from_bytes(raw_batch_bytes)
         if not batch:
             raise ValueError(f'[{user_id}] Failed to decode batch during processing.')
 
+        config_current_stage = state_machine.get_current_config()
+        expected_batch_type = config_current_stage['batch_type']
+        if batch.type == BatchType.EOF:
+            # Depending on current stage, it will send an EOF to the queue
+            eof_message_type = config_current_stage['message_type']
+            self._publish_eof(user_id, eof_message_type)
+            state_machine.advance()
+            self._update_stage(user_id, state_machine.stage)
+            return
+
+        # If it goes here, then will queue data
         message_type_map = {
             BatchType.MOVIES: MessageType.Movie,
             BatchType.CREDITS: MessageType.Cast,
             BatchType.RATINGS: MessageType.Rating,
         }
         associated_message_type = message_type_map.get(batch.type)
-
-        if batch.type == BatchType.EOF:
-            with self.clients_lock:
-                client_state = self.clients.get(user_id)
-                if not client_state:
-                    raise ValueError(
-                        f'Cannot process EOF for user {user_id}: session not found.'
-                    )
-                current_stage = client_state['stage']
-            stage_config = CleanerStateMachine.STAGE_CONFIG.get(current_stage, {})
-            eof_message_type = stage_config.get('message_type')
-
-            if not eof_message_type:
-                raise ValueError(
-                    f'Cannot process EOF for user {user_id}: invalid stage {current_stage}'
-                )
-
-            self._publish_eof(user_id, eof_message_type)
-            self._advance_session_stage(user_id)
-            return
-
         if not associated_message_type:
             logger.warning(f'No MessageType mapping for BatchType: {batch.type}')
-            return
+            raise ValueError(f'Invalid type: {batch.type}')
+
+        # If state is advanced, it will go back
+        if expected_batch_type != batch.type:
+            stage_to_update = CleanerStateMachine.BATCH_TO_STAGE[batch.type]
+            logger.warning(
+                f'Unexpected batch. Expecting {expected_batch_type}, got {batch.type}. Going to stage: {stage_to_update}'
+            )
+            self._update_stage(user_id, stage_to_update)
 
         object_list = batch_to_list_objects(batch)
         if object_list:
@@ -342,79 +334,6 @@ class Cleaner:
             logger.debug(
                 f'[{user_id}] Published batch of {len(object_list)} objects of type {associated_message_type.name}.'
             )
-
-    def _process_client_data(
-        self,
-        user_id: uuid.UUID,
-        client_socket,
-        stage_config: dict,
-        client_lock: threading.Lock,
-    ):
-        data_type_label = stage_config['label']
-        if not self.is_running or not client_socket:
-            logger.error(
-                f'[{user_id}] Cannot process client data for {data_type_label}: component missing or not running.'
-            )
-            return False
-        logger.info(
-            f'[{user_id}] Starting to process stream [{data_type_label}] from client...'
-        )
-
-        while self.is_running:
-            try:
-                raw_batch_bytes = receive_message(client_socket)
-                if raw_batch_bytes is None:
-                    logger.warning(
-                        f'[{user_id}] Client connection closed or receive failed while waiting for {data_type_label} batch.'
-                    )
-                    return False
-
-                batch = Batch.from_bytes(raw_batch_bytes)
-                # Save batch on disk
-                wal_filepath = self.client_input_wal_manager.write_entry(
-                    user_id, batch.type.name, raw_batch_bytes
-                )
-                try:
-                    ack_message = Message(user_id, MessageType.ACK, None)
-                    with client_lock:
-                        send_message(client_socket, ack_message.to_bytes())
-                    # logger.info(f'[{user_id}] Sent ACK to client for batch.')
-                except Exception as ack_e:
-                    logger.error(
-                        f'[{user_id}] Failed to send ACK to client: {ack_e}. Client will likely resend.'
-                    )
-                    return False
-
-                self._process_and_send_batch(user_id, raw_batch_bytes)
-                # Remove because is already saved
-                self.client_input_wal_manager.remove_entry(wal_filepath)
-            except ConnectionResetError:
-                logger.warning(
-                    f'[{user_id}] Client connection reset during {data_type_label} processing.'
-                )
-                return False
-            except ConnectionAbortedError:
-                logger.warning(
-                    f'[{user_id}] Client connection aborted during {data_type_label} processing.'
-                )
-                return False
-            except socket.error as e:
-                logger.warning(
-                    f'[{user_id}] Socket error during {data_type_label} processing: {e}'
-                )
-                return False
-            except Exception as e:
-                if self.is_running:
-                    logger.error(
-                        f'[{user_id}] Unexpected error in {data_type_label} receive loop: {e}',
-                        exc_info=True,
-                    )
-                return False
-
-        logger.info(
-            f'[{user_id}] Client data processing for {data_type_label} finished.'
-        )
-        return True
 
     def _publish_eof(self, user_id: uuid.UUID, stream_message_type: MessageType):
         try:
@@ -650,7 +569,6 @@ class Cleaner:
             return
 
         self._setup_signal_handlers()
-        self._recover_from_wal()
         self._recover_pending_results()
 
         if not self._setup_server_socket():

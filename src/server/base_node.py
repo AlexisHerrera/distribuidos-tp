@@ -23,7 +23,11 @@ NODE_STATE_NAME = 'node_state.json'
 
 class BaseNode(ABC):
     def __init__(
-        self, config: Config, node_type_arg: str, has_result_persisted: bool = False
+        self,
+        config: Config,
+        node_type_arg: str,
+        has_data_persisted: bool = False,
+        should_send_results: bool = False,
     ):
         self.config = config
         self.node_type = node_type_arg
@@ -42,8 +46,9 @@ class BaseNode(ABC):
         self.leader = None
         self.in_flight_tracker = InFlightTracker()
 
-        # sent results before eof
-        self.has_results_persisted = has_result_persisted
+        # Persist data
+        self.has_data_persisted = has_data_persisted
+        self.should_send_results = should_send_results
         # Threads executor (should be instantiated on node)
         self._executor = None
         self.healthcheck = Healthcheck(config.healthcheck_port)
@@ -63,7 +68,7 @@ class BaseNode(ABC):
                 )
                 self.leader = None
 
-            if self.has_results_persisted:
+            if self.has_data_persisted:
                 self.node_state_manager = StateManager(NODE_STATE_NAME)
                 self._load_node_state()
 
@@ -77,6 +82,7 @@ class BaseNode(ABC):
             raise
 
     def _load_node_state(self):
+        """This should be called from inherited class via super()"""
         if not self.node_state_manager:
             return
 
@@ -96,9 +102,19 @@ class BaseNode(ABC):
         )
 
         app_state = persisted_data.get('application_state')
-        if app_state and hasattr(self.logic, 'load_application_state'):
-            self.logic.load_application_state(app_state)
-            logger.info('Application state restored successfully.')
+        return app_state
+
+    # Default state persist, save every change
+    def persist_changes(self, message: Message):
+        self.processed_message_ids.add(str(message.message_id))
+        if hasattr(self.logic, 'get_application_state'):
+            app_state = self.logic.get_application_state()
+            state_to_persist = {
+                'processed_message_ids': list(self.processed_message_ids),
+                'application_state': app_state,
+            }
+            self.node_state_manager.save_state(state_to_persist)
+        # logger.info(f"Saving state: Msgs id: {len(list(self.processed_message_ids))}, app state: {len(app_state)}" )
 
     @abstractmethod
     def _get_logic_registry(self) -> Dict[str, Type]:
@@ -153,7 +169,7 @@ class BaseNode(ABC):
         pass
 
     def send_final_results(self, user_id: uuid.UUID):
-        if not self.has_results_persisted:
+        if not self.should_send_results:
             return
         try:
             out_msg = self.logic.message_result(user_id)
@@ -166,7 +182,7 @@ class BaseNode(ABC):
         user_id = message.user_id
 
         if (
-            self.has_results_persisted
+            self.has_data_persisted
             and str(message.message_id) in self.processed_message_ids
         ):
             logger.warning(
@@ -190,17 +206,8 @@ class BaseNode(ABC):
             if self.leader:
                 self.in_flight_tracker.increment(user_id)
             self.handle_message(message)
-            if self.has_results_persisted:
-                # chaos_test(0.01, f"Sink crashes processing: {message.message_id}")
-                self.processed_message_ids.add(str(message.message_id))
-                if hasattr(self.logic, 'get_application_state'):
-                    app_state = self.logic.get_application_state()
-                    state_to_persist = {
-                        'processed_message_ids': list(self.processed_message_ids),
-                        'application_state': app_state,
-                    }
-                    self.node_state_manager.save_state(state_to_persist)
-                    # logger.info(f"Saving state: Msgs id: {len(list(self.processed_message_ids))}, app state: {len(app_state)}" )
+            if self.has_data_persisted:
+                self.persist_changes(message)
 
         except Exception as e:
             logger.error(f'Error en handle_message: {e}', exc_info=True)
