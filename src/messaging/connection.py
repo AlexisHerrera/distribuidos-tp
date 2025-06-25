@@ -6,7 +6,7 @@ from typing import Callable
 from src.messaging.broker import Broker
 from src.messaging.consumer import Consumer
 from src.messaging.protocol.message import Message, MessageType
-from src.messaging.publisher import Publisher, DirectPublisher
+from src.messaging.publisher import Publisher, DirectPublisher, BroadcastPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ class MultiPublisherConnection:
         
         if(len(publishers_by_message_type) == 1):
             return publishers_by_message_type[0]
-        else: # Only for Direct Publishers with more than one client.
+        else:
             return self._get_publisher_for_client(publishers_by_message_type,message.user_id)
     
     def _get_publishers_by_message_type(self, msg_type: MessageType) -> list[Publisher] | None:
@@ -69,15 +69,20 @@ class MultiPublisherConnection:
     
     def _get_publisher_for_client(
         self,
-        directPublishers: list[DirectPublisher],
+        publishers: list[Publisher],
         user_id: uuid.UUID
-    ) -> DirectPublisher | None:
+    ) -> Publisher | None:
         user_id_str = str(user_id)
 
-        for publisher in directPublishers:
-            routing_key = publisher.routing_key
-            if user_id_str in routing_key:
-                return publisher
+        for publisher in publishers:
+            if isinstance(publisher, DirectPublisher):
+                routing_key = publisher.routing_key
+                if user_id_str in routing_key:
+                    return publisher
+            elif isinstance(publisher, BroadcastPublisher):
+                exchange_name = publisher.exchange_name
+                if user_id_str in exchange_name:
+                    return publisher
 
         return None
 
