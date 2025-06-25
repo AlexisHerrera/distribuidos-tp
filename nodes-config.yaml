@@ -2,7 +2,7 @@
 # all: 2
 
 # Clients
-clients: 1
+clients: 2
 
 # Filters
 filter_single_country: 2
