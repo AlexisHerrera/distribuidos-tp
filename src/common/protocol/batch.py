@@ -1,5 +1,6 @@
 import struct
 import logging
+import uuid
 from enum import Enum
 from typing import List
 
@@ -27,15 +28,19 @@ class BatchType(Enum):
 
 
 class Batch:
-    HEADER_FORMAT = '>BI'  # B = 1 byte unsigned char, I = 4 bytes unsigned int
+    # B (1 byte for type) + 16s (16 UUID) + I (4 bytes size)
+    HEADER_FORMAT = '>B16sI'
     HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
-    def __init__(self, batch_type: BatchType, data: List[str] | None):
+    def __init__(
+        self, batch_id: uuid.UUID, batch_type: BatchType, data: List[str] | None
+    ):  # <--- Añadir batch_id
         if not isinstance(batch_type, BatchType):
             raise TypeError('batch_type must be an instance of BatchType Enum')
         if data is not None and not isinstance(data, list):
             raise TypeError('data must be a list of strings or None')
 
+        self.id = batch_id
         self.type = batch_type
         self.data: List[str] = data if data is not None else []
 
@@ -45,8 +50,9 @@ class Batch:
             payload_bytes = payload_str.encode('utf-8')
             payload_len = len(payload_bytes)
 
-            header = struct.pack(Batch.HEADER_FORMAT, self.type.value, payload_len)
-
+            header = struct.pack(
+                Batch.HEADER_FORMAT, self.type.value, self.id.bytes, payload_len
+            )
             return header + payload_bytes
         except Exception as e:
             logger.error(f'Error during Batch serialization: {e}', exc_info=True)
@@ -61,10 +67,11 @@ class Batch:
             return None
 
         try:
-            batch_type_value, payload_len = struct.unpack(
+            batch_type_value, batch_id_bytes, payload_len = struct.unpack(
                 cls.HEADER_FORMAT, raw_bytes[: cls.HEADER_SIZE]
             )
             batch_type = BatchType(batch_type_value)
+            batch_id = uuid.UUID(bytes=batch_id_bytes)
 
             payload_bytes = raw_bytes[cls.HEADER_SIZE : cls.HEADER_SIZE + payload_len]
 
@@ -79,7 +86,7 @@ class Batch:
                 payload_str = payload_bytes.decode('utf-8')
                 data_list = payload_str.split('\n')
 
-            return cls(batch_type, data_list)
+            return cls(batch_id, batch_type, data_list)
 
         except struct.error as e:
             logger.error(
@@ -98,7 +105,9 @@ class Batch:
             return None
 
     def __repr__(self):
-        return f'Batch(type={self.type.name}, data_lines={len(self.data)})'
+        return (
+            f'Batch(id={self.id}, type={self.type.name}, data_lines={len(self.data)})'
+        )
 
 
 def batch_to_list_objects(batch: Batch) -> list:
