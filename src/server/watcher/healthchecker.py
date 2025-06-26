@@ -3,6 +3,7 @@ import subprocess
 import time
 from threading import Lock
 
+from src.common.runnable import Runnable
 from src.messaging.protocol.healthcheck import HealthcheckProtocol
 from src.messaging.tcp_socket import SocketDisconnected, TCPSocket
 
@@ -20,8 +21,7 @@ class Healthchecker:
         self.timeout = timeout
         self.reconnection_timeout = reconnection_timeout
 
-        self.is_running_lock: Lock = Lock()
-        self.is_running = True
+        self.is_running = Runnable()
 
         self.socket_lock: Lock = Lock()
         self.socket: TCPSocket = None
@@ -32,7 +32,7 @@ class Healthchecker:
         try:
             self._first_connection()
 
-            while self._is_running():
+            while self.is_running():
                 try:
                     logger.debug(
                         f'[HEALTHCHECKER] Sending healthcheck to {self.node_name}'
@@ -87,7 +87,7 @@ class Healthchecker:
             self._restart_and_reconnect_service()
 
     def _restart_and_reconnect_service(self):
-        while self._is_running():
+        while self.is_running():
             try:
                 self._restart_service()
                 self._connect_to_service()
@@ -122,13 +122,8 @@ class Healthchecker:
             addr = (self.node_name, self.port)
             self.socket = TCPSocket.create_and_connect(addr, self.timeout)
 
-    def _is_running(self) -> bool:
-        with self.is_running_lock:
-            return self.is_running
-
     def stop(self):
-        with self.is_running_lock:
-            self.is_running = False
+        self.is_running.stop()
 
         with self.socket_lock:
             if self.socket:

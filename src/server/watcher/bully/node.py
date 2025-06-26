@@ -1,8 +1,9 @@
 import logging
 from queue import SimpleQueue
-from threading import Lock, Thread
+from threading import Thread
 from typing import Callable
 
+from src.common.runnable import Runnable
 from src.messaging.protocol.bully import BullyProtocol
 from src.messaging.tcp_socket import SocketDisconnected, TCPSocket
 
@@ -22,8 +23,8 @@ class BullyNode:
         reconnect: Callable[[str], TCPSocket],
         is_leader: Callable[[int], bool],
     ):
-        self.is_running_lock = Lock()
-        self.is_running = True
+        self.is_running = Runnable()
+
         self.socket = socket
         self.node_name = node_name
         self.node_id = node_id
@@ -38,10 +39,11 @@ class BullyNode:
         logger.info(f'[BULLY] Begin recv of node id {self.node_id}')
 
         times = 0
-        # TODO: DONT TRY TO RECONNECT IF SOCKET COMES FROM ACCEPT
+        # Don't try to reconnect if socket comes from accept
+        # Let the other node make the reconnection
         reconnect = True if self.socket is None else False
         try:
-            while self._is_running():
+            while self.is_running():
                 try:
                     if reconnect:
                         self.socket = self.reconnect(self.node_name)
@@ -52,9 +54,11 @@ class BullyNode:
                     self.message_queue.put((message, self.node_id, self.node_name))
                     times = 0
                 except TimeoutError as e:
-                    logger.warning(
-                        f'[BULLY] Got timeout error from {self.node_name}: {e}'
-                    )
+                    if self.is_leader(self.node_id):
+                        logger.warning(
+                            f'[BULLY] Got timeout error from {self.node_name}: {e}'
+                        )
+
                     times += 1
                 except SocketDisconnected as e:
                     logger.warning(
@@ -88,14 +92,9 @@ class BullyNode:
                 f'[BULLY] Error ocurred while sending message to {self.node_name} ID {self.node_id}: {e}'
             )
 
-    def _is_running(self) -> bool:
-        with self.is_running_lock:
-            return self.is_running
-
     def stop(self):
         logger.info(f'[BULLY] Stopping node {self.node_name}')
-        with self.is_running_lock:
-            self.is_running = False
+        self.is_running.stop()
 
         if self.socket:
             self.socket.stop()

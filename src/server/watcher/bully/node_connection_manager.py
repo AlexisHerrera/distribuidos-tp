@@ -3,6 +3,7 @@ from queue import SimpleQueue
 from threading import Event, Lock, Thread
 from typing import Callable
 
+from src.common.runnable import Runnable
 from src.messaging.protocol.bully import BullyProtocol
 from src.messaging.server_socket import ServerSocket
 from src.messaging.tcp_socket import TCPSocket
@@ -10,6 +11,9 @@ from src.server.watcher.bully.node import BullyNode
 from src.utils.util import IncrementerStop
 
 logger = logging.getLogger(__name__)
+
+INITIAL_VALUE = 0
+MAX_TRIES = 3
 
 
 class NodeConnectionManager:
@@ -23,8 +27,7 @@ class NodeConnectionManager:
         all_peers_connected: Event,
         is_leader: Callable[[int], bool],
     ):
-        self.is_running_lock = Lock()
-        self.is_running = True
+        self.is_running = Runnable()
         self.port = port
         self.server: ServerSocket = ServerSocket(self.port, backlog=len(peers) + 1)
 
@@ -55,7 +58,7 @@ class NodeConnectionManager:
         self._connect_to_peers()
 
         try:
-            while self._is_running():
+            while self.is_running():
                 try:
                     client_socket, addr = self.server.accept()
 
@@ -125,12 +128,12 @@ class NodeConnectionManager:
             if self.node_id > node_id:
                 continue
 
-            inc = IncrementerStop(0, 3)
+            condition = IncrementerStop(INITIAL_VALUE, MAX_TRIES)
 
             socket = TCPSocket.connect_while_condition(
                 node_name,
                 self.port,
-                condition=inc.run,
+                condition=condition.run,
                 timeout=self.timeout,
             )
 
@@ -140,7 +143,7 @@ class NodeConnectionManager:
 
     def reconnect(self, node_name: int) -> TCPSocket:
         return TCPSocket.connect_while_condition(
-            node_name, self.port, condition=self._is_running, timeout=self.timeout
+            node_name, self.port, condition=self.is_running, timeout=self.timeout
         )
 
     def send(self, node_name: str, message: BullyProtocol):
@@ -175,14 +178,9 @@ class NodeConnectionManager:
         node_name = self._get_node_name_by_id(node_id)
         self.send(node_name, message)
 
-    def _is_running(self) -> bool:
-        with self.is_running_lock:
-            return self.is_running
-
     def stop(self):
         logger.info(f'[BULLY] Stopping connection manager {self.node_id}')
-        with self.is_running_lock:
-            self.is_running = False
+        self.is_running.stop()
 
         self.server.stop()
 

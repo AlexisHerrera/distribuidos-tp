@@ -4,6 +4,7 @@ from queue import SimpleQueue
 from threading import Event, Lock, Thread, Timer
 from typing import Callable
 
+from src.common.runnable import Runnable
 from src.messaging.protocol.bully import BullyProtocol
 from src.server.watcher.bully.node_connection_manager import NodeConnectionManager
 from src.server.watcher.bully.state_manager import BullyState, BullyStateManager
@@ -55,8 +56,7 @@ class Bully:
             is_leader=self._is_leader,
         )
 
-        self.is_running_lock = Lock()
-        self.is_running = True
+        self.is_running = Runnable()
 
         self.state: BullyStateManager = BullyStateManager(
             BullyState.ELECTION, self.node_id
@@ -97,7 +97,7 @@ class Bully:
         self.change_leader.wait()
         self.change_leader.clear()
 
-        while self._is_running():
+        while self.is_running():
             if self.am_i_leader():
                 logger.info('[BULLY] Beginning leader tasks...')
                 self.as_leader(self.change_leader)
@@ -157,7 +157,7 @@ class Bully:
     def _manage_recv(self):
         logger.info('[BULLY] Begin manage recv')
 
-        while self._is_running():
+        while self.is_running():
             (message, node_id, node_name) = self.message_queue.get()
             logger.debug(f'[BULLY] Received message {message} from {node_id}')
 
@@ -193,10 +193,6 @@ class Bully:
                 case _:  # Exit loop
                     break
 
-    def _is_running(self) -> bool:
-        with self.is_running_lock:
-            return self.is_running
-
     def _stop_timer(self):
         with self.timer_lock:
             if self.timer:
@@ -205,8 +201,7 @@ class Bully:
 
     def stop(self):
         logger.info('[BULLY] Stopping')
-        with self.is_running_lock:
-            self.is_running = False
+        self.is_running.stop()
 
         self.state.set_state(BullyState.END)
 

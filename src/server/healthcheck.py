@@ -2,6 +2,7 @@ import logging
 import threading
 from queue import Empty, SimpleQueue
 
+from src.common.runnable import Runnable
 from src.messaging.protocol.healthcheck import HealthcheckProtocol
 from src.messaging.server_socket import ServerSocket
 from src.messaging.tcp_socket import TCPSocket
@@ -12,8 +13,7 @@ logger = logging.getLogger(__name__)
 class Healthcheck:
     def __init__(self, healthcheck_port: int):
         self.socket = ServerSocket(healthcheck_port, 5)
-        self.is_running_lock = threading.Lock()
-        self.is_running = True
+        self.is_running: Runnable = Runnable()
         self.manager_queue: SimpleQueue = SimpleQueue()
         self.clients: dict[tuple, (threading.Thread, TCPSocket)] = {}
         logger.info('[HEALTHCHECK] Initiated healthcheck')
@@ -22,7 +22,7 @@ class Healthcheck:
 
     def _manage_client(self, socket: TCPSocket, addr: tuple):
         try:
-            while self._is_running():
+            while self.is_running():
                 message = socket.recv(HealthcheckProtocol.MESSAGE_BYTES_AMOUNT)
                 logger.debug(f'[HEALTHCHECK] Received {message} from {addr}')
 
@@ -51,7 +51,7 @@ class Healthcheck:
 
     def run(self):
         try:
-            while self._is_running():
+            while self.is_running():
                 healthchecker_socket, addr = self.socket.accept()
                 logger.info(
                     f'[HEALTHCHECK] Received new healthchecker from {TCPSocket.gethostbyaddress(addr)}'
@@ -69,14 +69,9 @@ class Healthcheck:
         except Exception as e:
             logger.error(f'[HEALTHCHECK] Healthcheck error: {e}')
 
-    def _is_running(self):
-        with self.is_running_lock:
-            return self.is_running
-
     def stop(self):
         logger.info('[HEALTHCHECK] Stopping healthcheck')
-        with self.is_running_lock:
-            self.is_running = False
+        self.is_running.stop()
 
         for _, (client, socket) in self.clients.items():
             socket.stop()

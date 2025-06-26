@@ -1,3 +1,7 @@
 max_stop: 3
 frequency: 10
 log_level: INFO
+nodes_filters:
+  - chaos_monkey
+  - ratings_joiner
+  - cast_joiner

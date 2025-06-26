@@ -75,7 +75,7 @@ class WatcherConfig:
                 node_id, node_name = p.split(':')
                 self.peers[node_name] = int(node_id)
 
-        filters = ['watcher', 'chaos_monkey']
+        filters = config.get('nodes_filters', ['watcher', 'chaos_monkey'])
         self.nodes: list[str] = NodesList(filters=filters).nodes
 
         self.log_level: str = config.get('log_level', 'INFO')
@@ -83,18 +83,17 @@ class WatcherConfig:
 
 class ChaosMonkeyConfig:
     def __init__(self, filename: str = 'config.yaml'):
-        data = {}
+        config = {}
         with open(filename, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f)
+            config = yaml.safe_load(f)
 
-        self.__dict__.update(data)
+        self.__dict__.update(config)
 
         if 'log_level' not in self.__dict__:
             self.log_level = 'INFO'
 
-        self.nodes = NodesList(
-            filters=['chaos_monkey', 'ratings_joiner', 'cast_joiner']
-        ).nodes
+        filters = config.get('nodes_filters', ['chaos_monkey'])
+        self.nodes = NodesList(filters=filters).nodes
 
 
 class NodesList:
@@ -102,10 +101,13 @@ class NodesList:
         self.nodes: list[str] = []
         with open(filename, 'r', encoding='utf-8') as f:
             for line in f:
-                no_new_line = line.replace('\n', '')
-                node_name = no_new_line.strip('\n ')
+                node_name = clean_line(line)
                 if not filter_node(node_name, filters):
                     self.nodes.append(node_name)
+
+
+def clean_line(line: str):
+    return line.replace('\n', '').strip('\n ')
 
 
 def filter_node(node_name: str, filters: list[str]) -> bool:
@@ -115,7 +117,7 @@ def filter_node(node_name: str, filters: list[str]) -> bool:
         return filtered
 
     for filter in filters:
-        if node_name.startswith(filter):
+        if filter in node_name:
             filtered = True
             break
 

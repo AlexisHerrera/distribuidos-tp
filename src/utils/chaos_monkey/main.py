@@ -3,8 +3,8 @@ import random
 import signal
 import subprocess
 from queue import Empty, SimpleQueue
-from threading import Lock
 
+from src.common.runnable import Runnable
 from src.utils.config import ChaosMonkeyConfig
 from src.utils.log import initialize_log
 
@@ -21,8 +21,7 @@ class ChaosMonkey:
         self.frequency = config.frequency
         self.nodes = config.nodes
 
-        self.is_running_lock = Lock()
-        self.is_running = True
+        self.is_running = Runnable()
         self.exit_queue: SimpleQueue = SimpleQueue()
         self._setup_signal_handlers()
         logger.info(
@@ -41,7 +40,7 @@ class ChaosMonkey:
         logger.info('Signal handlers configured.')
 
     def run(self):
-        while self._is_running():
+        while self.is_running():
             nodes = random.choices(
                 self.nodes, k=random.randint(MINIMUM_STOP_SERVICES, self.max_stop)
             )
@@ -70,14 +69,9 @@ class ChaosMonkey:
             )
         )
 
-    def _is_running(self) -> bool:
-        with self.is_running_lock:
-            return self.is_running
-
     def stop(self):
         logger.info('[CHAOS_MONKEY] Stopping')
-        with self.is_running_lock:
-            self.is_running = False
+        self.is_running.stop()
 
         self.exit_queue.put(EXIT_QUEUE)
 
