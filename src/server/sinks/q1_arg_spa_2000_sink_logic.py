@@ -32,6 +32,8 @@ class Q1ArgSpa2000(BaseSinkLogic):
 
     def message_result(self, user_id: uuid.UUID) -> Message:
         result = self.final_movies_and_genres.pop(user_id, [])
+        # Just to get consistent results
+        result.sort(key=lambda movie: movie.id)
 
         logger.info(f'Final Movie Genre for user {user_id}: count {len(result)}')
         for movies_genre in result:
