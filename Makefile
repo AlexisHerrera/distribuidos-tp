@@ -17,10 +17,8 @@ docker-compose-logs:
 	docker compose -f docker-compose.yaml logs -f
 .PHONY: docker-compose-logs
 
+interval=2
 watch:
-	@if [ -z "$(interval)" ]; then \
-		interval=2; \
-	fi
 	@echo "Using interval of $(interval) seconds"
 	watch -n $(interval) 'docker ps -a --filter "network=tp-escalabilidad_testing_net" --format "table {{.ID}}\t{{.State}}\t{{.Names}}\t{{.Status}}"'
 .PHONY: watch
