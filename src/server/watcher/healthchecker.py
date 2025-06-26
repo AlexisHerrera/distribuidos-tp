@@ -1,8 +1,8 @@
 import logging
 import subprocess
-import time
 from threading import Lock
 
+from src.common.cancellable_sleep import CancellableSleep
 from src.common.runnable import Runnable
 from src.messaging.protocol.healthcheck import HealthcheckProtocol
 from src.messaging.tcp_socket import SocketDisconnected, TCPSocket
@@ -20,6 +20,8 @@ class Healthchecker:
         self.port = port
         self.timeout = timeout
         self.reconnection_timeout = reconnection_timeout
+
+        self.sleep = CancellableSleep()
 
         self.is_running = Runnable()
 
@@ -52,7 +54,7 @@ class Healthchecker:
                             f'[HEALTHCHECKER] Received healthcheck from {self.node_name}. Sleeping...'
                         )
                         healthcheck = 0
-                        time.sleep(self.timeout)
+                        self.sleep(self.timeout)
                 except TimeoutError:
                     healthcheck += 1
                     logger.debug(
@@ -99,7 +101,7 @@ class Healthchecker:
                 logger.warning(
                     f'[HEALTHCHECKER] Could not restart and reconnect to {self.node_name}: {e}'
                 )
-            time.sleep(self.reconnection_timeout)
+            self.sleep(self.reconnection_timeout)
 
     def _restart_service(self):
         logger.info(f'[HEALTHCHECKER] Restarting service {self.node_name}')
@@ -128,3 +130,5 @@ class Healthchecker:
         with self.socket_lock:
             if self.socket:
                 self.socket.stop()
+
+        self.sleep.cancel()

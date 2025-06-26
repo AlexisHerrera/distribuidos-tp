@@ -1,9 +1,9 @@
 import logging
-import time
 from queue import SimpleQueue
 from threading import Event, Lock, Thread, Timer
 from typing import Callable
 
+from src.common.cancellable_sleep import CancellableSleep
 from src.common.runnable import Runnable
 from src.messaging.protocol.bully import BullyProtocol
 from src.server.watcher.bully.node_connection_manager import NodeConnectionManager
@@ -45,6 +45,8 @@ class Bully:
         self.message_queue: SimpleQueue = SimpleQueue()
         self.all_peers_connected: Event = Event()
         self.timeout = connection_timeout
+
+        self.sleep = CancellableSleep()
 
         self.nodes: NodeConnectionManager = NodeConnectionManager(
             port=port,
@@ -116,7 +118,7 @@ class Bully:
                 self.nodes.send_by_id(actual_leader, BullyProtocol.ALIVE)
             except Exception as e:
                 logger.warning(f'[BULLY] Could not send ALIVE to leader: {e}')
-            time.sleep(2)
+            self.sleep(self.timeout)
 
     def _send_coordinator(self):
         self.nodes.send_all(BullyProtocol.COORDINATOR)
@@ -204,6 +206,8 @@ class Bully:
         self.is_running.stop()
 
         self.state.set_state(BullyState.END)
+
+        self.sleep.cancel()
 
         self._stop_timer()
 

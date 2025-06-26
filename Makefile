@@ -18,7 +18,11 @@ docker-compose-logs:
 .PHONY: docker-compose-logs
 
 watch:
-	watch 'docker ps -a --filter "network=tp-escalabilidad_testing_net" --format "table {{.ID}}\t{{.State}}\t{{.Names}}\t{{.Status}}"'
+	@if [ -z "$(interval)" ]; then \
+		interval=2; \
+	fi
+	@echo "Using interval of $(interval) seconds"
+	watch -n $(interval) 'docker ps -a --filter "network=tp-escalabilidad_testing_net" --format "table {{.ID}}\t{{.State}}\t{{.Names}}\t{{.Status}}"'
 .PHONY: watch
 
 monkey-up:
@@ -33,6 +37,10 @@ monkey-down:
 chaos:
 	docker compose -f docker-compose.yaml --profile chaos up -d --build
 .PHONY: chaos
+
+chaos-down:
+	docker compose --profile chaos down
+.PHONY: chaos-down
 
 # make restart service=client-1
 restart:
